@@ -151,13 +151,14 @@ export function AdminCreditsTab() {
   const saveGlobalSettings = async () => {
     const { error } = await supabase
       .from("admin_settings")
-      .update({
+      .upsert({
+        key: "global_credits",
         value: { initial_balance: Number(initialBalance), cost_multiplier: Number(costMultiplier) },
         updated_at: new Date().toISOString(),
-      })
-      .eq("key", "global_credits");
+      }, { onConflict: "key" });
 
     if (error) {
+      console.error("Erro ao salvar global_credits:", error);
       toast.error("Erro ao salvar configurações");
     } else {
       toast.success("Configurações salvas!");

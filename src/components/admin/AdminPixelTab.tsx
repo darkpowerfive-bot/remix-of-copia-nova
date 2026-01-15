@@ -1124,18 +1124,22 @@ export function AdminPixelTab() {
     setSavingTracking(true);
     const { error } = await supabase
       .from("admin_settings")
-      .update({
+      .upsert({
+        key: "tracking",
         value: {
           facebook_pixel: facebookPixel,
           google_ads_email: googleAdsEmail,
           google_ads_conversion: googleAdsConversion,
         },
         updated_at: new Date().toISOString(),
-      })
-      .eq("key", "tracking");
+      }, { onConflict: "key" });
 
-    if (error) toast.error("Erro ao salvar");
-    else toast.success("Configurações de tracking salvas!");
+    if (error) {
+      console.error("Erro ao salvar tracking:", error);
+      toast.error("Erro ao salvar");
+    } else {
+      toast.success("Configurações de tracking salvas!");
+    }
     setSavingTracking(false);
   };
 
@@ -1145,13 +1149,14 @@ export function AdminPixelTab() {
       .from("admin_settings")
       .select("value")
       .eq("key", "notifications")
-      .single();
+      .maybeSingle();
 
     const currentValue = (current?.value as Record<string, any>) || {};
 
     const { error } = await supabase
       .from("admin_settings")
-      .update({
+      .upsert({
+        key: "notifications",
         value: {
           ...currentValue,
           whatsapp_id: whatsappId,
@@ -1159,11 +1164,14 @@ export function AdminPixelTab() {
           whatsapp_webhook: webhookUrl,
         },
         updated_at: new Date().toISOString(),
-      })
-      .eq("key", "notifications");
+      }, { onConflict: "key" });
 
-    if (error) toast.error("Erro ao salvar");
-    else toast.success("Configurações WhatsApp salvas!");
+    if (error) {
+      console.error("Erro ao salvar WhatsApp:", error);
+      toast.error("Erro ao salvar");
+    } else {
+      toast.success("Configurações WhatsApp salvas!");
+    }
     setSavingWhatsapp(false);
   };
 
