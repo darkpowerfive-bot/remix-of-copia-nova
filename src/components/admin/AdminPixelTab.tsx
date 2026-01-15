@@ -41,7 +41,7 @@ interface EmailTemplate {
 }
 
 // Default email logo URL
-const DEFAULT_EMAIL_LOGO = "https://kabnbvnephjifeazaiis.supabase.co/storage/v1/object/public/avatars/logo-email.gif";
+const DEFAULT_EMAIL_LOGO = "https://id-preview--cdd97740-cd0b-499e-a264-a7c891bc80ec.lovable.app/images/logo-email.gif";
 
 // Function to generate email header with dynamic logo
 const getEmailHeader = (logoUrl: string) => `<!DOCTYPE html>
