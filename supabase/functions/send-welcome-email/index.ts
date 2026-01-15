@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[SEND-WELCOME-EMAIL] ${step}${detailsStr}`);
 };
 
@@ -21,6 +21,75 @@ interface SmtpSettings {
   fromName?: string;
 }
 
+const DEFAULT_EMAIL_LOGO_PATH = "/images/logo-email.gif";
+
+const escapeRegExp = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const extractLogoUrlFromHtml = (html: string): string | null => {
+  const m = html.match(/src\s*=\s*"([^"]*logo-email\.(?:gif|png|jpe?g|webp)(?:\?[^\"]*)?)"/i);
+  return m?.[1] ?? null;
+};
+
+const resolveToAbsoluteUrl = (raw: string, origin: string | null): string | null => {
+  if (!raw) return null;
+  if (/^cid:/i.test(raw)) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("/") && origin) return `${origin}${raw}`;
+  return null;
+};
+
+const embedLogoAsCid = async (html: string, origin: string | null) => {
+  const extracted = extractLogoUrlFromHtml(html);
+  const fallback = origin ? `${origin}${DEFAULT_EMAIL_LOGO_PATH}` : null;
+  const logoUrl = resolveToAbsoluteUrl(extracted ?? "", origin) ?? fallback;
+
+  // Replace placeholder + any logo-email.* src with cid
+  let out = html.replace(/\{\{logo_url\}\}/g, "cid:logo-email");
+  out = out.replace(
+    /src\s*=\s*"[^"]*logo-email\.(?:gif|png|jpe?g|webp)(?:\?[^\"]*)?"/gi,
+    'src="cid:logo-email"'
+  );
+  if (extracted) out = out.replace(new RegExp(escapeRegExp(extracted), "g"), "cid:logo-email");
+
+  if (!logoUrl || /^cid:/i.test(logoUrl)) {
+    return { html: out, attachments: [] as any[] };
+  }
+
+  try {
+    const res = await fetch(logoUrl);
+    if (!res.ok) {
+      console.warn("Logo fetch failed", { logoUrl, status: res.status });
+      return { html: out, attachments: [] as any[] };
+    }
+
+    const contentType = res.headers.get("content-type") || "image/gif";
+    const bytes = new Uint8Array(await res.arrayBuffer());
+
+    const filename = contentType.includes("png")
+      ? "logo-email.png"
+      : contentType.includes("jpeg")
+        ? "logo-email.jpg"
+        : contentType.includes("webp")
+          ? "logo-email.webp"
+          : "logo-email.gif";
+
+    return {
+      html: out,
+      attachments: [
+        {
+          filename,
+          content: bytes,
+          cid: "logo-email",
+          contentType,
+        },
+      ],
+    };
+  } catch (e) {
+    console.warn("Logo fetch error", { logoUrl, error: String(e) });
+    return { html: out, attachments: [] as any[] };
+  }
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -30,7 +99,7 @@ serve(async (req) => {
     logStep("Function started");
 
     const { email, fullName } = await req.json();
-    
+
     if (!email) {
       throw new Error("Email é obrigatório");
     }
@@ -41,7 +110,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false }
+      auth: { persistSession: false },
     });
 
     // Fetch welcome template
@@ -82,7 +151,8 @@ serve(async (req) => {
     let emailBody = template.body;
 
     const userName = fullName || email.split("@")[0] || "Operador";
-    const dashboardUrl = `${req.headers.get("origin") || "https://premium-channel-hub.lovable.app"}/dashboard`;
+    const origin = req.headers.get("origin");
+    const dashboardUrl = `${origin || "https://premium-channel-hub.lovable.app"}/dashboard`;
 
     const variables: Record<string, string> = {
       "{{nome}}": userName,
@@ -92,10 +162,11 @@ serve(async (req) => {
       "{{action_link}}": dashboardUrl,
       "{{confirmation_link}}": dashboardUrl,
       "{{data}}": new Date().toLocaleDateString("pt-BR"),
+      "{{logo_url}}": origin ? `${origin}${DEFAULT_EMAIL_LOGO_PATH}` : DEFAULT_EMAIL_LOGO_PATH,
     };
 
     for (const [key, value] of Object.entries(variables)) {
-      const regex = new RegExp(key.replace(/[{}]/g, '\\$&'), "g");
+      const regex = new RegExp(key.replace(/[{}]/g, "\\$&"), "g");
       emailSubject = emailSubject.replace(regex, value);
       emailBody = emailBody.replace(regex, value);
     }
@@ -123,11 +194,14 @@ serve(async (req) => {
 
     const fromName = smtpSettings.fromName || "La Casa Dark Core";
 
+    const embedded = await embedLogoAsCid(emailBody, origin);
+
     await transporter.sendMail({
       from: `${fromName} <${smtpSettings.email}>`,
       to: email,
       subject: emailSubject,
-      html: emailBody,
+      html: embedded.html,
+      attachments: embedded.attachments,
     });
 
     logStep("Email sent successfully", { to: email });
@@ -136,14 +210,14 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: errorMessage });
-    
+
     return new Response(JSON.stringify({ success: false, error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
   }
 });
+

@@ -9,7 +9,7 @@ const corsHeaders = {
 };
 
 const logStep = (step: string, details?: any) => {
-  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[AUTH-EMAIL-HOOK] ${step}${detailsStr}`);
 };
 
@@ -24,11 +24,79 @@ interface SmtpSettings {
 
 // Map auth email types to our template types
 const AUTH_TYPE_TO_TEMPLATE: Record<string, string> = {
-  "recovery": "password_reset",
-  "signup": "welcome",
-  "magiclink": "welcome",
-  "invite": "welcome",
-  "email_change": "welcome",
+  recovery: "password_reset",
+  signup: "welcome",
+  magiclink: "welcome",
+  invite: "welcome",
+  email_change: "welcome",
+};
+
+const DEFAULT_EMAIL_LOGO_PATH = "/images/logo-email.gif";
+
+const escapeRegExp = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const extractLogoUrlFromHtml = (html: string): string | null => {
+  const m = html.match(/src\s*=\s*"([^"]*logo-email\.(?:gif|png|jpe?g|webp)(?:\?[^\"]*)?)"/i);
+  return m?.[1] ?? null;
+};
+
+const resolveToAbsoluteUrl = (raw: string, origin: string | null): string | null => {
+  if (!raw) return null;
+  if (/^cid:/i.test(raw)) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("/") && origin) return `${origin}${raw}`;
+  return null;
+};
+
+const embedLogoAsCid = async (html: string, origin: string | null) => {
+  const extracted = extractLogoUrlFromHtml(html);
+  const fallback = origin ? `${origin}${DEFAULT_EMAIL_LOGO_PATH}` : null;
+  const logoUrl = resolveToAbsoluteUrl(extracted ?? "", origin) ?? fallback;
+
+  let out = html.replace(/\{\{logo_url\}\}/g, "cid:logo-email");
+  out = out.replace(
+    /src\s*=\s*"[^"]*logo-email\.(?:gif|png|jpe?g|webp)(?:\?[^\"]*)?"/gi,
+    'src="cid:logo-email"'
+  );
+  if (extracted) out = out.replace(new RegExp(escapeRegExp(extracted), "g"), "cid:logo-email");
+
+  if (!logoUrl || /^cid:/i.test(logoUrl)) {
+    return { html: out, attachments: [] as any[] };
+  }
+
+  try {
+    const res = await fetch(logoUrl);
+    if (!res.ok) {
+      console.warn("Logo fetch failed", { logoUrl, status: res.status });
+      return { html: out, attachments: [] as any[] };
+    }
+
+    const contentType = res.headers.get("content-type") || "image/gif";
+    const bytes = new Uint8Array(await res.arrayBuffer());
+
+    const filename = contentType.includes("png")
+      ? "logo-email.png"
+      : contentType.includes("jpeg")
+        ? "logo-email.jpg"
+        : contentType.includes("webp")
+          ? "logo-email.webp"
+          : "logo-email.gif";
+
+    return {
+      html: out,
+      attachments: [
+        {
+          filename,
+          content: bytes,
+          cid: "logo-email",
+          contentType,
+        },
+      ],
+    };
+  } catch (e) {
+    console.warn("Logo fetch error", { logoUrl, error: String(e) });
+    return { html: out, attachments: [] as any[] };
+  }
 };
 
 serve(async (req) => {
@@ -36,17 +104,15 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-    { auth: { persistSession: false } }
-  );
+  const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", {
+    auth: { persistSession: false },
+  });
 
   try {
     logStep("Function started");
 
     const hookSecret = Deno.env.get("AUTH_EMAIL_HOOK_SECRET");
-    
+
     // Parse the payload
     const payload = await req.text();
     let emailData: any;
@@ -68,9 +134,9 @@ serve(async (req) => {
       emailData = JSON.parse(payload);
     }
 
-    logStep("Email data received", { 
+    logStep("Email data received", {
       type: emailData?.email_data?.email_action_type,
-      email: emailData?.user?.email 
+      email: emailData?.user?.email,
     });
 
     const user = emailData?.user;
@@ -90,7 +156,7 @@ serve(async (req) => {
 
     // Get the template type for this auth action
     const templateType = AUTH_TYPE_TO_TEMPLATE[email_action_type];
-    
+
     if (!templateType) {
       logStep("No template mapping for action type, using default", { type: email_action_type });
       return new Response(JSON.stringify({}), {
@@ -147,7 +213,7 @@ serve(async (req) => {
     // Build the reset/action URL
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     let actionUrl = "";
-    
+
     if (email_action_type === "recovery") {
       // For password recovery, build the Supabase auth verification URL
       const baseRedirect = redirect_to || site_url || "https://premium-channel-hub.lovable.app";
@@ -175,11 +241,12 @@ serve(async (req) => {
       "{{confirmation_link}}": actionUrl,
       "{{token}}": token || "",
       "{{data}}": new Date().toLocaleDateString("pt-BR"),
+      "{{logo_url}}": site_url ? `${site_url}${DEFAULT_EMAIL_LOGO_PATH}` : DEFAULT_EMAIL_LOGO_PATH,
     };
 
     for (const [key, value] of Object.entries(variables)) {
-      emailSubject = emailSubject.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), "g"), value);
-      emailBody = emailBody.replace(new RegExp(key.replace(/[{}]/g, '\\$&'), "g"), value);
+      emailSubject = emailSubject.replace(new RegExp(key.replace(/[{}]/g, "\\$&"), "g"), value);
+      emailBody = emailBody.replace(new RegExp(key.replace(/[{}]/g, "\\$&"), "g"), value);
     }
 
     logStep("Template variables replaced");
@@ -205,11 +272,14 @@ serve(async (req) => {
 
     const fromName = smtpSettings.fromName || "La Casa Dark Core";
 
+    const embedded = await embedLogoAsCid(emailBody, site_url || null);
+
     await transporter.sendMail({
       from: `${fromName} <${smtpSettings.email}>`,
       to: user.email,
       subject: emailSubject,
-      html: emailBody,
+      html: embedded.html,
+      attachments: embedded.attachments,
     });
 
     logStep("Custom email sent successfully", { to: user.email, template: templateType });
@@ -220,11 +290,10 @@ serve(async (req) => {
       status: 200,
       headers: { "Content-Type": "application/json", ...corsHeaders },
     });
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in send-auth-email", { message: errorMessage });
-    
+
     // Return empty response even on error to not block auth flow
     // The default Supabase email will be sent
     return new Response(JSON.stringify({}), {
