@@ -250,35 +250,55 @@ export const AdminExportDataTab = () => {
   const processJsonContent = (content: string, fileName: string) => {
     try {
       const parsed = JSON.parse(content);
+      const extracted = extractTableData(parsed, fileName);
       
-      // Validate structure
-      if (typeof parsed !== "object" || Array.isArray(parsed)) {
-        toast.error("Arquivo inválido. Esperado objeto com tabelas.");
-        return;
-      }
-
-      // Check which tables exist in the import
-      const validTables = Object.keys(parsed).filter(table => 
-        ALL_TABLES.some(t => t.name === table) && Array.isArray(parsed[table])
-      );
-
+      const validTables = Object.keys(extracted);
       if (validTables.length === 0) {
-        toast.error("Nenhuma tabela válida encontrada no arquivo.");
+        toast.error("Nenhuma tabela válida encontrada no arquivo. Verifique se a estrutura é compatível.");
+        console.log("Estrutura do arquivo:", typeof parsed, Array.isArray(parsed) ? "array" : "object");
         return;
       }
 
-      const filteredData: Record<string, any[]> = {};
-      validTables.forEach(table => {
-        filteredData[table] = parsed[table];
-      });
-
-      setImportData(filteredData);
+      setImportData(extracted);
       setImportFileName(fileName);
       setImportModalOpen(true);
     } catch (error) {
       console.error("Erro ao processar JSON:", error);
       toast.error("Erro ao ler arquivo. Verifique se é um JSON válido.");
     }
+  };
+
+  // Try to extract table data from various JSON structures
+  const extractTableData = (parsed: any, fileName: string): Record<string, any[]> => {
+    const result: Record<string, any[]> = {};
+    
+    // Case 1: Direct table structure { table_name: [...], table_name2: [...] }
+    if (typeof parsed === "object" && !Array.isArray(parsed)) {
+      for (const [key, value] of Object.entries(parsed)) {
+        if (Array.isArray(value) && ALL_TABLES.some(t => t.name === key)) {
+          result[key] = value;
+        }
+      }
+    }
+    
+    // Case 2: Array of records - try to guess table from filename
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      // Try to extract table name from filename (e.g., "profiles.json" -> "profiles")
+      const baseName = fileName.replace(/\.json$/i, "").split("/").pop() || "";
+      const cleanName = baseName.replace(/[^a-z_]/gi, "_").toLowerCase();
+      
+      const matchingTable = ALL_TABLES.find(t => 
+        t.name === cleanName || 
+        cleanName.includes(t.name) ||
+        t.name.includes(cleanName)
+      );
+      
+      if (matchingTable) {
+        result[matchingTable.name] = parsed;
+      }
+    }
+    
+    return result;
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -293,7 +313,7 @@ export const AdminExportDataTab = () => {
         const zip = new JSZip();
         const zipContent = await zip.loadAsync(file);
         
-        // Find JSON files in the ZIP
+        // Find JSON files in the ZIP (including in subdirectories)
         const jsonFiles = Object.keys(zipContent.files).filter(name => 
           name.toLowerCase().endsWith(".json") && !zipContent.files[name].dir
         );
@@ -303,42 +323,55 @@ export const AdminExportDataTab = () => {
           return;
         }
 
-        // If multiple JSON files, merge them
+        // Process all JSON files and merge them
         const allData: Record<string, any[]> = {};
+        const processedFiles: string[] = [];
+        const skippedFiles: string[] = [];
         
         for (const jsonFile of jsonFiles) {
-          const content = await zipContent.files[jsonFile].async("string");
           try {
+            const content = await zipContent.files[jsonFile].async("string");
             const parsed = JSON.parse(content);
-            if (typeof parsed === "object" && !Array.isArray(parsed)) {
+            const extracted = extractTableData(parsed, jsonFile);
+            
+            if (Object.keys(extracted).length > 0) {
+              processedFiles.push(jsonFile);
               // Merge tables from this file
-              for (const [table, data] of Object.entries(parsed)) {
-                if (ALL_TABLES.some(t => t.name === table) && Array.isArray(data)) {
-                  if (allData[table]) {
-                    allData[table] = [...allData[table], ...data];
-                  } else {
-                    allData[table] = data;
-                  }
+              for (const [table, data] of Object.entries(extracted)) {
+                if (allData[table]) {
+                  allData[table] = [...allData[table], ...data];
+                } else {
+                  allData[table] = data;
                 }
               }
+            } else {
+              skippedFiles.push(jsonFile);
             }
           } catch (e) {
             console.error(`Erro ao processar ${jsonFile}:`, e);
+            skippedFiles.push(jsonFile);
           }
         }
 
         const validTables = Object.keys(allData);
         if (validTables.length === 0) {
-          toast.error("Nenhuma tabela válida encontrada nos arquivos JSON do ZIP.");
+          const filesList = jsonFiles.slice(0, 3).join(", ") + (jsonFiles.length > 3 ? "..." : "");
+          toast.error(`Nenhuma tabela válida encontrada. Arquivos: ${filesList}. Verifique se a estrutura é compatível.`);
+          console.log("Arquivos encontrados no ZIP:", jsonFiles);
+          console.log("Arquivos ignorados:", skippedFiles);
           return;
         }
 
+        if (skippedFiles.length > 0) {
+          console.log("Arquivos ignorados (estrutura não reconhecida):", skippedFiles);
+        }
+
         setImportData(allData);
-        setImportFileName(`${file.name} (${jsonFiles.length} arquivo(s) JSON)`);
+        setImportFileName(`${file.name} (${processedFiles.length} arquivo(s) processado(s))`);
         setImportModalOpen(true);
       } catch (error) {
         console.error("Erro ao processar ZIP:", error);
-        toast.error("Erro ao ler arquivo ZIP.");
+        toast.error("Erro ao ler arquivo ZIP. Verifique se o arquivo não está corrompido.");
       }
     } 
     // Handle JSON files
