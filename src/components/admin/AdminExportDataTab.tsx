@@ -19,9 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Database, FileJson, FileSpreadsheet, Download, Loader2, Upload, AlertTriangle } from "lucide-react";
+import { Database, FileJson, FileSpreadsheet, Download, Loader2, Upload, AlertTriangle, FileArchive } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import JSZip from "jszip";
 
 interface TableInfo {
   name: string;
@@ -246,47 +247,111 @@ export const AdminExportDataTab = () => {
   };
 
   // Import functions
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const processJsonContent = (content: string, fileName: string) => {
+    try {
+      const parsed = JSON.parse(content);
+      
+      // Validate structure
+      if (typeof parsed !== "object" || Array.isArray(parsed)) {
+        toast.error("Arquivo inválido. Esperado objeto com tabelas.");
+        return;
+      }
+
+      // Check which tables exist in the import
+      const validTables = Object.keys(parsed).filter(table => 
+        ALL_TABLES.some(t => t.name === table) && Array.isArray(parsed[table])
+      );
+
+      if (validTables.length === 0) {
+        toast.error("Nenhuma tabela válida encontrada no arquivo.");
+        return;
+      }
+
+      const filteredData: Record<string, any[]> = {};
+      validTables.forEach(table => {
+        filteredData[table] = parsed[table];
+      });
+
+      setImportData(filteredData);
+      setImportFileName(fileName);
+      setImportModalOpen(true);
+    } catch (error) {
+      console.error("Erro ao processar JSON:", error);
+      toast.error("Erro ao ler arquivo. Verifique se é um JSON válido.");
+    }
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setImportFileName(file.name);
+    const fileName = file.name.toLowerCase();
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
+    // Handle ZIP files
+    if (fileName.endsWith(".zip")) {
       try {
-        const content = e.target?.result as string;
-        const parsed = JSON.parse(content);
+        const zip = new JSZip();
+        const zipContent = await zip.loadAsync(file);
         
-        // Validate structure
-        if (typeof parsed !== "object" || Array.isArray(parsed)) {
-          toast.error("Arquivo inválido. Esperado objeto com tabelas.");
-          return;
-        }
-
-        // Check which tables exist in the import
-        const validTables = Object.keys(parsed).filter(table => 
-          ALL_TABLES.some(t => t.name === table) && Array.isArray(parsed[table])
+        // Find JSON files in the ZIP
+        const jsonFiles = Object.keys(zipContent.files).filter(name => 
+          name.toLowerCase().endsWith(".json") && !zipContent.files[name].dir
         );
 
-        if (validTables.length === 0) {
-          toast.error("Nenhuma tabela válida encontrada no arquivo.");
+        if (jsonFiles.length === 0) {
+          toast.error("Nenhum arquivo JSON encontrado no ZIP.");
           return;
         }
 
-        const filteredData: Record<string, any[]> = {};
-        validTables.forEach(table => {
-          filteredData[table] = parsed[table];
-        });
+        // If multiple JSON files, merge them
+        const allData: Record<string, any[]> = {};
+        
+        for (const jsonFile of jsonFiles) {
+          const content = await zipContent.files[jsonFile].async("string");
+          try {
+            const parsed = JSON.parse(content);
+            if (typeof parsed === "object" && !Array.isArray(parsed)) {
+              // Merge tables from this file
+              for (const [table, data] of Object.entries(parsed)) {
+                if (ALL_TABLES.some(t => t.name === table) && Array.isArray(data)) {
+                  if (allData[table]) {
+                    allData[table] = [...allData[table], ...data];
+                  } else {
+                    allData[table] = data;
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error(`Erro ao processar ${jsonFile}:`, e);
+          }
+        }
 
-        setImportData(filteredData);
+        const validTables = Object.keys(allData);
+        if (validTables.length === 0) {
+          toast.error("Nenhuma tabela válida encontrada nos arquivos JSON do ZIP.");
+          return;
+        }
+
+        setImportData(allData);
+        setImportFileName(`${file.name} (${jsonFiles.length} arquivo(s) JSON)`);
         setImportModalOpen(true);
       } catch (error) {
-        console.error("Erro ao ler arquivo:", error);
-        toast.error("Erro ao ler arquivo. Verifique se é um JSON válido.");
+        console.error("Erro ao processar ZIP:", error);
+        toast.error("Erro ao ler arquivo ZIP.");
       }
-    };
-    reader.readAsText(file);
+    } 
+    // Handle JSON files
+    else if (fileName.endsWith(".json")) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        processJsonContent(content, file.name);
+      };
+      reader.readAsText(file);
+    } else {
+      toast.error("Formato não suportado. Use arquivos .json ou .zip");
+    }
 
     // Reset input
     if (fileInputRef.current) {
@@ -397,7 +462,7 @@ export const AdminExportDataTab = () => {
               type="file"
               ref={fileInputRef}
               onChange={handleFileSelect}
-              accept=".json"
+              accept=".json,.zip"
               className="hidden"
             />
             <Button
@@ -411,7 +476,7 @@ export const AdminExportDataTab = () => {
           </div>
         </div>
         <p className="text-muted-foreground mb-6">
-          Exporte todas as tabelas do banco de dados para backup ou análise
+          Exporte todas as tabelas do banco de dados para backup ou análise. Importação suporta arquivos <Badge variant="outline" className="ml-1">.json</Badge> e <Badge variant="outline" className="ml-1">.zip</Badge>
         </p>
 
         {/* Format selector */}
