@@ -101,11 +101,33 @@ async function validateClaude(apiKey: string): Promise<boolean> {
 
 async function validateGemini(apiKey: string): Promise<boolean> {
   try {
+    console.log('Gemini validation: starting...');
+    console.log(`Gemini key format: starts with "${apiKey.substring(0, 6)}...", length: ${apiKey.length}`);
+    
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
     );
-    return response.ok;
-  } catch {
+    
+    console.log(`Gemini validation response status: ${response.status}`);
+    
+    if (response.ok) {
+      console.log('Gemini validation: success');
+      return true;
+    }
+    
+    // Log the error response for debugging
+    const errorText = await response.text();
+    console.log(`Gemini validation error: ${errorText}`);
+    
+    // Sometimes quota exceeded (429) means key is valid
+    if (response.status === 429) {
+      console.log('Gemini validation: rate limited but key is valid');
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Gemini validation error:', error);
     return false;
   }
 }
