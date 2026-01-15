@@ -1155,7 +1155,8 @@ export function AdminPixelTab() {
     setSavingSmtp(true);
     const { error } = await supabase
       .from("admin_settings")
-      .update({
+      .upsert({
+        key: "smtp",
         value: {
           host: smtpHost,
           port: Number(smtpPort),
@@ -1164,8 +1165,7 @@ export function AdminPixelTab() {
           use_ssl: useSsl,
         },
         updated_at: new Date().toISOString(),
-      })
-      .eq("key", "smtp");
+      }, { onConflict: 'key' });
 
     if (error) toast.error("Erro ao salvar SMTP");
     else toast.success("Configurações SMTP salvas!");
