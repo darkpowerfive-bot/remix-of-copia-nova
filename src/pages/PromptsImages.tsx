@@ -272,7 +272,8 @@ const PromptsImages = () => {
   };
   
   // Non-persisted states
-  const [generating, setGenerating] = useState(false);
+const [generating, setGenerating] = useState(false);
+  const [cancelGenerationRef, setCancelGenerationRef] = useState<(() => void) | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [expandedScene, setExpandedScene] = useState<number | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
@@ -4811,68 +4812,66 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Loading - Análise de Roteiro */}
-      <Dialog open={generating} onOpenChange={() => {}}>
-        <DialogContent className="max-w-sm bg-card border-primary/50 rounded-2xl shadow-xl" hideCloseButton>
-          <div className="flex flex-col items-center justify-center py-10 space-y-6">
-            {/* Logo com efeito de pulso - PADRONIZADO */}
-            <div className="relative w-24 h-24">
-              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-              <div className="absolute inset-0 bg-primary/10 rounded-full animate-pulse" />
-              <div className="relative w-24 h-24 rounded-full border-2 border-primary/50 overflow-hidden">
-                <img 
-                  src={logoGif} 
-                  alt="Loading" 
-                  className="w-full h-full object-cover scale-110"
-                />
+      {/* Indicador Flutuante - Geração de Cenas (não-bloqueante) */}
+      {generating && (
+        <div className="fixed bottom-4 right-4 z-50 bg-card border border-primary/30 rounded-lg shadow-lg p-4 w-80">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                  <img src={logoGif} alt="Loading" className="w-full h-full object-cover" />
+                </div>
+                <div className="absolute inset-0 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
               </div>
+              <span className="text-sm font-medium text-foreground">
+                {chunkProgress.total > 1 ? 'Processando Roteiro' : 'Gerando Cenas'}
+              </span>
             </div>
-            
-            {/* Mensagem de progresso */}
-            <div className="text-center space-y-1">
-              <h3 className="text-lg font-semibold text-foreground">
-                {chunkProgress.total > 1 ? 'Processando Roteiro' : 'Analisando Roteiro'}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {loadingMessage}
-              </p>
-            </div>
-
-            {/* Contador de partes (se houver mais de 1) */}
-            {chunkProgress.total > 1 && (
-              <div className="flex items-center gap-2">
-                {Array.from({ length: chunkProgress.total }).map((_, idx) => (
-                  <div 
-                    key={idx}
-                    className={cn(
-                      "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300",
-                      idx < chunkProgress.current
-                        ? "bg-primary text-primary-foreground"
-                        : idx === chunkProgress.current - 1
-                          ? "bg-primary/80 text-primary-foreground animate-pulse"
-                          : "bg-muted-foreground/20 text-muted-foreground"
-                    )}
-                  >
-                    {idx < chunkProgress.current ? (
-                      <Check className="w-3 h-3" />
-                    ) : (
-                      idx + 1
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Barra de progresso */}
-            <div className="w-full space-y-2">
-              <Progress value={progress} className="h-1.5 bg-secondary" />
-              <p className="text-xs text-center text-muted-foreground">
-                {sceneProgress.total > 0 ? `${progress}% • ${sceneProgress.done}/${sceneProgress.total}` : `${progress}%`}
-              </p>
-            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 hover:bg-destructive/20 hover:text-destructive"
+              onClick={() => {
+                if (cancelGenerationRef) {
+                  cancelGenerationRef();
+                }
+                setGenerating(false);
+              }}
+              title="Cancelar"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+
+          {/* Contador de partes */}
+          {chunkProgress.total > 1 && (
+            <div className="flex items-center gap-1 mb-2">
+              {Array.from({ length: chunkProgress.total }).map((_, idx) => (
+                <div 
+                  key={idx}
+                  className={cn(
+                    "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all",
+                    idx < chunkProgress.current
+                      ? "bg-primary text-primary-foreground"
+                      : idx === chunkProgress.current - 1
+                        ? "bg-primary/80 text-primary-foreground animate-pulse"
+                        : "bg-muted-foreground/20 text-muted-foreground"
+                  )}
+                >
+                  {idx < chunkProgress.current ? <Check className="w-2.5 h-2.5" /> : idx + 1}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <Progress value={progress} className="h-1.5 mb-2" />
+          
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{loadingMessage}</span>
+            <span>{sceneProgress.total > 0 ? `${sceneProgress.done}/${sceneProgress.total}` : `${progress}%`}</span>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Reescrita Automática de Prompt */}
       <Dialog open={bgState.rewriteProgress.isRewriting} onOpenChange={() => {}}>
