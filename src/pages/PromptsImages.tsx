@@ -1053,6 +1053,95 @@ const [generating, setGenerating] = useState(false);
 
   // Estado local para regeneração individual
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
+  const [regeneratingLost, setRegeneratingLost] = useState(false);
+
+  // Regenerar cenas perdidas com novos prompts similares gerados por IA
+  const handleRegenerateLostWithAI = async () => {
+    const lostScenes = generatedScenes.filter(s => !s.generatedImage);
+    if (lostScenes.length === 0) {
+      toast({ title: "Nenhuma cena perdida para regenerar" });
+      return;
+    }
+
+    setRegeneratingLost(true);
+
+    try {
+      // Pegar algumas cenas com imagem para usar como referência de estilo
+      const successfulScenes = generatedScenes.filter(s => s.generatedImage).slice(0, 3);
+      const referencePrompts = successfulScenes.map(s => s.imagePrompt).join('\n');
+
+      // Para cada cena perdida, gerar um novo prompt similar
+      const updatedScenes = [...generatedScenes];
+      
+      for (const lostScene of lostScenes) {
+        try {
+          // Usar IA para gerar prompt similar
+          const { data, error } = await supabase.functions.invoke('ai-assistant', {
+            body: {
+              messages: [
+                {
+                  role: 'system',
+                  content: `Você é um especialista em prompts de imagem. Gere um prompt alternativo para a cena abaixo, mantendo o mesmo estilo visual das cenas de referência. Retorne APENAS o prompt em inglês, sem explicações.`
+                },
+                {
+                  role: 'user',
+                  content: `Cena ${lostScene.number} - Texto: "${lostScene.text}"
+
+Prompt original que falhou: "${lostScene.imagePrompt}"
+
+Prompts de referência (estilo a manter):
+${referencePrompts || 'Estilo cinematográfico, alta qualidade'}
+
+Gere um prompt alternativo em inglês que mantenha a mesma qualidade visual mas com uma abordagem diferente que possa funcionar melhor.`
+                }
+              ],
+              model: 'gemini-2.5-flash'
+            }
+          });
+
+          if (!error && data?.content) {
+            const newPrompt = data.content.trim();
+            const sceneIndex = generatedScenes.findIndex(s => s.number === lostScene.number);
+            if (sceneIndex !== -1) {
+              updatedScenes[sceneIndex] = {
+                ...updatedScenes[sceneIndex],
+                imagePrompt: newPrompt
+              };
+            }
+          }
+        } catch (err) {
+          console.warn(`Erro ao gerar novo prompt para cena ${lostScene.number}:`, err);
+        }
+      }
+
+      // Atualizar cenas com novos prompts
+      updateScenes(updatedScenes);
+
+      toast({
+        title: "Prompts regenerados!",
+        description: `${lostScenes.length} prompt(s) foram atualizados. Gerando imagens...`,
+      });
+
+      // Iniciar geração das imagens com os novos prompts
+      const pendingIndexes = updatedScenes
+        .map((s, idx) => ({ s, idx }))
+        .filter(({ s }) => !s.generatedImage)
+        .map(({ idx }) => idx);
+
+      const cookieCount = Math.max(1, getImageFXCookieCount() || 1);
+      startBgGeneration(updatedScenes, style, pendingIndexes, detectedCharacters, cookieCount);
+
+    } catch (error: any) {
+      console.error('Erro ao regenerar perdidas:', error);
+      toast({
+        title: "Erro",
+        description: error?.message || "Não foi possível regenerar as cenas perdidas",
+        variant: "destructive",
+      });
+    } finally {
+      setRegeneratingLost(false);
+    }
+  };
 
   const downloadScenesAsZip = async (scenes: ScenePrompt[], zipFileName: string) => {
     const zip = new JSZip();
@@ -4015,22 +4104,38 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                               <Check className="w-3.5 h-3.5 mr-1.5" />
                               Selecionar todas
                             </Button>
-                            {/* Selecionar apenas mídias perdidas */}
-                            {generatedScenes.some(s => !s.generatedImage) && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const lost = generatedScenes.filter(s => !s.generatedImage).map(s => s.number);
-                                  setSelectedImages(new Set(lost));
-                                  toast({ title: `${lost.length} mídias perdidas selecionadas` });
-                                }}
-                                className="h-7 text-xs border-destructive/50 text-destructive hover:bg-destructive/10"
-                              >
-                                <X className="w-3.5 h-3.5 mr-1.5" />
-                                Selecionar perdidas ({generatedScenes.filter(s => !s.generatedImage).length})
-                              </Button>
-                            )}
+                            {/* Selecionar apenas mídias perdidas com números das cenas */}
+                            {generatedScenes.some(s => !s.generatedImage) && (() => {
+                              const lostScenes = generatedScenes.filter(s => !s.generatedImage);
+                              const lostNumbers = lostScenes.map(s => s.number);
+                              const displayNumbers = lostNumbers.length <= 5 
+                                ? lostNumbers.join(', ') 
+                                : `${lostNumbers.slice(0, 4).join(', ')}... +${lostNumbers.length - 4}`;
+                              
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedImages(new Set(lostNumbers));
+                                        toast({ title: `${lostNumbers.length} mídias perdidas selecionadas`, description: `Cenas: ${lostNumbers.join(', ')}` });
+                                      }}
+                                      className="h-7 text-xs border-destructive/50 text-destructive hover:bg-destructive/10"
+                                    >
+                                      <X className="w-3.5 h-3.5 mr-1.5" />
+                                      Selecionar perdidas ({displayNumbers})
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="max-w-xs">
+                                    <p className="text-xs">
+                                      <strong>Cenas perdidas:</strong> {lostNumbers.join(', ')}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })()}
                             <Button
                               variant="outline"
                               size="sm"
@@ -4093,23 +4198,42 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                               </Button>
                             )}
                             
-                            {/* Botão para regenerar apenas mídias perdidas */}
-                            {generatedScenes.some(s => !s.generatedImage) && (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={handleGenerateAllImages}
-                                disabled={generatingImages}
-                                className="h-7 text-xs"
-                              >
-                                {generatingImages ? (
-                                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                                ) : (
-                                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                                )}
-                                Regenerar Perdidas ({generatedScenes.filter(s => !s.generatedImage).length})
-                              </Button>
-                            )}
+                            {/* Botão para regenerar apenas mídias perdidas com números das cenas */}
+                            {generatedScenes.some(s => !s.generatedImage) && (() => {
+                              const lostScenes = generatedScenes.filter(s => !s.generatedImage);
+                              const lostNumbers = lostScenes.map(s => s.number);
+                              const displayNumbers = lostNumbers.length <= 5 
+                                ? lostNumbers.join(', ') 
+                                : `${lostNumbers.slice(0, 4).join(', ')}... +${lostNumbers.length - 4}`;
+                              
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={handleRegenerateLostWithAI}
+                                      disabled={generatingImages || regeneratingLost}
+                                      className="h-7 text-xs"
+                                    >
+                                      {(generatingImages || regeneratingLost) ? (
+                                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                                      ) : (
+                                        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                                      )}
+                                      Regenerar Perdidas ({displayNumbers})
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="max-w-xs">
+                                    <p className="text-xs">
+                                      <strong>Cenas perdidas:</strong> {lostNumbers.join(', ')}
+                                      <br /><br />
+                                      A IA irá gerar novos prompts similares ao estilo das outras cenas para manter consistência visual.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })()}
                           </div>
                         </div>
                         <div className="relative">
