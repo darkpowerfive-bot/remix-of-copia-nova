@@ -72,7 +72,7 @@ export const AdminNotificationsTab = () => {
       .from("admin_settings")
       .select("value")
       .eq("key", "notifications")
-      .single();
+      .maybeSingle();
 
     const fakeUsersJson = fakeUsers.map(u => ({ id: u.id, name: u.name, type: u.type }));
     
@@ -89,15 +89,19 @@ export const AdminNotificationsTab = () => {
 
     const { error } = await supabase
       .from("admin_settings")
-      .update({
+      .upsert({
+        key: "notifications",
         value: newValue,
         updated_at: new Date().toISOString(),
-      })
-      .eq("key", "notifications");
+      }, { onConflict: "key" });
 
     setSaving(false);
-    if (error) toast.error("Erro ao salvar");
-    else toast.success("Configurações salvas!");
+    if (error) {
+      console.error("Erro ao salvar notificações:", error);
+      toast.error("Erro ao salvar");
+    } else {
+      toast.success("Configurações salvas!");
+    }
   };
 
   const handleAddFakeUser = () => {
