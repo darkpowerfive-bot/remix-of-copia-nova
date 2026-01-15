@@ -402,6 +402,7 @@ export const AdminExportDataTab = () => {
     const totalTables = tables.length;
     let successCount = 0;
     let errorCount = 0;
+    const errorDetails: { table: string; error: string; records: number }[] = [];
 
     try {
       for (let i = 0; i < tables.length; i++) {
@@ -411,6 +412,8 @@ export const AdminExportDataTab = () => {
         setImportProgress(Math.round(((i + 1) / totalTables) * 100));
 
         if (!tableData || tableData.length === 0) continue;
+
+        let tableHasError = false;
 
         try {
           if (importMode === "replace") {
@@ -422,6 +425,8 @@ export const AdminExportDataTab = () => {
 
             if (deleteError) {
               console.error(`Erro ao limpar ${tableName}:`, deleteError);
+              errorDetails.push({ table: tableName, error: `Limpar: ${deleteError.message}`, records: tableData.length });
+              tableHasError = true;
             }
           }
 
@@ -438,6 +443,10 @@ export const AdminExportDataTab = () => {
 
               if (error) {
                 console.error(`Erro ao importar ${tableName} (batch ${j}):`, error);
+                if (!tableHasError) {
+                  errorDetails.push({ table: tableName, error: error.message, records: tableData.length });
+                  tableHasError = true;
+                }
                 errorCount++;
               }
             } else {
@@ -448,14 +457,21 @@ export const AdminExportDataTab = () => {
 
               if (error) {
                 console.error(`Erro ao importar ${tableName} (batch ${j}):`, error);
+                if (!tableHasError) {
+                  errorDetails.push({ table: tableName, error: error.message, records: tableData.length });
+                  tableHasError = true;
+                }
                 errorCount++;
               }
             }
           }
 
-          successCount++;
-        } catch (tableError) {
+          if (!tableHasError) {
+            successCount++;
+          }
+        } catch (tableError: any) {
           console.error(`Erro na tabela ${tableName}:`, tableError);
+          errorDetails.push({ table: tableName, error: tableError?.message || "Erro desconhecido", records: tableData.length });
           errorCount++;
         }
       }
@@ -463,7 +479,20 @@ export const AdminExportDataTab = () => {
       if (errorCount === 0) {
         toast.success(`${successCount} tabela(s) importada(s) com sucesso!`);
       } else {
-        toast.warning(`Importação concluída: ${successCount} sucesso, ${errorCount} erros`);
+        // Log detailed errors for debugging
+        console.group("📋 Detalhes dos erros de importação:");
+        errorDetails.forEach(({ table, error, records }) => {
+          console.log(`❌ ${table} (${records} registros): ${error}`);
+        });
+        console.groupEnd();
+        
+        const errorTablesPreview = errorDetails.slice(0, 3).map(e => e.table).join(", ");
+        const moreErrors = errorDetails.length > 3 ? ` e mais ${errorDetails.length - 3}` : "";
+        
+        toast.warning(
+          `Importação: ${successCount} sucesso, ${errorDetails.length} tabelas com erro (${errorTablesPreview}${moreErrors}). Ver console para detalhes.`,
+          { duration: 8000 }
+        );
       }
 
       setImportModalOpen(false);
