@@ -79,7 +79,8 @@ import { AdminMonitoringTab } from "@/components/admin/AdminMonitoringTab";
 import { AdminBlogTab } from "@/components/admin/AdminBlogTab";
 import { AdminUserPermissionsTab } from "@/components/admin/AdminUserPermissionsTab";
 import { AdminWhatsAppTemplatesTab } from "@/components/admin/AdminWhatsAppTemplatesTab";
-import { MessageCircle } from "lucide-react";
+import { AdminExportDataTab } from "@/components/admin/AdminExportDataTab";
+import { MessageCircle, Database } from "lucide-react";
 interface AdminStats {
   totalUsers: number;
   pendingActivation: number;
@@ -671,6 +672,10 @@ const AdminPanel = () => {
                 <MessageCircle className="w-4 h-4" />
                 WhatsApp
               </TabsTrigger>
+              <TabsTrigger value="export-data" className="flex items-center gap-2">
+                <Database className="w-4 h-4" />
+                Exportar Dados
+              </TabsTrigger>
             </TabsList>
 
             {/* Users Tab */}
@@ -1024,6 +1029,10 @@ const AdminPanel = () => {
 
             <TabsContent value="whatsapp-templates">
               <AdminWhatsAppTemplatesTab />
+            </TabsContent>
+
+            <TabsContent value="export-data">
+              <AdminExportDataTab />
             </TabsContent>
           </Tabs>
         </div>
