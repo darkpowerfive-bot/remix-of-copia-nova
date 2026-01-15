@@ -1407,9 +1407,15 @@ export function AdminPixelTab() {
     const legacyDefaults = [
       DEFAULT_EMAIL_LOGO,
       "https://kabnbvnephjifeazaiis.supabase.co/storage/v1/object/public/avatars/logo-email.gif",
+      "https://aqbpqxxcuvueqfwyhrgw.supabase.co/storage/v1/object/public/blog-images/logo-email.gif",
+      "https://aqbpqxxcuvueqfwyhrgw.supabase.co/storage/v1/object/public/avatars/logo-email.gif",
     ];
 
     let out = html;
+
+    // Replace {{logo_url}} placeholder
+    out = out.replace(/\{\{logo_url\}\}/g, logo);
+
     for (const legacy of legacyDefaults) {
       out = out.replace(new RegExp(escapeRegExp(legacy), "g"), logo);
     }
