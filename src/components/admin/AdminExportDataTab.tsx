@@ -392,21 +392,110 @@ export const AdminExportDataTab = () => {
     }
   };
 
+  // Define a ordem correta de importação (tabelas base primeiro, dependentes depois)
+  const IMPORT_ORDER: string[] = [
+    // 1. Tabelas de sistema sem dependências
+    "plan_permissions",
+    "credit_packages",
+    "admin_settings",
+    "api_providers",
+    "email_templates",
+    "niche_best_times",
+    
+    // 2. Perfis de usuário (base para quase tudo)
+    "profiles",
+    
+    // 3. Tabelas de usuário que dependem de profiles
+    "user_roles",
+    "user_credits",
+    "user_preferences",
+    "user_api_settings",
+    "user_goals",
+    "user_individual_permissions",
+    "user_kanban_settings",
+    
+    // 4. Pastas e organização (base para outras tabelas)
+    "folders",
+    "tags",
+    
+    // 5. Agentes (base para scripts)
+    "script_agents",
+    
+    // 6. Canais monitorados (base para notificações e vídeos)
+    "monitored_channels",
+    
+    // 7. Tabelas de conteúdo
+    "analyzed_videos",
+    "generated_titles",
+    "generated_scripts",
+    "generated_images",
+    "generated_audios",
+    "scene_prompts",
+    "saved_prompts",
+    "reference_thumbnails",
+    "batch_generation_history",
+    
+    // 8. Análises e vídeos
+    "channel_analyses",
+    "channel_goals",
+    "pinned_videos",
+    "video_analyses",
+    "video_notifications",
+    "saved_analytics_channels",
+    
+    // 9. Organização dependente
+    "title_tags",
+    "agent_files",
+    
+    // 10. Agenda e tarefas
+    "publication_schedule",
+    "production_board_tasks",
+    "task_completion_history",
+    "schedule_reminders_sent",
+    "pomodoro_state",
+    
+    // 11. Créditos e transações
+    "credit_transactions",
+    "credit_usage",
+    "imagefx_monthly_usage",
+    
+    // 12. Outros
+    "push_subscriptions",
+    "srt_history",
+    "user_file_uploads",
+    "video_generation_jobs",
+    
+    // 13. Blog e marketing
+    "blog_articles",
+    "blog_page_views",
+    "product_clicks",
+    "newsletter_subscribers",
+    "migration_invites",
+  ];
+
   const executeImport = async () => {
     if (!importData) return;
 
     setImporting(true);
     setImportProgress(0);
 
-    const tables = Object.keys(importData);
-    const totalTables = tables.length;
+    // Ordenar tabelas pela ordem de importação
+    const allTableNames = Object.keys(importData);
+    const orderedTables = [
+      // Primeiro as tabelas na ordem definida
+      ...IMPORT_ORDER.filter(t => allTableNames.includes(t)),
+      // Depois as tabelas que não estão na lista (caso existam novas)
+      ...allTableNames.filter(t => !IMPORT_ORDER.includes(t))
+    ];
+
+    const totalTables = orderedTables.length;
     let successCount = 0;
-    let errorCount = 0;
     const errorDetails: { table: string; error: string; records: number }[] = [];
+    const skippedTables: { table: string; reason: string }[] = [];
 
     try {
-      for (let i = 0; i < tables.length; i++) {
-        const tableName = tables[i];
+      for (let i = 0; i < orderedTables.length; i++) {
+        const tableName = orderedTables[i];
         const tableData = importData[tableName];
         setImportCurrentTable(tableName);
         setImportProgress(Math.round(((i + 1) / totalTables) * 100));
@@ -432,6 +521,8 @@ export const AdminExportDataTab = () => {
 
           // Insert data in batches of 100
           const batchSize = 100;
+          let batchErrors = 0;
+          
           for (let j = 0; j < tableData.length; j += batchSize) {
             const batch = tableData.slice(j, j + batchSize);
             
@@ -443,11 +534,11 @@ export const AdminExportDataTab = () => {
 
               if (error) {
                 console.error(`Erro ao importar ${tableName} (batch ${j}):`, error);
+                batchErrors++;
                 if (!tableHasError) {
                   errorDetails.push({ table: tableName, error: error.message, records: tableData.length });
                   tableHasError = true;
                 }
-                errorCount++;
               }
             } else {
               // Insert - replace mode already deleted
@@ -457,11 +548,11 @@ export const AdminExportDataTab = () => {
 
               if (error) {
                 console.error(`Erro ao importar ${tableName} (batch ${j}):`, error);
+                batchErrors++;
                 if (!tableHasError) {
                   errorDetails.push({ table: tableName, error: error.message, records: tableData.length });
                   tableHasError = true;
                 }
-                errorCount++;
               }
             }
           }
@@ -472,11 +563,10 @@ export const AdminExportDataTab = () => {
         } catch (tableError: any) {
           console.error(`Erro na tabela ${tableName}:`, tableError);
           errorDetails.push({ table: tableName, error: tableError?.message || "Erro desconhecido", records: tableData.length });
-          errorCount++;
         }
       }
 
-      if (errorCount === 0) {
+      if (errorDetails.length === 0) {
         toast.success(`${successCount} tabela(s) importada(s) com sucesso!`);
       } else {
         // Log detailed errors for debugging
@@ -485,6 +575,21 @@ export const AdminExportDataTab = () => {
           console.log(`❌ ${table} (${records} registros): ${error}`);
         });
         console.groupEnd();
+        
+        // Categorizar erros para ajudar o usuário
+        const fkErrors = errorDetails.filter(e => e.error.includes("foreign key") || e.error.includes("fkey"));
+        const rlsErrors = errorDetails.filter(e => e.error.includes("row-level security"));
+        const duplicateErrors = errorDetails.filter(e => e.error.includes("duplicate") || e.error.includes("unique constraint"));
+        
+        if (fkErrors.length > 0) {
+          console.log("⚠️ Erros de FK: Dados referenciam usuários que não existem neste projeto.");
+        }
+        if (rlsErrors.length > 0) {
+          console.log("⚠️ Erros de RLS: Verifique se você é admin e tem permissões corretas.");
+        }
+        if (duplicateErrors.length > 0) {
+          console.log("⚠️ Erros de duplicação: Dados já existem com conflitos em campos únicos.");
+        }
         
         const errorTablesPreview = errorDetails.slice(0, 3).map(e => e.table).join(", ");
         const moreErrors = errorDetails.length > 3 ? ` e mais ${errorDetails.length - 3}` : "";
