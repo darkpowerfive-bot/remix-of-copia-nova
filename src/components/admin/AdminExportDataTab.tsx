@@ -1,10 +1,25 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { Database, FileJson, FileSpreadsheet, Download, Loader2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Database, FileJson, FileSpreadsheet, Download, Loader2, Upload, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -94,6 +109,7 @@ const ALL_TABLES: TableInfo[] = [
 ];
 
 type ExportFormat = "json" | "csv";
+type ImportMode = "replace" | "merge";
 
 export const AdminExportDataTab = () => {
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
@@ -101,6 +117,16 @@ export const AdminExportDataTab = () => {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTable, setCurrentTable] = useState("");
+
+  // Import states
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const [importCurrentTable, setImportCurrentTable] = useState("");
+  const [importMode, setImportMode] = useState<ImportMode>("merge");
+  const [importData, setImportData] = useState<Record<string, any[]> | null>(null);
+  const [importFileName, setImportFileName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toggleTable = (tableName: string) => {
     setSelectedTables(prev => 
@@ -190,8 +216,6 @@ export const AdminExportDataTab = () => {
         a.click();
         URL.revokeObjectURL(url);
       } else {
-        // Export as CSV (one file per table in a zip, or combined)
-        // For simplicity, we'll create separate downloads or a combined file
         let combinedCSV = "";
         
         for (const [tableName, data] of Object.entries(exportData)) {
@@ -221,15 +245,170 @@ export const AdminExportDataTab = () => {
     }
   };
 
+  // Import functions
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content);
+        
+        // Validate structure
+        if (typeof parsed !== "object" || Array.isArray(parsed)) {
+          toast.error("Arquivo inválido. Esperado objeto com tabelas.");
+          return;
+        }
+
+        // Check which tables exist in the import
+        const validTables = Object.keys(parsed).filter(table => 
+          ALL_TABLES.some(t => t.name === table) && Array.isArray(parsed[table])
+        );
+
+        if (validTables.length === 0) {
+          toast.error("Nenhuma tabela válida encontrada no arquivo.");
+          return;
+        }
+
+        const filteredData: Record<string, any[]> = {};
+        validTables.forEach(table => {
+          filteredData[table] = parsed[table];
+        });
+
+        setImportData(filteredData);
+        setImportModalOpen(true);
+      } catch (error) {
+        console.error("Erro ao ler arquivo:", error);
+        toast.error("Erro ao ler arquivo. Verifique se é um JSON válido.");
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const executeImport = async () => {
+    if (!importData) return;
+
+    setImporting(true);
+    setImportProgress(0);
+
+    const tables = Object.keys(importData);
+    const totalTables = tables.length;
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (let i = 0; i < tables.length; i++) {
+        const tableName = tables[i];
+        const tableData = importData[tableName];
+        setImportCurrentTable(tableName);
+        setImportProgress(Math.round(((i + 1) / totalTables) * 100));
+
+        if (!tableData || tableData.length === 0) continue;
+
+        try {
+          if (importMode === "replace") {
+            // Delete all existing data first
+            const { error: deleteError } = await supabase
+              .from(tableName as any)
+              .delete()
+              .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
+
+            if (deleteError) {
+              console.error(`Erro ao limpar ${tableName}:`, deleteError);
+            }
+          }
+
+          // Insert data in batches of 100
+          const batchSize = 100;
+          for (let j = 0; j < tableData.length; j += batchSize) {
+            const batch = tableData.slice(j, j + batchSize);
+            
+            if (importMode === "merge") {
+              // Upsert - merge with existing data
+              const { error } = await supabase
+                .from(tableName as any)
+                .upsert(batch, { onConflict: "id", ignoreDuplicates: false });
+
+              if (error) {
+                console.error(`Erro ao importar ${tableName} (batch ${j}):`, error);
+                errorCount++;
+              }
+            } else {
+              // Insert - replace mode already deleted
+              const { error } = await supabase
+                .from(tableName as any)
+                .insert(batch);
+
+              if (error) {
+                console.error(`Erro ao importar ${tableName} (batch ${j}):`, error);
+                errorCount++;
+              }
+            }
+          }
+
+          successCount++;
+        } catch (tableError) {
+          console.error(`Erro na tabela ${tableName}:`, tableError);
+          errorCount++;
+        }
+      }
+
+      if (errorCount === 0) {
+        toast.success(`${successCount} tabela(s) importada(s) com sucesso!`);
+      } else {
+        toast.warning(`Importação concluída: ${successCount} sucesso, ${errorCount} erros`);
+      }
+
+      setImportModalOpen(false);
+      setImportData(null);
+    } catch (error) {
+      console.error("Erro ao importar:", error);
+      toast.error("Erro ao importar dados");
+    } finally {
+      setImporting(false);
+      setImportProgress(0);
+      setImportCurrentTable("");
+    }
+  };
+
   const userTables = ALL_TABLES.filter(t => t.category === "user");
   const systemTables = ALL_TABLES.filter(t => t.category === "system");
 
   return (
     <div className="space-y-6">
       <Card className="p-6 bg-card border-border">
-        <div className="flex items-center gap-3 mb-2">
-          <Database className="h-6 w-6 text-primary" />
-          <h2 className="text-xl font-bold text-foreground">Exportar Dados do Sistema</h2>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <Database className="h-6 w-6 text-primary" />
+            <h2 className="text-xl font-bold text-foreground">Exportar Dados do Sistema</h2>
+          </div>
+          {/* Import button */}
+          <div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept=".json"
+              className="hidden"
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              className="gap-2"
+            >
+              <Upload className="h-4 w-4" />
+              Importar Dados
+            </Button>
+          </div>
         </div>
         <p className="text-muted-foreground mb-6">
           Exporte todas as tabelas do banco de dados para backup ou análise
@@ -363,6 +542,107 @@ export const AdminExportDataTab = () => {
           </div>
         </div>
       </Card>
+
+      {/* Import Confirmation Modal */}
+      <Dialog open={importModalOpen} onOpenChange={setImportModalOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-primary" />
+              Importar Dados
+            </DialogTitle>
+            <DialogDescription>
+              Arquivo selecionado: <span className="font-medium text-foreground">{importFileName}</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          {importData && (
+            <div className="space-y-4 py-4">
+              {/* Tables found */}
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Tabelas encontradas no arquivo:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(importData).map(([table, data]) => (
+                    <Badge key={table} variant="secondary" className="text-xs">
+                      {ALL_TABLES.find(t => t.name === table)?.displayName || table} ({data.length})
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Import mode */}
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  Modo de importação:
+                </label>
+                <Select value={importMode} onValueChange={(v) => setImportMode(v as ImportMode)}>
+                  <SelectTrigger className="bg-secondary border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="merge">
+                      <div className="flex flex-col">
+                        <span>Mesclar (Merge)</span>
+                        <span className="text-xs text-muted-foreground">Atualiza existentes e adiciona novos</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="replace">
+                      <div className="flex flex-col">
+                        <span>Substituir (Replace)</span>
+                        <span className="text-xs text-muted-foreground">Remove todos os dados e insere novos</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Warning for replace mode */}
+              {importMode === "replace" && (
+                <div className="flex items-start gap-2 p-3 bg-destructive/10 rounded-md border border-destructive/20">
+                  <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-destructive">Atenção!</p>
+                    <p className="text-muted-foreground">
+                      O modo Substituir irá apagar TODOS os dados existentes nas tabelas selecionadas antes de importar.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Progress bar (when importing) */}
+              {importing && (
+                <div className="space-y-2">
+                  <Progress value={importProgress} className="h-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Importando: {importCurrentTable} ({importProgress}%)
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportModalOpen(false)} disabled={importing}>
+              Cancelar
+            </Button>
+            <Button onClick={executeImport} disabled={importing} className="gap-2">
+              {importing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Importando...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4" />
+                  Iniciar Importação
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
