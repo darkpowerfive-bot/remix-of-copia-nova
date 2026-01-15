@@ -41,7 +41,16 @@ interface EmailTemplate {
 }
 
 // Default email logo URL
-const DEFAULT_EMAIL_LOGO = "https://id-preview--cdd97740-cd0b-499e-a264-a7c891bc80ec.lovable.app/images/logo-email.gif";
+const DEFAULT_EMAIL_LOGO_FALLBACK_PATH = "/images/logo-email.gif";
+const DEFAULT_EMAIL_LOGO = (() => {
+  try {
+    return typeof window !== "undefined"
+      ? `${window.location.origin}${DEFAULT_EMAIL_LOGO_FALLBACK_PATH}`
+      : DEFAULT_EMAIL_LOGO_FALLBACK_PATH;
+  } catch {
+    return DEFAULT_EMAIL_LOGO_FALLBACK_PATH;
+  }
+})();
 
 // Function to generate email header with dynamic logo
 const getEmailHeader = (logoUrl: string) => `<!DOCTYPE html>
@@ -1003,7 +1012,14 @@ export function AdminPixelTab() {
 
     if (emailSettings?.value) {
       const e = emailSettings.value as Record<string, string>;
-      if (e.logo_url) setEmailLogoUrl(e.logo_url);
+      const raw = e.logo_url;
+
+      // Ignore legacy/invalid logo URLs (from other projects)
+      const isLegacy = typeof raw === "string" && raw.includes("kabnbvnephjifeazaiis.supabase.co");
+      if (raw && !isLegacy) setEmailLogoUrl(raw);
+      else setEmailLogoUrl(DEFAULT_EMAIL_LOGO);
+    } else {
+      setEmailLogoUrl(DEFAULT_EMAIL_LOGO);
     }
 
     setLoading(false);
@@ -1244,10 +1260,7 @@ export function AdminPixelTab() {
     }
 
     // Replace logo URL in template body with current logo
-    const updatedBody = defaultTemplate.body.replace(
-      new RegExp(DEFAULT_EMAIL_LOGO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-      emailLogoUrl
-    );
+    const updatedBody = replaceLogoInHtml(defaultTemplate.body);
 
     const { error } = await supabase
       .from("email_templates")
@@ -1273,10 +1286,7 @@ export function AdminPixelTab() {
       const defaultTemplate = DEFAULT_TEMPLATES[template.template_type];
       if (defaultTemplate) {
         // Replace logo URL in template body with current logo
-        const updatedBody = defaultTemplate.body.replace(
-          new RegExp(DEFAULT_EMAIL_LOGO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-          emailLogoUrl
-        );
+        const updatedBody = replaceLogoInHtml(defaultTemplate.body);
 
         await supabase
           .from("email_templates")
@@ -1366,9 +1376,55 @@ export function AdminPixelTab() {
     return icons[type] || "📧";
   };
 
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  const resolveLogoUrl = (raw?: string) => {
+    if (!raw) return DEFAULT_EMAIL_LOGO;
+
+    // block known legacy URL that points to a different project
+    if (raw.includes("kabnbvnephjifeazaiis.supabase.co")) return DEFAULT_EMAIL_LOGO;
+
+    // allow absolute http(s)
+    if (/^https?:\/\//i.test(raw)) return raw;
+
+    // allow absolute path
+    if (raw.startsWith("/")) {
+      try {
+        return typeof window !== "undefined" ? `${window.location.origin}${raw}` : raw;
+      } catch {
+        return raw;
+      }
+    }
+
+    // otherwise fallback
+    return DEFAULT_EMAIL_LOGO;
+  };
+
+  const replaceLogoInHtml = (html: string) => {
+    const logo = resolveLogoUrl(emailLogoUrl);
+
+    // Replace any previous default/legacy logo URLs and any logo-email.* occurrences
+    const legacyDefaults = [
+      DEFAULT_EMAIL_LOGO,
+      "https://kabnbvnephjifeazaiis.supabase.co/storage/v1/object/public/avatars/logo-email.gif",
+    ];
+
+    let out = html;
+    for (const legacy of legacyDefaults) {
+      out = out.replace(new RegExp(escapeRegExp(legacy), "g"), logo);
+    }
+
+    out = out.replace(
+      /src="[^"]*logo-email\.(?:gif|png|jpe?g|webp)(?:\?[^\"]*)?"/gi,
+      `src="${logo}"`
+    );
+
+    return out;
+  };
+
   const renderPreviewWithVariables = (body: string) => {
     // Replace variables with sample data for preview
-    return body
+    const withVars = body
       .replace(/\{\{name\}\}/g, "João Silva")
       .replace(/\{\{email\}\}/g, "joao@exemplo.com")
       .replace(/\{\{login_url\}\}/g, "#")
@@ -1382,6 +1438,8 @@ export function AdminPixelTab() {
       .replace(/\{\{transaction_id\}\}/g, "TXN-123456")
       .replace(/\{\{days_remaining\}\}/g, "3")
       .replace(/\{\{renewal_link\}\}/g, "#");
+
+    return replaceLogoInHtml(withVars);
   };
 
   if (loading) {
@@ -1561,7 +1619,7 @@ export function AdminPixelTab() {
                   alt="Email Logo" 
                   className="w-20 h-20 rounded-full object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = "/placeholder.svg";
+                    (e.target as HTMLImageElement).src = DEFAULT_EMAIL_LOGO_FALLBACK_PATH;
                   }}
                 />
               </div>
