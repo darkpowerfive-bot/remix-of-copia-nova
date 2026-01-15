@@ -1,0 +1,90 @@
+# ============================================
+# PRODUCTION - Load Balanced Multi-Instance Setup
+# ============================================
+# Deploy: docker-compose -f docker-compose.prod.yml up -d --scale app=3
+
+version: '3.8'
+
+services:
+  # ============================================
+  # NGINX LOAD BALANCER (Entry Point)
+  # ============================================
+  nginx-lb:
+    image: nginx:alpine
+    container_name: canaisdarks-lb
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-lb.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - canaisdarks-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # APPLICATION INSTANCES (Scalable)
+  # ============================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "80"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - canaisdarks-network
+    deploy:
+      mode: replicated
+      replicas: 3
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    sysctls:
+      - net.core.somaxconn=65535
+      - net.ipv4.tcp_max_syn_backlog=65535
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+
+networks:
+  canaisdarks-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

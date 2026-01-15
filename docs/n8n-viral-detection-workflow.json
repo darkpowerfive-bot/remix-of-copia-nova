@@ -1,0 +1,290 @@
+{
+  "name": "🔥 Detecção Viral Escalável v15 (Webhook + Schedule)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "hoursInterval": 1 }] }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-240, 300],
+      "notes": "Executa a cada 1 hora"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "ae2f7a27-36cc-4ca7-82dc-3aaba3ed9860",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-240, 100],
+      "webhookId": "ae2f7a27-36cc-4ca7-82dc-3aaba3ed9860",
+      "notes": "Recebe trigger manual do app (Verificar Agora)"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ message: 'Workflow was started', success: true }) }}",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "Respond Immediately",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [0, 100],
+      "notes": "Responde imediatamente ao app"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://kabnbvnephjifeazaiis.supabase.co/functions/v1/get-viral-monitoring-configs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthYm5idm5lcGhqaWZlYXphaWlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNDU0ODksImV4cCI6MjA4MjcyMTQ4OX0.usAoqnQCFqrxCujKBqrBTmxp_MmVY-w_LhzKAa7Nm5I" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthYm5idm5lcGhqaWZlYXphaWlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNDU0ODksImV4cCI6MjA4MjcyMTQ4OX0.usAoqnQCFqrxCujKBqrBTmxp_MmVY-w_LhzKAa7Nm5I" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      },
+      "id": "fetch-configs",
+      "name": "Fetch User Configs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 200],
+      "notes": "Busca configs ativas (is_active=true, tem niches e youtube_api_key)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// v15: Preparação robusta para 5-300 usuários\nconst response = $input.first().json;\n\nif (!response.success || !response.configs || response.configs.length === 0) {\n  console.log('[v15] Nenhuma config ativa encontrada');\n  return [{ json: { hasConfigs: false, message: 'No active configs found', count: 0 } }];\n}\n\nconst configs = response.configs;\nconsole.log(`[v15] ✅ ${configs.length} usuários ativos para processar`);\n\n// Retorna cada config como item separado\nreturn configs.map((config, index) => ({\n  json: {\n    hasConfigs: true,\n    _index: index,\n    _total: configs.length,\n    user_id: config.user_id,\n    niches: config.niches || [],\n    viral_threshold: config.viral_threshold || 1000,\n    youtube_api_key: config.youtube_api_key,\n    country: config.country || 'BR',\n    video_types: config.video_types || ['long', 'short'],\n    whatsapp: config.whatsapp\n  }\n}));"
+      },
+      "id": "prepare-configs",
+      "name": "Prepare Configs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 200],
+      "notes": "v15: Prepara configs como itens separados"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.hasConfigs }}", "value2": true }]
+        }
+      },
+      "id": "has-configs",
+      "name": "Has Configs?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// v15: Delay 200-500ms entre usuários para evitar rate limit\nconst item = $input.first().json;\nconst delay = 200 + Math.floor(Math.random() * 300);\nawait new Promise(r => setTimeout(r, delay));\nconsole.log(`[v15] ========== Usuário ${item._index + 1}/${item._total} ==========`);\nreturn [{ json: item }];"
+      },
+      "id": "rate-limit",
+      "name": "Rate Limit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 100],
+      "notes": "v15: Delay inline via Code para evitar rate limit"
+    },
+    {
+      "parameters": {
+        "jsCode": "// v15: Monta URLs de busca com suporte a country e video_types\nconst item = $input.first().json;\nconst niches = item.niches || [];\nconst youtubeApiKey = item.youtube_api_key;\nconst userId = item.user_id;\nconst viralThreshold = item.viral_threshold || 1000;\nconst videoTypes = item.video_types || ['long'];\nconst country = item.country || 'BR';\nconst whatsapp = item.whatsapp;\n\nconsole.log(`[v15] User: ${userId}`);\nconsole.log(`[v15] Niches: ${niches.join(', ')}`);\nconsole.log(`[v15] Country: ${country}, Threshold: ${viralThreshold}`);\n\nif (!youtubeApiKey || niches.length === 0) {\n  console.log(`[v15] ⚠️ Pulando usuário ${userId}: sem API key ou niches`);\n  return [{ json: { skip: true, reason: 'Missing API key or niches', user_id: userId } }];\n}\n\nconst publishedAfter = new Date();\npublishedAfter.setDate(publishedAfter.getDate() - 7);\n\n// Mapeia country para relevanceLanguage\nconst langMap = { BR: 'pt', PT: 'pt', ES: 'es', MX: 'es', AR: 'es', US: 'en', GB: 'en', FR: 'fr', DE: 'de', IT: 'it', JP: 'ja', KR: 'ko' };\nconst relevanceLanguage = langMap[country] || 'en';\n\n// Determina filtro de duração\nlet videoDuration = '';\nconst wantsShorts = videoTypes.includes('short');\nconst wantsLong = videoTypes.includes('long');\nif (wantsShorts && !wantsLong) videoDuration = '&videoDuration=short';\nelse if (wantsLong && !wantsShorts) videoDuration = '&videoDuration=medium';\n\n// Monta URLs para cada nicho (max 3 para economizar quota)\nconst searchUrls = niches.slice(0, 3).map(niche => ({\n  niche,\n  url: `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&order=viewCount&maxResults=20&publishedAfter=${publishedAfter.toISOString()}${videoDuration}&regionCode=${country}&relevanceLanguage=${relevanceLanguage}&q=${encodeURIComponent(niche)}&key=${youtubeApiKey}`\n}));\n\nreturn [{\n  json: {\n    skip: false,\n    user_id: userId,\n    whatsapp: whatsapp,\n    viral_threshold: viralThreshold,\n    youtube_api_key: youtubeApiKey,\n    video_types: videoTypes,\n    country: country,\n    searchUrls: searchUrls,\n    _index: item._index,\n    _total: item._total\n  }\n}];"
+      },
+      "id": "prepare-searches",
+      "name": "Prepare Search URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 100],
+      "notes": "v15: Prepara busca com country e video_types"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.skip }}", "value2": true }]
+        }
+      },
+      "id": "check-skip",
+      "name": "Should Skip?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1320, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// v15: Executa buscas no YouTube para cada nicho do usuário\nconst userData = $input.first().json;\nconst searchUrls = userData.searchUrls;\nlet allVideos = [];\n\nfor (const search of searchUrls) {\n  try {\n    const response = await fetch(search.url);\n    const data = await response.json();\n    \n    if (data.error) {\n      console.log(`[v15] Erro na busca ${search.niche}: ${data.error.message}`);\n      continue;\n    }\n    \n    if (data.items && data.items.length > 0) {\n      console.log(`[v15] Nicho \"${search.niche}\": ${data.items.length} vídeos`);\n      for (const item of data.items) {\n        if (item.id?.videoId) {\n          allVideos.push({\n            videoId: item.id.videoId,\n            title: item.snippet?.title || '',\n            channelTitle: item.snippet?.channelTitle || '',\n            channelId: item.snippet?.channelId || '',\n            thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || '',\n            publishedAt: item.snippet?.publishedAt,\n            niche: search.niche\n          });\n        }\n      }\n    }\n  } catch (err) {\n    console.log(`[v15] Erro fetch ${search.niche}: ${err.message}`);\n  }\n}\n\n// Remove duplicatas por videoId\nconst uniqueVideos = Array.from(new Map(allVideos.map(v => [v.videoId, v])).values());\n\nconsole.log(`[v15] Total: ${uniqueVideos.length} vídeos únicos para user ${userData.user_id}`);\n\nif (uniqueVideos.length === 0) {\n  return [{ json: { ...userData, videos: [], hasVideos: false } }];\n}\n\nreturn [{ json: { ...userData, videos: uniqueVideos, hasVideos: true } }];"
+      },
+      "id": "search-youtube",
+      "name": "Search YouTube",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 0],
+      "notes": "v15: Busca em todos os nichos do usuário"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.hasVideos }}", "value2": true }]
+        }
+      },
+      "id": "has-videos",
+      "name": "Has Videos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1760, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// v15: Busca estatísticas dos vídeos em batch\nconst userData = $input.first().json;\nconst videos = userData.videos;\nconst apiKey = userData.youtube_api_key;\n\n// Batch de 50 IDs (limite da API)\nconst videoIds = videos.map(v => v.videoId);\nconst batches = [];\nfor (let i = 0; i < videoIds.length; i += 50) {\n  batches.push(videoIds.slice(i, i + 50));\n}\n\nconst videosWithStats = [];\n\nfor (const batch of batches) {\n  try {\n    const statsUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics,contentDetails&id=${batch.join(',')}&key=${apiKey}`;\n    const response = await fetch(statsUrl);\n    const data = await response.json();\n    \n    if (data.items) {\n      for (const item of data.items) {\n        const video = videos.find(v => v.videoId === item.id);\n        if (video) {\n          const views = parseInt(item.statistics?.viewCount || '0');\n          const likes = parseInt(item.statistics?.likeCount || '0');\n          const comments = parseInt(item.statistics?.commentCount || '0');\n          \n          // Calcula horas desde publicação\n          const publishedAt = new Date(video.publishedAt);\n          const hoursAge = Math.max(1, (Date.now() - publishedAt.getTime()) / (1000 * 60 * 60));\n          const viewsPerHour = Math.round(views / hoursAge);\n          \n          // Detecta se é Short (duração <= 60s)\n          const duration = item.contentDetails?.duration || 'PT0S';\n          const match = duration.match(/PT(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?/);\n          const totalSeconds = (parseInt(match?.[1] || '0') * 3600) + (parseInt(match?.[2] || '0') * 60) + parseInt(match?.[3] || '0');\n          const isShort = totalSeconds <= 60;\n          \n          videosWithStats.push({\n            ...video,\n            views,\n            likes,\n            comments,\n            hoursAge: Math.round(hoursAge * 10) / 10,\n            viewsPerHour,\n            isShort,\n            durationSeconds: totalSeconds\n          });\n        }\n      }\n    }\n  } catch (err) {\n    console.log(`[v15] Erro stats: ${err.message}`);\n  }\n}\n\nconsole.log(`[v15] Stats obtidas para ${videosWithStats.length} vídeos`);\n\nreturn [{ json: { ...userData, videos: videosWithStats } }];"
+      },
+      "id": "get-stats",
+      "name": "Get Video Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, -100],
+      "notes": "v15: Busca estatísticas em batch de 50"
+    },
+    {
+      "parameters": {
+        "jsCode": "// v15: Filtra vídeos virais baseado no threshold do usuário\nconst userData = $input.first().json;\nconst videos = userData.videos;\nconst threshold = userData.viral_threshold;\nconst videoTypes = userData.video_types || ['long', 'short'];\nconst wantsShorts = videoTypes.includes('short');\nconst wantsLong = videoTypes.includes('long');\n\n// Filtra por tipo de vídeo E threshold\nconst viralVideos = videos\n  .filter(v => {\n    // Filtro de tipo\n    if (wantsShorts && wantsLong) return true;\n    if (wantsShorts && !wantsLong) return v.isShort;\n    if (wantsLong && !wantsShorts) return !v.isShort;\n    return true;\n  })\n  .filter(v => v.viewsPerHour >= threshold)\n  .sort((a, b) => b.viewsPerHour - a.viewsPerHour)\n  .slice(0, 5) // Max 5 por usuário\n  .map(v => ({\n    video_id: v.videoId,\n    title: v.title,\n    channel_name: v.channelTitle,\n    channel_url: `https://www.youtube.com/channel/${v.channelId}`,\n    video_url: `https://www.youtube.com/watch?v=${v.videoId}`,\n    thumbnail_url: v.thumbnail,\n    views: v.views,\n    likes: v.likes,\n    comments: v.comments,\n    viral_score: v.viewsPerHour,\n    niche: v.niche,\n    hours_ago: v.hoursAge,\n    is_short: v.isShort\n  }));\n\nconsole.log(`[v15] User ${userData.user_id}: ${viralVideos.length} virais (threshold: ${threshold})`);\n\nif (viralVideos.length === 0) {\n  return [{ json: { ...userData, viralVideos: [], hasVirals: false } }];\n}\n\nreturn [{ json: { ...userData, viralVideos, hasVirals: true } }];"
+      },
+      "id": "filter-virals",
+      "name": "Filter Viral Videos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, -100],
+      "notes": "v15: Filtra por threshold e tipo de vídeo"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{ $json.hasVirals }}", "value2": true }]
+        }
+      },
+      "id": "has-virals",
+      "name": "Has Virals?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2420, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://kabnbvnephjifeazaiis.supabase.co/functions/v1/viral-webhook",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthYm5idm5lcGhqaWZlYXphaWlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNDU0ODksImV4cCI6MjA4MjcyMTQ4OX0.usAoqnQCFqrxCujKBqrBTmxp_MmVY-w_LhzKAa7Nm5I" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthYm5idm5lcGhqaWZlYXphaWlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjcxNDU0ODksImV4cCI6MjA4MjcyMTQ4OX0.usAoqnQCFqrxCujKBqrBTmxp_MmVY-w_LhzKAa7Nm5I" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ user_id: $json.user_id, videos: $json.viralVideos, whatsapp: $json.whatsapp }) }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "send-webhook",
+      "name": "Send to Viral Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2640, -200],
+      "notes": "v15: Envia virais para webhook com whatsapp"
+    },
+    {
+      "parameters": {},
+      "id": "no-configs",
+      "name": "No Active Configs",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {},
+      "id": "user-skipped",
+      "name": "User Skipped",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1540, 200]
+    },
+    {
+      "parameters": {},
+      "id": "no-videos",
+      "name": "No Videos Found",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1980, 100]
+    },
+    {
+      "parameters": {},
+      "id": "no-virals",
+      "name": "No Viral Videos",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2640, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// v15: Log final de conclusão\nconsole.log('[v15] ✅ Processamento concluído com sucesso');\nreturn $input.all();"
+      },
+      "id": "done",
+      "name": "Done",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2860, -200],
+      "notes": "v15: Log de conclusão"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "Fetch User Configs", "type": "main", "index": 0 }]] },
+    "Webhook Trigger": { "main": [[{ "node": "Respond Immediately", "type": "main", "index": 0 }]] },
+    "Respond Immediately": { "main": [[{ "node": "Fetch User Configs", "type": "main", "index": 0 }]] },
+    "Fetch User Configs": { "main": [[{ "node": "Prepare Configs", "type": "main", "index": 0 }]] },
+    "Prepare Configs": { "main": [[{ "node": "Has Configs?", "type": "main", "index": 0 }]] },
+    "Has Configs?": {
+      "main": [
+        [{ "node": "Rate Limit", "type": "main", "index": 0 }],
+        [{ "node": "No Active Configs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Rate Limit": { "main": [[{ "node": "Prepare Search URLs", "type": "main", "index": 0 }]] },
+    "Prepare Search URLs": { "main": [[{ "node": "Should Skip?", "type": "main", "index": 0 }]] },
+    "Should Skip?": {
+      "main": [
+        [{ "node": "User Skipped", "type": "main", "index": 0 }],
+        [{ "node": "Search YouTube", "type": "main", "index": 0 }]
+      ]
+    },
+    "Search YouTube": { "main": [[{ "node": "Has Videos?", "type": "main", "index": 0 }]] },
+    "Has Videos?": {
+      "main": [
+        [{ "node": "Get Video Stats", "type": "main", "index": 0 }],
+        [{ "node": "No Videos Found", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Video Stats": { "main": [[{ "node": "Filter Viral Videos", "type": "main", "index": 0 }]] },
+    "Filter Viral Videos": { "main": [[{ "node": "Has Virals?", "type": "main", "index": 0 }]] },
+    "Has Virals?": {
+      "main": [
+        [{ "node": "Send to Viral Webhook", "type": "main", "index": 0 }],
+        [{ "node": "No Viral Videos", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send to Viral Webhook": { "main": [[{ "node": "Done", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { 
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "America/Sao_Paulo"
+  },
+  "tags": ["viral", "youtube", "scalable", "v15", "webhook"],
+  "meta": { "templateId": "viral-detection-v15-webhook" }
+}
