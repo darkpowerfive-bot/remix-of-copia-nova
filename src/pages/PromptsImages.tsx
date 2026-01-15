@@ -5063,7 +5063,7 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
           <DialogHeader className="pb-3">
             <DialogTitle className="flex items-center gap-3 text-foreground text-lg">
               <Video className="w-5 h-5 text-primary" />
-              Exportar para CapCut
+              Exportar para editor de vídeo
             </DialogTitle>
           </DialogHeader>
           
