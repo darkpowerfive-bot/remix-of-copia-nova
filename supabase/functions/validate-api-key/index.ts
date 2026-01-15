@@ -125,6 +125,25 @@ async function validateGemini(apiKey: string): Promise<boolean> {
       return true;
     }
     
+    // 403 with SERVICE_DISABLED means key is valid but API not enabled in project
+    // Accept the key if format is correct - user just needs to enable API
+    if (response.status === 403) {
+      try {
+        const errorData = JSON.parse(errorText);
+        const reason = errorData?.error?.details?.[0]?.reason;
+        if (reason === 'SERVICE_DISABLED' && apiKey.startsWith('AIzaSy') && apiKey.length >= 39) {
+          console.log('Gemini validation: API disabled but key format valid, accepting');
+          return true;
+        }
+      } catch {
+        // If can't parse, check key format
+        if (apiKey.startsWith('AIzaSy') && apiKey.length >= 39) {
+          console.log('Gemini validation: 403 but key format valid, accepting');
+          return true;
+        }
+      }
+    }
+    
     return false;
   } catch (error) {
     console.error('Gemini validation error:', error);
