@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
-import { Loader2, Film, Copy, Check, Image, Images, Download, ArrowRight, Upload, FileText, Sparkles, CheckCircle2, Rocket, Clock, AlertCircle, Settings } from "lucide-react";
+import { Loader2, Film, Copy, Check, Images, Download, ArrowRight, Upload, Sparkles, Clock, AlertCircle, Settings } from "lucide-react";
+import { BackgroundSceneGenerationIndicator, type SceneGenerationState } from "@/components/scenes/BackgroundSceneGenerationIndicator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { addBrandingFooter } from "@/lib/utils";
@@ -69,17 +69,26 @@ const SceneGenerator = () => {
   ];
   
   // Non-persisted states
-  const [isGenerating, setIsGenerating] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showCustomWps, setShowCustomWps] = useState(false);
   const [customWps, setCustomWps] = useState("");
-  const [progressModalOpen, setProgressModalOpen] = useState(false);
-  const [generationStatus, setGenerationStatus] = useState<"generating" | "complete">("generating");
-  const [generationProgress, setGenerationProgress] = useState(0);
-  const [currentSceneCount, setCurrentSceneCount] = useState(0);
-  const [totalExpectedScenes, setTotalExpectedScenes] = useState(0);
   const [shouldAutoStartBatch, setShouldAutoStartBatch] = useState(false);
+  
+  // Cancelation ref for aborting generation
+  const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // Background generation state
+  const [sceneGenState, setSceneGenState] = useState<SceneGenerationState>({
+    isGenerating: false,
+    status: "generating",
+    currentSceneCount: 0,
+    totalExpectedScenes: 0,
+    progress: 0,
+    wordCount: 0,
+    wordsPerScene: "40",
+    startTime: null
+  });
   
   // Novo: Modal de pré-análise de timeline
   const [preAnalysisOpen, setPreAnalysisOpen] = useState(false);
@@ -219,6 +228,20 @@ const SceneGenerator = () => {
     handleGenerate();
   };
 
+  const handleCancelGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setSceneGenState(prev => ({
+      ...prev,
+      isGenerating: false,
+      status: "generating",
+      startTime: null
+    }));
+    toast.info("Geração cancelada");
+  };
+
   const handleGenerate = async () => {
     if (!script.trim()) {
       toast.error("Cole o roteiro para gerar prompts de cenas");
@@ -228,13 +251,17 @@ const SceneGenerator = () => {
     // Calcular créditos baseado em lotes de 10 cenas
     const scenesMultiplier = Math.ceil(estimatedScenes / 10);
     
-    setIsGenerating(true);
     setScenes([]);
-    setProgressModalOpen(true);
-    setGenerationStatus("generating");
-    setGenerationProgress(0);
-    setCurrentSceneCount(0);
-    setTotalExpectedScenes(estimatedScenes);
+    setSceneGenState({
+      isGenerating: true,
+      status: "generating",
+      currentSceneCount: 0,
+      totalExpectedScenes: estimatedScenes,
+      progress: 0,
+      wordCount,
+      wordsPerScene,
+      startTime: Date.now()
+    });
 
     // Retry logic
     const maxRetries = 3;
@@ -252,6 +279,7 @@ const SceneGenerator = () => {
         const accessToken = session?.access_token;
 
         const controller = new AbortController();
+        abortControllerRef.current = controller;
         const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout total
 
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-scenes`, {
@@ -301,11 +329,14 @@ const SceneGenerator = () => {
           }
 
           setScenes(jsonScenes);
-          setCurrentSceneCount(jsonScenes.length);
-          setTotalExpectedScenes(jsonScenes.length);
-          setGenerationProgress(100);
-          setGenerationStatus("complete");
-          setIsGenerating(false);
+          setSceneGenState(prev => ({
+            ...prev,
+            isGenerating: false,
+            status: "complete",
+            currentSceneCount: jsonScenes.length,
+            totalExpectedScenes: jsonScenes.length,
+            progress: 100
+          }));
           return;
         }
 
@@ -342,7 +373,10 @@ const SceneGenerator = () => {
 
               if (data.type === "init") {
                 maxTotal = data.estimatedScenes || estimatedScenes;
-                setTotalExpectedScenes(maxTotal);
+                setSceneGenState(prev => ({
+                  ...prev,
+                  totalExpectedScenes: maxTotal
+                }));
               } else if (data.type === "batch_start") {
                 // Atualizar UI com progresso do lote
                 console.log(`[Stream] Batch ${data.batch}/${data.totalBatches} starting...`);
@@ -354,16 +388,23 @@ const SceneGenerator = () => {
                 setScenes([...collectedScenes]);
 
                 const actualTotal = Math.max(data.total || maxTotal, collectedScenes.length);
-                setCurrentSceneCount(collectedScenes.length);
-                setTotalExpectedScenes(actualTotal);
-
                 const progress = Math.min(95, (collectedScenes.length / actualTotal) * 100);
-                setGenerationProgress(progress);
+                
+                setSceneGenState(prev => ({
+                  ...prev,
+                  currentSceneCount: collectedScenes.length,
+                  totalExpectedScenes: actualTotal,
+                  progress
+                }));
               } else if (data.type === "complete") {
-                setCurrentSceneCount(collectedScenes.length);
-                setTotalExpectedScenes(collectedScenes.length);
-                setGenerationProgress(100);
-                setGenerationStatus("complete");
+                setSceneGenState(prev => ({
+                  ...prev,
+                  isGenerating: false,
+                  status: "complete",
+                  currentSceneCount: collectedScenes.length,
+                  totalExpectedScenes: collectedScenes.length,
+                  progress: 100
+                }));
                 streamCompleted = true;
               } else if (data.type === "error") {
                 throw new Error(data.error);
@@ -378,12 +419,15 @@ const SceneGenerator = () => {
         if (collectedScenes.length > 0) {
           if (!streamCompleted) {
             // Stream terminou mas não recebeu 'complete' - assumir sucesso
-            setCurrentSceneCount(collectedScenes.length);
-            setTotalExpectedScenes(collectedScenes.length);
-            setGenerationProgress(100);
-            setGenerationStatus("complete");
+            setSceneGenState(prev => ({
+              ...prev,
+              isGenerating: false,
+              status: "complete",
+              currentSceneCount: collectedScenes.length,
+              totalExpectedScenes: collectedScenes.length,
+              progress: 100
+            }));
           }
-          setIsGenerating(false);
           return; // Sucesso - sair do loop de retry
         } else {
           throw new Error("Nenhuma cena gerada. Tente novamente.");
@@ -393,6 +437,11 @@ const SceneGenerator = () => {
         console.error(`[Generate] Attempt ${attempt + 1} failed:`, error);
         lastError = error instanceof Error ? error : new Error("Erro desconhecido");
         
+        // Se for cancelamento pelo usuário, sair silenciosamente
+        if (lastError.name === 'AbortError') {
+          return;
+        }
+        
         // Se for erro de créditos insuficientes, não retry
         if (lastError.message.includes("insuficiente") || lastError.message.includes("402")) {
           break;
@@ -401,25 +450,40 @@ const SceneGenerator = () => {
         // Se foi a última tentativa
         if (attempt === maxRetries - 1) {
           toast.error(`Falha após ${maxRetries} tentativas: ${lastError.message}`);
-          setProgressModalOpen(false);
+          setSceneGenState(prev => ({
+            ...prev,
+            isGenerating: false,
+            status: "generating",
+            startTime: null
+          }));
         }
       }
     }
 
-    setIsGenerating(false);
+    setSceneGenState(prev => ({
+      ...prev,
+      isGenerating: false,
+      status: "generating",
+      startTime: null
+    }));
   };
 
-  const handleCloseProgressModal = () => {
-    setProgressModalOpen(false);
+  const handleCloseGenerationIndicator = () => {
+    setSceneGenState(prev => ({
+      ...prev,
+      isGenerating: false,
+      status: "generating",
+      startTime: null
+    }));
   };
 
   const handleGoToBatch = () => {
     const prompts = scenes.map(s => s.imagePrompt).join("\n\n");
     console.log("[SceneGenerator] Going to batch with prompts:", prompts.substring(0, 200));
     
-    // Primeiro atualizar prompts e fechar modal
+    // Primeiro atualizar prompts e fechar indicador
     setBatchPrompts(prompts);
-    setProgressModalOpen(false);
+    handleCloseGenerationIndicator();
     
     // Depois ativar auto-start e mudar aba (com pequeno delay para garantir estado atualizado)
     setTimeout(() => {
@@ -697,10 +761,10 @@ const SceneGenerator = () => {
 
                       <Button
                         onClick={handleOpenPreAnalysis}
-                        disabled={isGenerating || !script.trim()}
+                        disabled={sceneGenState.isGenerating || !script.trim()}
                         className="w-full"
                       >
-                        {isGenerating ? (
+                        {sceneGenState.isGenerating ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                             Gerando prompts...
@@ -810,105 +874,18 @@ const SceneGenerator = () => {
         </div>
       </div>
 
-      {/* Progress/Complete Modal */}
-      <Dialog open={progressModalOpen} onOpenChange={setProgressModalOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {generationStatus === "generating" ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
-                  Gerando Prompts de Cenas
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-5 h-5 text-green-500" />
-                  Prompts Gerados com Sucesso!
-                </>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {generationStatus === "generating" ? (
-              <>
-                <div className="flex items-center justify-center py-6">
-                  <div className="relative">
-                    <div className="w-24 h-24 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden shadow-[0_0_30px_hsl(var(--primary)/0.4)]">
-                      <img 
-                        src={logo1}
-                        alt="Processando"
-                        className="w-full h-full object-cover scale-110"
-                      />
-                    </div>
-                    <div className="absolute inset-0 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Progress value={generationProgress} className="h-2" />
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      Gerando prompts otimizados...
-                    </span>
-                    <span className="font-mono font-semibold text-primary">
-                      {currentSceneCount}/{totalExpectedScenes}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-center text-xs text-muted-foreground">
-                  <p>{wordCount} palavras • {wordsPerScene} palavras/cena</p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center justify-center py-4">
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-primary mb-1">
-                      {scenes.length}
-                    </div>
-                    <p className="text-sm text-muted-foreground">prompts gerados</p>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-secondary/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Preview do primeiro prompt:</p>
-                  <p className="text-sm text-foreground line-clamp-3">
-                    {scenes[0]?.imagePrompt || "..."}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      downloadTxt();
-                      handleCloseProgressModal();
-                    }}
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Baixar TXT
-                  </Button>
-                  <Button
-                    className="w-full"
-                    onClick={handleGoToBatch}
-                  >
-                    <Images className="w-4 h-4 mr-2" />
-                    Gerar Imagens em Lote
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full text-muted-foreground"
-                    onClick={handleCloseProgressModal}
-                  >
-                    Ver Prompts Detalhados
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Background Scene Generation Indicator */}
+      <BackgroundSceneGenerationIndicator
+        state={sceneGenState}
+        onCancel={handleCancelGeneration}
+        onComplete={handleCloseGenerationIndicator}
+        onDownloadTxt={() => {
+          downloadTxt();
+          handleCloseGenerationIndicator();
+        }}
+        onGoToBatch={handleGoToBatch}
+        firstPromptPreview={scenes[0]?.imagePrompt}
+      />
 
       {/* Pre-Analysis Timeline Modal */}
       <Dialog open={preAnalysisOpen} onOpenChange={setPreAnalysisOpen}>
