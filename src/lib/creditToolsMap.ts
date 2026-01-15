@@ -243,72 +243,155 @@ export const AI_MODELS_MAP: Record<string, string> = {
   'openai/gpt-4o-mini': 'GPT-4o Mini',
 };
 
-// Custos padrão por ferramenta (em créditos)
+// Custos padrão por ferramenta (em créditos) - SINCRONIZADO COM BACKEND
+// Custos base (modelos mais baratos). Gemini/Claude/GPT podem ter multiplicadores
 export const CREDIT_COSTS: Record<string, number> = {
-  // Análise de Títulos - 1 crédito por análise
-  'title_analysis': 1,
-  'analyze_titles': 1,
-  'analyze_video_titles': 1,
+  // 🧠 ANÁLISE DE TÍTULOS - 6-9 créditos (base: 6, gemini: 7, claude: 9)
+  'title_analysis': 6,
+  'analyze_titles': 6,
+  'analyze_video_titles': 6,
   
-  // Gerador de Thumbnails - 5 créditos por thumbnail
+  // 🖼️ GERADOR DE THUMBNAILS - 5 créditos
   'thumbnail_generation': 5,
   'generate_thumbnail': 5,
   
-  // Gerador de Scripts - 2 créditos por minuto
+  // 📝 GERADOR DE SCRIPTS - 2 créditos por minuto
   'script_generation': 2,
   'generate_script': 2,
   'generate_script_with_formula': 2,
   
-  // Gerador de Cenas - 3 créditos por cena
-  'scene_generation': 3,
-  'generate_scenes': 3,
+  // 🎬 GERADOR DE CENAS - 2-4 créditos por lote de 10 cenas (base: 2, gemini: 3, claude: 4)
+  'scene_generation': 2,
+  'generate_scenes': 2,
   
-  // Gerador de Voz (TTS) - 1 crédito por 100 caracteres
-  'voice_generation': 1,
-  'generate_tts': 1,
-  'tts': 1,
+  // 🎙️ GERADOR DE VOZ (TTS) - 2-12 créditos baseado no tamanho
+  // Até 500 chars: 2, até 2000: 4, até 4000: 8, mais: 12
+  'voice_generation': 2,
+  'generate_tts': 2,
+  'tts': 2,
+  'tts_generation': 2,
   
-  // Gerador de Imagens - 5 créditos por imagem
-  'image_generation': 5,
-  'generate_image': 5,
+  // 🎨 GERADOR DE IMAGENS - 1-3 créditos por prompt (base: 1, gemini: 2, claude: 3)
+  'image_generation': 1,
+  'generate_image': 1,
   'prompt_image': 1,
+  'image_prompt': 1,
   
-  // Transcrição de Vídeo - 2 créditos por minuto
+  // 📃 TRANSCRIÇÃO DE VÍDEO - 2-4 créditos base (base: 2, gemini: 3, claude: 4)
   'transcription': 2,
   'transcribe_video': 2,
   
-  // Análise de Canal - 3 créditos por análise
-  'channel_analysis': 3,
-  'analyze_channel': 3,
+  // 📺 ANÁLISE DE CANAL - 5-7 créditos (base: 5, gemini: 6, claude: 7)
+  'channel_analysis': 5,
+  'analyze_channel': 5,
   
-  // Análise de Transcrição - 2 créditos por análise
-  'transcript_analysis': 2,
-  'analyze_transcript': 2,
+  // 📄 ANÁLISE DE TRANSCRIÇÃO - 6-9 créditos (similar a título)
+  'transcript_analysis': 6,
+  'analyze_transcript': 6,
   
-  // Assistente IA - 1 crédito por consulta
-  'ai_assistant': 1,
+  // 🤖 ASSISTENTE IA - Variável por operação (calculado dinamicamente)
+  'ai_assistant': 5,
   
-  // Imagens em Lote - 4 créditos por imagem
-  'batch_images': 4,
+  // 🖼️ IMAGENS EM LOTE - 10-30 créditos por lote de 10 (base: 10, gemini: 20, claude: 30)
+  'batch_images': 10,
+  'image_batch_10': 10,
   
-  // Gerador de Vídeo - 10 créditos por vídeo
+  // 🎥 GERADOR DE VÍDEO - 10-15 créditos (base: 10, gemini: 12, claude: 15)
   'video_generation': 10,
+  'ready_video': 10,
   
-  // Análise de Fórmula - 2 créditos
-  'analyze_script_formula': 2,
+  // 🧪 ANÁLISE DE FÓRMULA DE AGENTE - 10-14 créditos (base: 10, gemini: 12, claude: 14)
+  'analyze_script_formula': 10,
+  'formula_analysis_agent': 10,
   
-  // Exploração de Nicho - 2 créditos
-  'explore_niche': 2,
+  // 🔍 EXPLORAÇÃO DE NICHO - 6-9 créditos (base: 6, gemini: 7, claude: 9)
+  'explore_niche': 6,
   
-  // Busca de Canais - 1 crédito
-  'search_channels': 1,
+  // 🔎 BUSCA DE CANAIS - 5 créditos
+  'search_channels': 5,
   
-  // Análise Viral - 3 créditos
-  'viral_analysis': 3,
+  // 📈 ANÁLISE VIRAL - 5-7 créditos (igual a channel_analysis)
+  'viral_analysis': 5,
   
-  // Análise de Múltiplos Canais - 15 créditos
+  // 📊 ANÁLISE DE MÚLTIPLOS CANAIS - 15-22 créditos (base: 15, gemini: 18, claude: 22)
   'analyze_multiple_channels': 15,
+  'multi_channel_analysis': 15,
 };
+
+// Multiplicadores por modelo (conforme documentação backend)
+export const MODEL_MULTIPLIERS: Record<string, number> = {
+  'base': 1.0,
+  'gemini': 1.2,
+  'gemini-flash': 1.0,
+  'gemini-pro': 1.5,
+  'claude': 1.5,
+  'gpt-4': 1.5,
+  'gpt-4o': 1.5,
+  'gpt-5': 1.5,
+};
+
+// Função para calcular custo com multiplicador de modelo
+export function calculateCostWithModel(operationType: string, model?: string): number {
+  const baseCost = CREDIT_COSTS[operationType] || 5;
+  
+  if (!model) return baseCost;
+  
+  const modelLower = model.toLowerCase();
+  let multiplier = 1.0;
+  
+  if (modelLower.includes('claude') || modelLower.includes('gpt-4') || modelLower.includes('gpt-5')) {
+    multiplier = MODEL_MULTIPLIERS['claude'];
+  } else if (modelLower.includes('gemini') && modelLower.includes('pro')) {
+    multiplier = MODEL_MULTIPLIERS['gemini-pro'];
+  } else if (modelLower.includes('gemini')) {
+    multiplier = MODEL_MULTIPLIERS['gemini'];
+  }
+  
+  return Math.ceil(baseCost * multiplier);
+}
+
+// Custos específicos para TTS baseado no tamanho do texto
+export function calculateTTSCost(textLength: number): number {
+  if (textLength <= 500) return 2;
+  if (textLength <= 2000) return 4;
+  if (textLength <= 4000) return 8;
+  return 12;
+}
+
+// Custos para geração de cenas em lote
+export function calculateSceneBatchCost(sceneCount: number, model?: string): number {
+  const baseCostPer10 = CREDIT_COSTS['scene_generation'] || 2;
+  const batches = Math.ceil(sceneCount / 10);
+  const baseCost = batches * baseCostPer10;
+  
+  if (!model) return baseCost;
+  
+  const modelLower = model.toLowerCase();
+  if (modelLower.includes('claude') || modelLower.includes('gpt')) {
+    return Math.ceil(baseCost * 1.5);
+  } else if (modelLower.includes('gemini')) {
+    return Math.ceil(baseCost * 1.2);
+  }
+  
+  return baseCost;
+}
+
+// Custos para geração de script baseado na duração
+export function calculateScriptCost(durationMinutes: number, model?: string): number {
+  const costPerMinute = CREDIT_COSTS['script_generation'] || 2;
+  const baseCost = Math.ceil(durationMinutes * costPerMinute);
+  
+  if (!model) return baseCost;
+  
+  const modelLower = model.toLowerCase();
+  if (modelLower.includes('claude') || modelLower.includes('gpt')) {
+    return Math.ceil(baseCost * 1.4); // 2.8 por minuto
+  } else if (modelLower.includes('gemini')) {
+    return Math.ceil(baseCost * 1.2); // 2.4 por minuto
+  }
+  
+  return baseCost;
+}
 
 export function getToolInfo(operationType: string): { name: string; icon: string; description: string } {
   return CREDIT_TOOLS_MAP[operationType] || { 
@@ -323,8 +406,12 @@ export function getModelName(modelId: string | null): string {
   return AI_MODELS_MAP[modelId] || modelId.split('/').pop()?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || modelId;
 }
 
-export function getToolCost(operationType: string): number {
-  return CREDIT_COSTS[operationType] || 1;
+export function getToolCost(operationType: string, model?: string): number {
+  // Usar cálculo com multiplicador se modelo for fornecido
+  if (model) {
+    return calculateCostWithModel(operationType, model);
+  }
+  return CREDIT_COSTS[operationType] || 5;
 }
 
 // Função para reembolsar créditos em caso de falha
