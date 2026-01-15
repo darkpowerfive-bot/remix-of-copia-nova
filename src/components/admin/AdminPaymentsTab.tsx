@@ -96,7 +96,8 @@ export function AdminPaymentsTab() {
     setSaving(true);
     const { error } = await supabase
       .from("admin_settings")
-      .update({
+      .upsert({
+        key: "stripe",
         value: {
           public_key: publicKey,
           secret_key: secretKey,
@@ -104,10 +105,10 @@ export function AdminPaymentsTab() {
           webhook_email: webhookEmail,
         },
         updated_at: new Date().toISOString(),
-      })
-      .eq("key", "stripe");
+      }, { onConflict: "key" });
 
     if (error) {
+      console.error("Erro ao salvar Stripe:", error);
       toast.error("Erro ao salvar configurações");
     } else {
       toast.success("Configurações do Stripe salvas!");
