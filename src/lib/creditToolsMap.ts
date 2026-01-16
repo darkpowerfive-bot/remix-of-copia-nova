@@ -272,11 +272,15 @@ export const CREDIT_COSTS: Record<string, number> = {
   'tts': 2,
   'tts_generation': 2,
   
-  // 🎨 GERADOR DE IMAGENS/PROMPTS - Custo real: ~R$0.001 (gpt-4.1-mini) → 1 crédito = R$0.05 (5000% margem)
-  'image_generation': 1,
-  'generate_image': 1,
+  // 🎨 GERAÇÃO DE IMAGENS - GRÁTIS (usa cookies ImageFX do usuário)
+  'image_generation': 0,
+  'generate_image': 0,
+  'generate_imagefx': 0,
+  
+  // 📝 GERAÇÃO DE PROMPTS PARA IMAGENS - Custo real: ~R$0.001 (gpt-4.1-mini) → 1 crédito = R$0.05
   'prompt_image': 1,
   'image_prompt': 1,
+  'generate_prompts': 1,
   
   // 📃 TRANSCRIÇÃO DE VÍDEO - Custo real: ~R$0.015/min (whisper-1) → 2 créditos = R$0.10 (566% margem)
   'transcription': 2,
@@ -293,9 +297,10 @@ export const CREDIT_COSTS: Record<string, number> = {
   // 🤖 ASSISTENTE IA - Custo real variável → 3 créditos = R$0.15
   'ai_assistant': 3,
   
-  // 🖼️ IMAGENS EM LOTE (10) - Custo real: ~R$0.50 (gpt-4o-image) → 20 créditos = R$1.00 (100% margem) - Ajustar se usar flux
-  'batch_images': 20,
-  'image_batch_10': 20,
+  // 🖼️ PROMPTS EM LOTE - Custo real: ~R$0.01 (gpt-4.1-mini) → 3 créditos = R$0.15 (geração de imagem é grátis via cookies)
+  'batch_images': 3,
+  'image_batch_10': 3,
+  'batch_prompts': 3,
   
   // 🎥 GERADOR DE VÍDEO - Custo real: ~R$0.50 (vídeo curto) → 25 créditos = R$1.25 (150% margem)
   'video_generation': 25,
