@@ -81,7 +81,8 @@ import {
   Lock,
   Settings,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Clapperboard
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -3774,7 +3775,7 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                         {generating ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         ) : (
-                          <Sparkles className="w-4 h-4 mr-2" />
+                          <Clapperboard className="w-4 h-4 mr-2" />
                         )}
                         Gerar Cenas {scriptStats.words > 0 && `(~${scriptStats.estimatedScenes})`}
                       </Button>
