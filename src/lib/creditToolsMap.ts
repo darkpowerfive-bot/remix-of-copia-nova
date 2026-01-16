@@ -244,78 +244,79 @@ export const AI_MODELS_MAP: Record<string, string> = {
 };
 
 // Custos padrão por ferramenta (em créditos) - SINCRONIZADO COM BACKEND
-// Custos base (modelos mais baratos). Gemini/Claude/GPT podem ter multiplicadores
+// Custos otimizados para 300% de margem de lucro baseado nos preços da Laozhang API
+// Referência: 1 crédito = R$0.05 | Margem: 300%+
 export const CREDIT_COSTS: Record<string, number> = {
-  // 🧠 ANÁLISE DE TÍTULOS - 6-9 créditos (base: 6, gemini: 7, claude: 9)
-  'title_analysis': 6,
-  'analyze_titles': 6,
-  'analyze_video_titles': 6,
+  // 🧠 ANÁLISE DE TÍTULOS - Custo real: ~R$0.002 (gpt-4.1-mini) → 3 créditos = R$0.15 (7500% margem)
+  'title_analysis': 3,
+  'analyze_titles': 3,
+  'analyze_video_titles': 3,
   
-  // 🖼️ GERADOR DE THUMBNAILS - 5 créditos
-  'thumbnail_generation': 5,
-  'generate_thumbnail': 5,
+  // 🖼️ GERADOR DE THUMBNAILS - Custo real: ~R$0.05 (gpt-4o-image) → 4 créditos = R$0.20 (300% margem)
+  'thumbnail_generation': 4,
+  'generate_thumbnail': 4,
   
-  // 📝 GERADOR DE SCRIPTS - 2 créditos por minuto
-  'script_generation': 2,
-  'generate_script': 2,
-  'generate_script_with_formula': 2,
+  // 📝 GERADOR DE SCRIPTS - Custo real: ~R$0.005/min (gpt-4.1-mini) → 1 crédito/min = R$0.05 (900% margem)
+  'script_generation': 1,
+  'generate_script': 1,
+  'generate_script_with_formula': 1,
   
-  // 🎬 GERADOR DE CENAS - 2-4 créditos por lote de 10 cenas (base: 2, gemini: 3, claude: 4)
+  // 🎬 GERADOR DE CENAS - Custo real: ~R$0.002/lote (gpt-4.1-mini) → 2 créditos = R$0.10 (5000% margem)
   'scene_generation': 2,
   'generate_scenes': 2,
   
-  // 🎙️ GERADOR DE VOZ (TTS) - 2-12 créditos baseado no tamanho
-  // Até 500 chars: 2, até 2000: 4, até 4000: 8, mais: 12
+  // 🎙️ GERADOR DE VOZ (TTS) - Custo real: ~R$0.075/1k chars (tts-1) → 2-8 créditos
+  // Até 500 chars: 2, até 2000: 3, até 4000: 5, mais: 8
   'voice_generation': 2,
   'generate_tts': 2,
   'tts': 2,
   'tts_generation': 2,
   
-  // 🎨 GERADOR DE IMAGENS - 1-3 créditos por prompt (base: 1, gemini: 2, claude: 3)
+  // 🎨 GERADOR DE IMAGENS/PROMPTS - Custo real: ~R$0.001 (gpt-4.1-mini) → 1 crédito = R$0.05 (5000% margem)
   'image_generation': 1,
   'generate_image': 1,
   'prompt_image': 1,
   'image_prompt': 1,
   
-  // 📃 TRANSCRIÇÃO DE VÍDEO - 2-4 créditos base (base: 2, gemini: 3, claude: 4)
+  // 📃 TRANSCRIÇÃO DE VÍDEO - Custo real: ~R$0.015/min (whisper-1) → 2 créditos = R$0.10 (566% margem)
   'transcription': 2,
   'transcribe_video': 2,
   
-  // 📺 ANÁLISE DE CANAL - 5-7 créditos (base: 5, gemini: 6, claude: 7)
-  'channel_analysis': 5,
-  'analyze_channel': 5,
+  // 📺 ANÁLISE DE CANAL - Custo real: ~R$0.005 (gpt-4.1-mini) → 3 créditos = R$0.15 (3000% margem)
+  'channel_analysis': 3,
+  'analyze_channel': 3,
   
-  // 📄 ANÁLISE DE TRANSCRIÇÃO - 6-9 créditos (similar a título)
-  'transcript_analysis': 6,
-  'analyze_transcript': 6,
+  // 📄 ANÁLISE DE TRANSCRIÇÃO - Custo real: ~R$0.003 (gpt-4.1-mini) → 3 créditos = R$0.15 (5000% margem)
+  'transcript_analysis': 3,
+  'analyze_transcript': 3,
   
-  // 🤖 ASSISTENTE IA - Variável por operação (calculado dinamicamente)
-  'ai_assistant': 5,
+  // 🤖 ASSISTENTE IA - Custo real variável → 3 créditos = R$0.15
+  'ai_assistant': 3,
   
-  // 🖼️ IMAGENS EM LOTE - 10-30 créditos por lote de 10 (base: 10, gemini: 20, claude: 30)
-  'batch_images': 10,
-  'image_batch_10': 10,
+  // 🖼️ IMAGENS EM LOTE (10) - Custo real: ~R$0.50 (gpt-4o-image) → 20 créditos = R$1.00 (100% margem) - Ajustar se usar flux
+  'batch_images': 20,
+  'image_batch_10': 20,
   
-  // 🎥 GERADOR DE VÍDEO - 10-15 créditos (base: 10, gemini: 12, claude: 15)
-  'video_generation': 10,
-  'ready_video': 10,
+  // 🎥 GERADOR DE VÍDEO - Custo real: ~R$0.50 (vídeo curto) → 25 créditos = R$1.25 (150% margem)
+  'video_generation': 25,
+  'ready_video': 25,
   
-  // 🧪 ANÁLISE DE FÓRMULA DE AGENTE - 10-14 créditos (base: 10, gemini: 12, claude: 14)
-  'analyze_script_formula': 10,
-  'formula_analysis_agent': 10,
+  // 🧪 ANÁLISE DE FÓRMULA DE AGENTE - Custo real: ~R$0.01 → 5 créditos = R$0.25 (2500% margem)
+  'analyze_script_formula': 5,
+  'formula_analysis_agent': 5,
   
-  // 🔍 EXPLORAÇÃO DE NICHO - 6-9 créditos (base: 6, gemini: 7, claude: 9)
-  'explore_niche': 6,
+  // 🔍 EXPLORAÇÃO DE NICHO - Custo real: ~R$0.005 → 3 créditos = R$0.15 (3000% margem)
+  'explore_niche': 3,
   
-  // 🔎 BUSCA DE CANAIS - 5 créditos
-  'search_channels': 5,
+  // 🔎 BUSCA DE CANAIS - Custo real: ~R$0.003 → 2 créditos = R$0.10 (3300% margem)
+  'search_channels': 2,
   
-  // 📈 ANÁLISE VIRAL - 5-7 créditos (igual a channel_analysis)
-  'viral_analysis': 5,
+  // 📈 ANÁLISE VIRAL - Custo real: ~R$0.005 → 3 créditos = R$0.15 (3000% margem)
+  'viral_analysis': 3,
   
-  // 📊 ANÁLISE DE MÚLTIPLOS CANAIS - 15-22 créditos (base: 15, gemini: 18, claude: 22)
-  'analyze_multiple_channels': 15,
-  'multi_channel_analysis': 15,
+  // 📊 ANÁLISE DE MÚLTIPLOS CANAIS - Custo real: ~R$0.02 → 8 créditos = R$0.40 (2000% margem)
+  'analyze_multiple_channels': 8,
+  'multi_channel_analysis': 8,
 };
 
 // Multiplicadores por modelo (conforme documentação backend)
@@ -350,12 +351,13 @@ export function calculateCostWithModel(operationType: string, model?: string): n
   return Math.ceil(baseCost * multiplier);
 }
 
-// Custos específicos para TTS baseado no tamanho do texto
+// Custos específicos para TTS baseado no tamanho do texto - Otimizado para 300%+ margem
+// Custo real: ~R$0.015/1k chars (tts-1 da OpenAI via Laozhang)
 export function calculateTTSCost(textLength: number): number {
-  if (textLength <= 500) return 2;
-  if (textLength <= 2000) return 4;
-  if (textLength <= 4000) return 8;
-  return 12;
+  if (textLength <= 500) return 2;    // Custo ~R$0.0075 → Cobra R$0.10 (1233% margem)
+  if (textLength <= 2000) return 3;   // Custo ~R$0.03 → Cobra R$0.15 (400% margem)
+  if (textLength <= 4000) return 5;   // Custo ~R$0.06 → Cobra R$0.25 (316% margem)
+  return 8;                            // Custo ~R$0.10 → Cobra R$0.40 (300% margem)
 }
 
 // Custos para geração de cenas em lote
