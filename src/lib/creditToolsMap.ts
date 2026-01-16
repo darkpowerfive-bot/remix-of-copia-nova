@@ -136,6 +136,18 @@ export const CREDIT_TOOLS_MAP: Record<string, { name: string; icon: string; desc
     icon: '🤖', 
     description: 'Consulta ao assistente de IA' 
   },
+  'agent_chat': { 
+    name: 'Chat com Agente', 
+    icon: '💬', 
+    description: 'Conversa com agente de IA personalizado' 
+  },
+  
+  // Prompts de Cenas (usado no backend)
+  'scene_prompts': { 
+    name: 'Prompts de Cenas', 
+    icon: '🎬', 
+    description: 'Geração de prompts para cenas de vídeo' 
+  },
   
   // Imagens em Lote
   'batch_images': { 
@@ -296,6 +308,10 @@ export const CREDIT_COSTS: Record<string, number> = {
   
   // 🤖 ASSISTENTE IA - Custo real variável → 3 créditos = R$0.15
   'ai_assistant': 3,
+  'agent_chat': 3,
+  
+  // 🎬 PROMPTS DE CENAS - Custo real: ~R$0.002/lote → 2 créditos = R$0.10 (5000% margem)
+  'scene_prompts': 2,
   
   // 🖼️ PROMPTS EM LOTE - Custo real: ~R$0.01 (gpt-4.1-mini) → 3 créditos = R$0.15 (geração de imagem é grátis via cookies)
   'batch_images': 3,
