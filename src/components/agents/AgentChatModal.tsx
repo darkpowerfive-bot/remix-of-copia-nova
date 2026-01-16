@@ -159,8 +159,8 @@ Você deve:
     setInput("");
     setIsLoading(true);
 
-    // CRÍTICO: Deduzir créditos ANTES do chat (custo fixo de 2 créditos por mensagem)
-    const CHAT_CREDITS = 2;
+    // CRÍTICO: Deduzir créditos ANTES do chat (custo fixo de 3 créditos por mensagem = ai_assistant)
+    const CHAT_CREDITS = 3;
     let deductionResult: { success: boolean; refund: () => Promise<void> } | null = null;
     
     if (usePlatformCredits !== false) {

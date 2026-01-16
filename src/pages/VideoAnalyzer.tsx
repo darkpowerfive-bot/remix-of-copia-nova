@@ -894,7 +894,7 @@ const VideoAnalyzer = () => {
                     <label className="text-base text-muted-foreground">Motor de IA</label>
                     <Badge variant="outline" className="text-primary border-primary text-sm px-3 py-1">
                       <Zap className="w-4 h-4 mr-1" />
-                      Custo estimado: {aiModel === "multimodal" ? "4 créditos" : "1 crédito"}
+                      Custo estimado: {aiModel === "multimodal" ? "12 créditos" : "3 créditos"}
                     </Badge>
                   </div>
                   <Select value={aiModel} onValueChange={setAiModel}>

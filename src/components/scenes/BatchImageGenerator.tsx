@@ -296,7 +296,7 @@ const BatchImageGenerator = ({ initialPrompts = "", autoStart = false, scenesDat
       }
     }
 
-    // Calcular custo total (4 créditos por imagem)
+    // Calcular custo total (3 créditos por lote de prompts - imagens são grátis via cookies)
     const totalCost = prompts.length * CREDIT_COSTS.batch_images;
     
     // Deduzir créditos antes
