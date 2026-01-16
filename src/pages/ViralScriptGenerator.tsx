@@ -634,9 +634,9 @@ export default function ViralScriptGenerator() {
     }
   }, [isGenerating]);
 
-  // Calculate estimated credits: 1 credit per minute
+  // Calculate estimated credits: 1 credit per minute (script_generation = 1 crédito/min)
   useEffect(() => {
-    const estimated = Math.ceil(duration); // 1 crédito por minuto
+    const estimated = Math.ceil(duration); // 1 crédito por minuto conforme CREDIT_COSTS
     setEstimatedCredits(estimated);
   }, [duration]);
 
