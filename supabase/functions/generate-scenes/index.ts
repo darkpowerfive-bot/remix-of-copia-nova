@@ -353,19 +353,34 @@ async function analyzeReferenceImages(
   
   for (const ref of referenceCharacters) {
     try {
-      // Usar modelo de visão para analisar a imagem
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini", // Modelo com visão
-          messages: [
-            {
-              role: "system",
-              content: `You are a visual description expert. Analyze the image and provide a DETAILED physical description of the person for use in AI image generation prompts.
+      // Usar um modelo com visão para analisar a imagem.
+      // IMPORTANTE: O endpoint pode variar (Lovable AI Gateway vs. provedor externo).
+      // Para maximizar compatibilidade, tentamos primeiro com o modelo escolhido (apiModel)
+      // e, se falhar, usamos um fallback comumente compatível com visão.
+      const visionModelCandidates = Array.from(
+        new Set([
+          apiModel,
+          "google/gemini-3-flash-preview", // default recomendado (multimodal) no Lovable AI
+          "openai/gpt-5-mini", // fallback multimodal
+        ].filter(Boolean))
+      );
+
+      let data: any = null;
+      let lastStatus: number | null = null;
+
+      for (const visionModel of visionModelCandidates) {
+        const resp = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: visionModel,
+            messages: [
+              {
+                role: "system",
+                content: `You are a visual description expert. Analyze the image and provide a DETAILED physical description of the person for use in AI image generation prompts.
 
 Focus on:
 - Age range (young adult, middle-aged, elderly)
@@ -378,35 +393,35 @@ Focus on:
 - Clothing style if relevant to character
 
 Return ONLY a concise English description (50-80 words) suitable for image generation prompts.
-DO NOT include the character name in the description.`
-            },
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: `Describe this person named "${ref.name}" for image generation:`
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: ref.imageBase64
-                  }
-                }
-              ]
-            }
-          ],
-          max_tokens: 200,
-          temperature: 0.3
-        }),
-      });
+DO NOT include the character name in the description.`,
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: `Describe this person named "${ref.name}" for image generation:` },
+                  { type: "image_url", image_url: { url: ref.imageBase64 } },
+                ],
+              },
+            ],
+            max_tokens: 200,
+            temperature: 0.3,
+          }),
+        });
 
-      if (!response.ok) {
-        console.error(`[Analyze Reference] Failed to analyze image for ${ref.name}:`, response.status);
-        continue;
+        if (resp.ok) {
+          data = await resp.json();
+          break;
+        }
+
+        lastStatus = resp.status;
+        const errText = await resp.text().catch(() => "");
+        console.warn(`[Analyze Reference] Vision model failed (${visionModel}) for ${ref.name}:`, lastStatus, errText?.slice(0, 200));
       }
 
-      const data = await response.json();
+      if (!data) {
+        console.error(`[Analyze Reference] Failed to analyze image for ${ref.name}:`, lastStatus ?? "unknown");
+        continue;
+      }
       const description = data.choices?.[0]?.message?.content?.trim() || "";
 
       if (description) {
