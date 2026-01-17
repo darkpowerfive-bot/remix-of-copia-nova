@@ -660,7 +660,9 @@ const [generating, setGenerating] = useState(false);
       let globalSceneNumber = 1;
 
       const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-      // Usar SSE (Server-Sent Events) para streaming - conexão mantida viva indefinidamente
+      // Usar SSE (Server-Sent Events) para streaming
+      // - Com retry automático
+      // - Com timeout por inatividade (evita ficar “conectando” para sempre)
       const invokeGenerateScenesWithStreaming = async (
         body: any,
         onBatchComplete: (scenes: ScenePrompt[], batchNum: number, totalBatches: number, characters: CharacterDescription[]) => void,
@@ -669,103 +671,145 @@ const [generating, setGenerating] = useState(false);
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         const functionUrl = `${supabaseUrl}/functions/v1/generate-scenes`;
-        
+
         const { data: { session } } = await supabase.auth.getSession();
         const authToken = session?.access_token;
-        
-        const response = await fetch(functionUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken || supabaseKey}`,
-            'apikey': supabaseKey,
-          },
-          body: JSON.stringify({ ...body, stream: true }), // Ativar streaming
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          let errorMessage = `HTTP ${response.status}`;
+
+        const MAX_ATTEMPTS = 3;
+        const IDLE_TIMEOUT_MS = 25000; // se não chega nenhum evento nesse tempo, reconecta
+
+        let lastError: unknown = null;
+
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+          const controller = new AbortController();
+          let idleInterval: number | null = null;
+
           try {
-            const errorJson = JSON.parse(errorText);
-            errorMessage = errorJson.error || errorMessage;
-          } catch {
-            errorMessage = errorText || errorMessage;
-          }
-          throw new Error(errorMessage);
-        }
-        
-        // Processar stream SSE
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error("Stream não disponível");
-        
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let totalCredits = 0;
-        let totalScenesReceived = 0;
-        let receivedCharacters: CharacterDescription[] = [];
-        let totalExpectedScenes = 0;
-        let currentBatch = 0;
-        let totalBatches = 0;
-        
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
-          buffer = lines.pop() || ''; // Manter linha incompleta no buffer
-          
-          for (const line of lines) {
-            // Ignorar comentários SSE (heartbeat)
-            if (line.startsWith(':')) continue;
-            if (!line.startsWith('data: ')) continue;
-            const jsonStr = line.slice(6).trim();
-            if (!jsonStr) continue;
-            
-            try {
-              const event = JSON.parse(jsonStr);
-              
-              if (event.type === 'init') {
-                totalExpectedScenes = event.estimatedScenes || 0;
-                totalBatches = event.totalBatches || 1;
-                onProgress(`Iniciando geração de ${event.estimatedScenes} cenas em ${event.totalBatches} lotes...`);
-                if (event.characters) {
-                  receivedCharacters = event.characters;
-                }
-              } else if (event.type === 'batch_start') {
-                currentBatch = event.batch || 0;
-                onProgress(`Processando lote ${event.batch}/${event.totalBatches}...`);
-              } else if (event.type === 'scene') {
-                // NOVO: Processar cenas individualmente para atualização em tempo real
-                const scene = event.scene;
-                if (scene) {
-                  totalScenesReceived++;
-                  // Callback com cena individual - atualiza UI imediatamente
-                  onBatchComplete([scene], currentBatch, totalBatches, receivedCharacters);
-                  onProgress(`Cena ${event.current}/${event.total} gerada`);
-                }
-              } else if (event.type === 'batch') {
-                // Fallback para lotes completos (compatibilidade)
-                const batchScenes = event.scenes || [];
-                totalScenesReceived += batchScenes.length;
-                onBatchComplete(batchScenes, event.batchNumber, event.totalBatches, receivedCharacters);
-                onProgress(`Lote ${event.batchNumber}/${event.totalBatches} concluído: ${batchScenes.length} cenas`);
-              } else if (event.type === 'batch_retry') {
-                onProgress(`Lote ${event.batch}: ${event.message || 'Reprocessando...'}`);
-              } else if (event.type === 'complete') {
-                totalCredits = event.creditsUsed || 0;
-                onProgress(`Geração completa: ${event.totalScenes} cenas`);
-              } else if (event.type === 'error') {
-                throw new Error(event.error || 'Erro na geração');
+            onProgress(attempt === 1 ? 'Conectando...' : `Reconectando (tentativa ${attempt}/${MAX_ATTEMPTS})...`);
+
+            const response = await fetch(functionUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Authorization': `Bearer ${authToken || supabaseKey}`,
+                'apikey': supabaseKey,
+              },
+              body: JSON.stringify({ ...body, stream: true }),
+              signal: controller.signal,
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              let errorMessage = `HTTP ${response.status}`;
+              try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.error || errorMessage;
+              } catch {
+                errorMessage = errorText || errorMessage;
               }
-            } catch (parseErr) {
-              console.warn('[SSE] Parse error:', parseErr, jsonStr);
+              throw new Error(errorMessage);
             }
+
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('Stream não disponível');
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let totalCredits = 0;
+            let totalScenesReceived = 0;
+            let receivedCharacters: CharacterDescription[] = [];
+            let totalExpectedScenes = 0;
+            let currentBatch = 0;
+            let totalBatches = 0;
+
+            let lastEventAt = Date.now();
+            idleInterval = window.setInterval(() => {
+              if (Date.now() - lastEventAt > IDLE_TIMEOUT_MS) {
+                controller.abort();
+              }
+            }, 1500);
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n\n');
+              buffer = lines.pop() || '';
+
+              for (const line of lines) {
+                if (line.startsWith(':')) {
+                  // heartbeat
+                  lastEventAt = Date.now();
+                  continue;
+                }
+                if (!line.startsWith('data: ')) continue;
+                const jsonStr = line.slice(6).trim();
+                if (!jsonStr) continue;
+
+                try {
+                  const event = JSON.parse(jsonStr);
+                  lastEventAt = Date.now();
+
+                  if (event.type === 'init') {
+                    totalExpectedScenes = event.estimatedScenes || 0;
+                    totalBatches = event.totalBatches || 1;
+                    onProgress(`Iniciando geração de ${event.estimatedScenes} cenas em ${event.totalBatches} lotes...`);
+                    if (event.characters) {
+                      receivedCharacters = event.characters;
+                    }
+                  } else if (event.type === 'batch_start') {
+                    currentBatch = event.batch || 0;
+                    onProgress(`Processando lote ${event.batch}/${event.totalBatches}...`);
+                  } else if (event.type === 'scene') {
+                    const scene = event.scene;
+                    if (scene) {
+                      totalScenesReceived++;
+                      onBatchComplete([scene], currentBatch, totalBatches, receivedCharacters);
+                      onProgress(`Cena ${event.current}/${event.total} gerada`);
+                    }
+                  } else if (event.type === 'batch') {
+                    const batchScenes = event.scenes || [];
+                    totalScenesReceived += batchScenes.length;
+                    onBatchComplete(batchScenes, event.batchNumber, event.totalBatches, receivedCharacters);
+                    onProgress(`Lote ${event.batchNumber}/${event.totalBatches} concluído: ${batchScenes.length} cenas`);
+                  } else if (event.type === 'batch_retry') {
+                    onProgress(`Lote ${event.batch}: ${event.message || 'Reprocessando...'}`);
+                  } else if (event.type === 'complete') {
+                    totalCredits = event.creditsUsed || 0;
+                    onProgress(`Geração completa: ${event.totalScenes} cenas`);
+                  } else if (event.type === 'error') {
+                    throw new Error(event.error || 'Erro na geração');
+                  }
+                } catch (parseErr) {
+                  console.warn('[SSE] Parse error:', parseErr, jsonStr);
+                }
+              }
+            }
+
+            if (idleInterval) window.clearInterval(idleInterval);
+
+            // sucesso
+            return { creditsUsed: totalCredits, totalScenes: totalScenesReceived || totalExpectedScenes };
+          } catch (err) {
+            if (idleInterval) window.clearInterval(idleInterval);
+            lastError = err;
+
+            const msg = (err as any)?.name === 'AbortError'
+              ? 'Conexão ficou inativa (reconectando...)'
+              : ((err as any)?.message || String(err));
+
+            console.warn('[Streaming] Error:', msg);
+
+            if (attempt === MAX_ATTEMPTS) throw err;
+            await sleep(1200 * attempt);
+            continue;
           }
         }
-        
-        return { creditsUsed: totalCredits, totalScenes: totalScenesReceived };
+
+        throw lastError instanceof Error ? lastError : new Error('Falha no streaming');
       };
 
       // Fallback para modo não-streaming (roteiros pequenos ou erro)
