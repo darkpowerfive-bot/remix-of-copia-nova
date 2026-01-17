@@ -467,31 +467,84 @@ const [generating, setGenerating] = useState(false);
   };
   
   // Funções para manipular imagens de referência
-  const imageToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+  // IMPORTANTE: enviamos a imagem para o backend como base64.
+  // Para evitar "Failed to fetch" (payload grande demais), comprimimos e redimensionamos no browser.
+  const imageToBase64 = async (file: File): Promise<string> => {
+    const MAX_DIMENSION = 768; // mantém detalhes de rosto e reduz muito o tamanho
+    const JPEG_QUALITY = 0.82;
+
+    const toDataUrlFromBlob = (blob: Blob) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+    // carregar imagem
+    let bitmap: ImageBitmap | null = null;
+    try {
+      bitmap = await createImageBitmap(file);
+    } catch {
+      bitmap = null;
+    }
+
+    if (!bitmap) {
+      // fallback FileReader (sem resize) se createImageBitmap falhar
+      return await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const srcW = bitmap.width;
+    const srcH = bitmap.height;
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(srcW, srcH));
+    const dstW = Math.max(1, Math.round(srcW * scale));
+    const dstH = Math.max(1, Math.round(srcH * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = dstW;
+    canvas.height = dstH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      throw new Error("Falha ao processar imagem (canvas)");
+    }
+
+    ctx.drawImage(bitmap, 0, 0, dstW, dstH);
+    bitmap.close();
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("Falha ao comprimir imagem"))),
+        "image/jpeg",
+        JPEG_QUALITY
+      );
     });
+
+    return await toDataUrlFromBlob(blob);
   };
 
   const handleReferenceImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    
+
     const remainingSlots = 5 - referenceImages.length;
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
-    
+
     for (const file of filesToProcess) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast({ title: "Imagem muito grande", description: "Máximo 5MB por imagem", variant: "destructive" });
+      // Limite maior aqui é ok, pois vamos comprimir.
+      if (file.size > 15 * 1024 * 1024) {
+        toast({ title: "Imagem muito grande", description: "Máximo 15MB por imagem", variant: "destructive" });
         continue;
       }
-      
+
       const preview = URL.createObjectURL(file);
       const base64 = await imageToBase64(file);
-      
+
       setReferenceImages(prev => [...prev, {
         id: crypto.randomUUID(),
         file,
@@ -500,7 +553,7 @@ const [generating, setGenerating] = useState(false);
         base64
       }]);
     }
-    
+
     if (e.target) e.target.value = "";
   };
 
