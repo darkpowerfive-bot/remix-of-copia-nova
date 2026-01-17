@@ -918,7 +918,39 @@ const [generating, setGenerating] = useState(false);
       // Determinar se usar streaming (sempre que possível) para evitar “travadas” longas no UI
       // - Para roteiros grandes (ou divididos em partes), usamos streaming em cada chunk.
       const useStreaming = wordCount > 300;
-      
+
+      // IMPORTANTÍSSIMO: não enviar as imagens de referência (base64) em TODOS os chunks.
+      // Enviamos apenas no 1º chunk para o backend extrair as descrições;
+      // nos próximos chunks, a consistência é mantida via existingCharacters.
+      //
+      // OBS: se a imagem foi adicionada antes da compressão existir (ou ficou grande demais),
+      // recomprimimos aqui para evitar "Failed to fetch" por payload muito grande.
+      const MAX_BASE64_LEN = 1_200_000; // ~0.9MB (base64 cresce ~33%)
+      const effectiveReferenceImages = await Promise.all(
+        referenceImages.map(async (img) => {
+          if (!img.base64 || img.base64.length <= MAX_BASE64_LEN) return img;
+          try {
+            const newBase64 = await imageToBase64(img.file);
+            return { ...img, base64: newBase64 };
+          } catch {
+            return img;
+          }
+        })
+      );
+
+      // Atualizar state caso tenhamos recomprimido (mantém para próximas tentativas)
+      if (effectiveReferenceImages.some((img, i) => img.base64 !== referenceImages[i]?.base64)) {
+        setReferenceImages(effectiveReferenceImages);
+      }
+
+      const referenceCharactersPayload = effectiveReferenceImages
+        .filter((img) => img.characterName.trim() && img.base64)
+        .map((img) => ({
+          name: img.characterName.trim(),
+          imageBase64: img.base64!,
+        }));
+
+
       if (useStreaming) {
         // MODO STREAMING (também para múltiplos chunks)
         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
@@ -947,12 +979,10 @@ const [generating, setGenerating] = useState(false);
               // IMPORTANTE: numeração e consistência entre chunks
               startSceneNumber: globalSceneNumber,
               existingCharacters: allCharacters.length > 0 ? allCharacters : undefined,
-              referenceCharacters: referenceImages
-                .filter(img => img.characterName.trim() && img.base64)
-                .map(img => ({
-                  name: img.characterName.trim(),
-                  imageBase64: img.base64!
-                }))
+              referenceCharacters:
+                chunkIndex === 0 && allCharacters.length === 0
+                  ? referenceCharactersPayload
+                  : undefined,
             },
             (batchScenes, batchNum, totalBatches, characters) => {
               // Callback para cada cena (stream) ou lote (fallback)
@@ -1052,12 +1082,10 @@ const [generating, setGenerating] = useState(false);
               existingCharacters: allCharacters.length > 0 ? allCharacters : undefined,
               startSceneNumber: globalSceneNumber,
               stream: false,
-              referenceCharacters: referenceImages
-                .filter(img => img.characterName.trim() && img.base64)
-                .map(img => ({
-                  name: img.characterName.trim(),
-                  imageBase64: img.base64!
-                }))
+              referenceCharacters:
+                chunkIndex === 0 && allCharacters.length === 0
+                  ? referenceCharactersPayload
+                  : undefined,
             });
           } finally {
             clearInterval(progressInterval);
