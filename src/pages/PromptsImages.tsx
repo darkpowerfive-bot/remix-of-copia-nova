@@ -82,7 +82,8 @@ import {
   Settings,
   AlertCircle,
   Sparkles,
-  Clapperboard
+  Clapperboard,
+  User
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -127,6 +128,15 @@ interface CharacterDescription {
   name: string;
   description: string;
   seed: number;
+}
+
+// Interface para imagens de referência de personagens
+interface ReferenceImage {
+  id: string;
+  file: File;
+  preview: string;
+  characterName: string;
+  base64?: string;
 }
 
 interface ScenePrompt {
@@ -294,6 +304,10 @@ const [generating, setGenerating] = useState(false);
   const [selectedImages, setSelectedImages] = useState<Set<number>>(() => new Set());
   const [includeVeo3Prompts, setIncludeVeo3Prompts] = usePersistedState("prompts_include_veo3", false);
   
+  // Imagens de referência para personagens
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
+  const referenceInputRef = useRef<HTMLInputElement>(null);
+  
 
   const [showCapcutInstructions, setShowCapcutInstructions] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("clean");
@@ -450,6 +464,58 @@ const [generating, setGenerating] = useState(false);
       title: `📥 Guia de Intro: ${preset.name}`, 
       description: "Arquivo baixado com estrutura de gancho e dicas profissionais" 
     });
+  };
+  
+  // Funções para manipular imagens de referência
+  const imageToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleReferenceImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    
+    const remainingSlots = 5 - referenceImages.length;
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    
+    for (const file of filesToProcess) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "Imagem muito grande", description: "Máximo 5MB por imagem", variant: "destructive" });
+        continue;
+      }
+      
+      const preview = URL.createObjectURL(file);
+      const base64 = await imageToBase64(file);
+      
+      setReferenceImages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        file,
+        preview,
+        characterName: "",
+        base64
+      }]);
+    }
+    
+    if (e.target) e.target.value = "";
+  };
+
+  const removeReferenceImage = (id: string) => {
+    setReferenceImages(prev => {
+      const img = prev.find(i => i.id === id);
+      if (img) URL.revokeObjectURL(img.preview);
+      return prev.filter(i => i.id !== id);
+    });
+  };
+
+  const updateCharacterName = (id: string, name: string) => {
+    setReferenceImages(prev => prev.map(img => 
+      img.id === id ? { ...img, characterName: name } : img
+    ));
   };
   
   // FFmpeg hook
@@ -748,7 +814,13 @@ const [generating, setGenerating] = useState(false);
               maxScenes: 500,
               wpm: currentWpm,
               includeVeo3: includeVeo3Prompts,
-              startSceneNumber: 1
+              startSceneNumber: 1,
+              referenceCharacters: referenceImages
+                .filter(img => img.characterName.trim() && img.base64)
+                .map(img => ({
+                  name: img.characterName.trim(),
+                  imageBase64: img.base64!
+                }))
             },
             (batchScenes, batchNum, totalBatches, characters) => {
               // Callback quando cada lote é concluído
@@ -831,7 +903,13 @@ const [generating, setGenerating] = useState(false);
               includeVeo3: includeVeo3Prompts,
               existingCharacters: allCharacters.length > 0 ? allCharacters : undefined,
               startSceneNumber: globalSceneNumber,
-              stream: false // Não usar streaming no fallback
+              stream: false, // Não usar streaming no fallback
+              referenceCharacters: referenceImages
+                .filter(img => img.characterName.trim() && img.base64)
+                .map(img => ({
+                  name: img.characterName.trim(),
+                  imageBase64: img.base64!
+                }))
             });
           } finally {
             clearInterval(progressInterval);
@@ -3753,6 +3831,88 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                       <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/30">
                         🎬 Veo3
                       </Badge>
+                    </div>
+
+                    {/* Imagens de Referência para Personagens */}
+                    <div className="space-y-3 mt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <Label className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-primary" />
+                            Imagens de Referência (Personagens)
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Adicione fotos para manter consistência visual dos personagens
+                          </p>
+                        </div>
+                        {referenceImages.length < 5 && (
+                          <>
+                            <input
+                              ref={referenceInputRef}
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={handleReferenceImageUpload}
+                              className="hidden"
+                              id="prompts-reference-image-upload"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => referenceInputRef.current?.click()}
+                              className="h-8"
+                            >
+                              <ImagePlus className="w-4 h-4 mr-1" />
+                              Adicionar
+                            </Button>
+                          </>
+                        )}
+                      </div>
+
+                      {referenceImages.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                          {referenceImages.map((img) => (
+                            <div key={img.id} className="relative group">
+                              <div className="aspect-square rounded-lg overflow-hidden border border-border bg-secondary/50">
+                                <img
+                                  src={img.preview}
+                                  alt={img.characterName || "Referência"}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => removeReferenceImage(img.id)}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                              <Input
+                                placeholder="Nome do personagem"
+                                value={img.characterName}
+                                onChange={(e) => updateCharacterName(img.id, e.target.value)}
+                                className="mt-2 h-8 text-xs"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div 
+                          className="border-2 border-dashed border-border/50 rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                          onClick={() => referenceInputRef.current?.click()}
+                        >
+                          <ImagePlus className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                          <p className="text-sm text-muted-foreground">
+                            Clique para adicionar fotos dos personagens
+                          </p>
+                          <p className="text-xs text-muted-foreground/70 mt-1">
+                            Máximo 5 imagens • A IA usará essas referências nos prompts
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex gap-2 mt-3">
