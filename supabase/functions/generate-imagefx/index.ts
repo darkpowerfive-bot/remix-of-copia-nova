@@ -446,14 +446,22 @@ async function getUserImageFXCookies(userId: string): Promise<string[] | null> {
 
     const rawCookies = (data as any).imagefx_cookies || null;
     if (!rawCookies) return null;
-    
-    // Split by ||| for multiple cookies support
-    const cookieList = rawCookies.split('|||').map((c: string) => c.trim()).filter((c: string) => c.length > 0);
-    
-    if (cookieList.length === 0) return null;
-    
-    console.log(`[ImageFX] Found ${cookieList.length} user cookie(s) configured`);
-    return cookieList;
+
+    // Aceitar separadores comuns (||| ou quebras de linha) e limpar colagens do DevTools
+    const split = rawCookies
+      .split(/\|\|\||\r?\n+/)
+      .map((c: string) => c.trim())
+      .filter((c: string) => c.length > 0)
+      .map((c: string) => c
+        .replace(/^cookie:\s*/i, '')
+        .replace(/^\"|\"$/g, '')
+        .replace(/^'|'$/g, '')
+      );
+
+    if (split.length === 0) return null;
+
+    console.log(`[ImageFX] Found ${split.length} user cookie(s) configured`);
+    return split;
   } catch (e) {
     console.error('[ImageFX] Error fetching user cookies:', e);
     return null;
