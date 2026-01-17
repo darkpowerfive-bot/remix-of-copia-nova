@@ -704,6 +704,9 @@ const [generating, setGenerating] = useState(false);
         let totalCredits = 0;
         let totalScenesReceived = 0;
         let receivedCharacters: CharacterDescription[] = [];
+        let totalExpectedScenes = 0;
+        let currentBatch = 0;
+        let totalBatches = 0;
         
         while (true) {
           const { done, value } = await reader.read();
@@ -714,6 +717,8 @@ const [generating, setGenerating] = useState(false);
           buffer = lines.pop() || ''; // Manter linha incompleta no buffer
           
           for (const line of lines) {
+            // Ignorar comentários SSE (heartbeat)
+            if (line.startsWith(':')) continue;
             if (!line.startsWith('data: ')) continue;
             const jsonStr = line.slice(6).trim();
             if (!jsonStr) continue;
@@ -722,15 +727,32 @@ const [generating, setGenerating] = useState(false);
               const event = JSON.parse(jsonStr);
               
               if (event.type === 'init') {
+                totalExpectedScenes = event.estimatedScenes || 0;
+                totalBatches = event.totalBatches || 1;
                 onProgress(`Iniciando geração de ${event.estimatedScenes} cenas em ${event.totalBatches} lotes...`);
                 if (event.characters) {
                   receivedCharacters = event.characters;
                 }
+              } else if (event.type === 'batch_start') {
+                currentBatch = event.batch || 0;
+                onProgress(`Processando lote ${event.batch}/${event.totalBatches}...`);
+              } else if (event.type === 'scene') {
+                // NOVO: Processar cenas individualmente para atualização em tempo real
+                const scene = event.scene;
+                if (scene) {
+                  totalScenesReceived++;
+                  // Callback com cena individual - atualiza UI imediatamente
+                  onBatchComplete([scene], currentBatch, totalBatches, receivedCharacters);
+                  onProgress(`Cena ${event.current}/${event.total} gerada`);
+                }
               } else if (event.type === 'batch') {
+                // Fallback para lotes completos (compatibilidade)
                 const batchScenes = event.scenes || [];
                 totalScenesReceived += batchScenes.length;
                 onBatchComplete(batchScenes, event.batchNumber, event.totalBatches, receivedCharacters);
                 onProgress(`Lote ${event.batchNumber}/${event.totalBatches} concluído: ${batchScenes.length} cenas`);
+              } else if (event.type === 'batch_retry') {
+                onProgress(`Lote ${event.batch}: ${event.message || 'Reprocessando...'}`);
               } else if (event.type === 'complete') {
                 totalCredits = event.creditsUsed || 0;
                 onProgress(`Geração completa: ${event.totalScenes} cenas`);
@@ -823,16 +845,20 @@ const [generating, setGenerating] = useState(false);
                 }))
             },
             (batchScenes, batchNum, totalBatches, characters) => {
-              // Callback quando cada lote é concluído
-              const adjustedScenes = batchScenes.map((scene: ScenePrompt, idx: number) => ({
-                ...scene,
-                number: globalSceneNumber + idx
-              }));
-              globalSceneNumber += batchScenes.length;
-              allScenes = [...allScenes, ...adjustedScenes];
+              // Callback para cada cena ou lote - agora recebe cenas com números já definidos pelo backend
+              for (const scene of batchScenes) {
+                // Usar número da cena do backend (já vem correto)
+                const sceneNumber = scene.number || (allScenes.length + 1);
+                const adjustedScene = { ...scene, number: sceneNumber };
+                
+                // Verificar se a cena já existe (evitar duplicatas)
+                if (!allScenes.some(s => s.number === sceneNumber)) {
+                  allScenes = [...allScenes, adjustedScene];
+                }
+              }
               
-              // Atualizar UI em tempo real
-              const pct = 10 + (batchNum / totalBatches) * 80;
+              // Atualizar UI em tempo real - baseado em cenas recebidas
+              const pct = 10 + (allScenes.length / Math.max(1, estimatedTotalScenes)) * 80;
               setProgress(Math.min(90, Math.round(pct)));
               setSceneProgress({ done: allScenes.length, total: Math.max(allScenes.length, estimatedTotalScenes) });
               
@@ -845,10 +871,13 @@ const [generating, setGenerating] = useState(false);
                 }
               }
               
-              toast({
-                title: `Lote ${batchNum}/${totalBatches} concluído`,
-                description: `${batchScenes.length} cenas geradas`,
-              });
+              // Mostrar toast apenas a cada 20 cenas para não spammar
+              if (allScenes.length % 20 === 0 || allScenes.length === estimatedTotalScenes) {
+                toast({
+                  title: `Progresso: ${allScenes.length} cenas`,
+                  description: `Processando lote ${batchNum}/${totalBatches}`,
+                });
+              }
             },
             (message) => {
               setLoadingMessage(message);
