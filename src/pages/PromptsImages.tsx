@@ -818,15 +818,26 @@ const [generating, setGenerating] = useState(false);
         throw new Error("Falha após 3 tentativas");
       };
 
-      // Determinar se usar streaming (roteiros grandes) ou modo normal
-      const useStreaming = totalChunks === 1 && wordCount > 500; // Streaming para roteiros médios/grandes em 1 chunk
+      // Determinar se usar streaming (sempre que possível) para evitar “travadas” longas no UI
+      // - Para roteiros grandes (ou divididos em partes), usamos streaming em cada chunk.
+      const useStreaming = wordCount > 300;
       
       if (useStreaming) {
-        // MODO STREAMING - conexão mantida viva indefinidamente
-        try {
-          const chunk = scriptChunks[0];
-          setLoadingMessage('Conectando ao servidor de geração...');
-          
+        // MODO STREAMING (também para múltiplos chunks)
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+          const chunk = scriptChunks[chunkIndex];
+          const chunkWordCount = chunk.split(/\s+/).filter(Boolean).length;
+          const estimatedScenesInChunk = Math.max(1, Math.ceil(chunkWordCount / (parseInt(wordsPerScene) || 80)));
+
+          setChunkProgress({ current: chunkIndex + 1, total: totalChunks, scenesProcessed: allScenes.length });
+          setLoadingMessage(
+            totalChunks > 1
+              ? `Conectando (parte ${chunkIndex + 1}/${totalChunks})...`
+              : 'Conectando ao servidor de geração...'
+          );
+
+          const previousSceneCount = allScenes.length;
+
           const result = await invokeGenerateScenesWithStreaming(
             {
               script: chunk,
@@ -836,7 +847,9 @@ const [generating, setGenerating] = useState(false);
               maxScenes: 500,
               wpm: currentWpm,
               includeVeo3: includeVeo3Prompts,
-              startSceneNumber: 1,
+              // IMPORTANTE: numeração e consistência entre chunks
+              startSceneNumber: globalSceneNumber,
+              existingCharacters: allCharacters.length > 0 ? allCharacters : undefined,
               referenceCharacters: referenceImages
                 .filter(img => img.characterName.trim() && img.base64)
                 .map(img => ({
@@ -845,23 +858,22 @@ const [generating, setGenerating] = useState(false);
                 }))
             },
             (batchScenes, batchNum, totalBatches, characters) => {
-              // Callback para cada cena ou lote - agora recebe cenas com números já definidos pelo backend
+              // Callback para cada cena (stream) ou lote (fallback)
               for (const scene of batchScenes) {
-                // Usar número da cena do backend (já vem correto)
                 const sceneNumber = scene.number || (allScenes.length + 1);
                 const adjustedScene = { ...scene, number: sceneNumber };
-                
-                // Verificar se a cena já existe (evitar duplicatas)
+
                 if (!allScenes.some(s => s.number === sceneNumber)) {
                   allScenes = [...allScenes, adjustedScene];
                 }
               }
-              
-              // Atualizar UI em tempo real - baseado em cenas recebidas
-              const pct = 10 + (allScenes.length / Math.max(1, estimatedTotalScenes)) * 80;
+
+              // Atualizar UI em tempo real
+              const total = Math.max(estimatedTotalScenes, allScenes.length);
+              const pct = 10 + (allScenes.length / Math.max(1, total)) * 80;
               setProgress(Math.min(90, Math.round(pct)));
-              setSceneProgress({ done: allScenes.length, total: Math.max(allScenes.length, estimatedTotalScenes) });
-              
+              setSceneProgress({ done: allScenes.length, total });
+
               // Mesclar personagens
               if (characters && characters.length > 0) {
                 for (const char of characters) {
@@ -870,9 +882,9 @@ const [generating, setGenerating] = useState(false);
                   }
                 }
               }
-              
-              // Mostrar toast apenas a cada 20 cenas para não spammar
-              if (allScenes.length % 20 === 0 || allScenes.length === estimatedTotalScenes) {
+
+              // Toast moderado
+              if (allScenes.length % 20 === 0) {
                 toast({
                   title: `Progresso: ${allScenes.length} cenas`,
                   description: `Processando lote ${batchNum}/${totalBatches}`,
@@ -880,17 +892,28 @@ const [generating, setGenerating] = useState(false);
               }
             },
             (message) => {
-              setLoadingMessage(message);
+              // Mensagem mais “viva” durante lotes longos
+              if (totalChunks > 1) {
+                setLoadingMessage(`Parte ${chunkIndex + 1}/${totalChunks}: ${message}`);
+              } else {
+                setLoadingMessage(message);
+              }
             }
           );
-          
-          totalCreditsUsed = result.creditsUsed;
-        } catch (streamError: any) {
-          console.error('[Streaming] Error:', streamError);
-          throw streamError;
+
+          totalCreditsUsed += result.creditsUsed;
+
+          // Atualizar numeração global para o próximo chunk
+          const maxNumber = allScenes.reduce((acc, s) => Math.max(acc, s.number || 0), 0);
+          globalSceneNumber = Math.max(globalSceneNumber, maxNumber + 1);
+
+          // Caso o chunk tenha retornado zero cenas (falha), avançar ao menos pelo estimado
+          if (allScenes.length === previousSceneCount) {
+            globalSceneNumber += estimatedScenesInChunk;
+          }
         }
       } else {
-        // MODO NORMAL - para roteiros muito grandes divididos em chunks
+        // MODO NORMAL - para roteiros pequenos
         for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
           const chunk = scriptChunks[chunkIndex];
           const chunkWordCount = chunk.split(/\s+/).filter(Boolean).length;
@@ -921,7 +944,6 @@ const [generating, setGenerating] = useState(false);
 
           let response: any;
           try {
-            // Usar streaming para cada chunk também
             response = await invokeGenerateScenesWithRetry({
               script: chunk,
               model,
@@ -932,7 +954,7 @@ const [generating, setGenerating] = useState(false);
               includeVeo3: includeVeo3Prompts,
               existingCharacters: allCharacters.length > 0 ? allCharacters : undefined,
               startSceneNumber: globalSceneNumber,
-              stream: false, // Não usar streaming no fallback
+              stream: false,
               referenceCharacters: referenceImages
                 .filter(img => img.characterName.trim() && img.base64)
                 .map(img => ({

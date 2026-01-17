@@ -992,6 +992,8 @@ serve(async (req) => {
       wpm = 140,
       includeVeo3 = false, // Novo: incluir prompts Veo3
       stream = false, // Nova opção para streaming
+      startSceneNumber = 1, // NOVO: numeração correta quando o roteiro é dividido em partes
+      existingCharacters = [] as CharacterDescription[], // NOVO: manter consistência entre partes
       referenceCharacters = [] as ReferenceCharacterInput[] // NOVO: Personagens com imagens de referência
     } = body;
 
@@ -1094,32 +1096,37 @@ serve(async (req) => {
     // OTIMIZADO: Detectar contexto, personagens E mapa visual em UMA chamada
     console.log(`[Generate Scenes] Detecting context + characters + visual map (unified call)...`);
     const { context: scriptContext, characters: scriptCharacters, visualMap } = await detectContextAndCharacters(script, apiUrl, apiKey, apiModel);
-    
+
     // NOVO: Analisar imagens de referência para extrair descrições de personagens
     let referenceChars: CharacterDescription[] = [];
     if (referenceCharacters && referenceCharacters.length > 0) {
       console.log(`[Generate Scenes] Analyzing ${referenceCharacters.length} reference images...`);
       referenceChars = await analyzeReferenceImages(referenceCharacters, apiUrl, apiKey, apiModel);
     }
-    
-    // Mesclar personagens: referências têm prioridade (descrições mais precisas da imagem)
-    const allCharacters = [...referenceChars];
-    for (const scriptChar of scriptCharacters) {
-      // Só adicionar personagens do script se não houver referência com mesmo nome
-      const hasReference = referenceChars.some(r => 
-        r.name.toLowerCase() === scriptChar.name.toLowerCase()
-      );
-      if (!hasReference) {
-        allCharacters.push(scriptChar);
-      }
-    }
-    
-    console.log(`[Generate Scenes] Context: ${scriptContext.period}, Theme: ${visualMap.mainTheme}, Characters: ${allCharacters.length} (${referenceChars.length} from reference)`, 
-      allCharacters.map((c: CharacterDescription) => c.name));
+
+    // Mesclar personagens com prioridade:
+    // 1) Referências (mais precisas)
+    // 2) existingCharacters (consistência entre chunks)
+    // 3) personagens detectados no script
+    const allCharacters: CharacterDescription[] = [];
+
+    const pushUnique = (char: CharacterDescription) => {
+      const exists = allCharacters.some(c => c.name.toLowerCase() === char.name.toLowerCase());
+      if (!exists) allCharacters.push(char);
+    };
+
+    for (const c of referenceChars) pushUnique(c);
+    for (const c of (existingCharacters || [])) pushUnique(c);
+    for (const c of scriptCharacters) pushUnique(c);
+
+    console.log(
+      `[Generate Scenes] Context: ${scriptContext.period}, Theme: ${visualMap.mainTheme}, Characters: ${allCharacters.length} (${referenceChars.length} from reference)`,
+      allCharacters.map((c: CharacterDescription) => c.name)
+    );
 
     // PRÉ-SEGMENTAR o roteiro inteiro ANTES de chamar a IA
     // Isso garante sincronização PERFEITA: cada cena tem texto exato que será narrado
-    const allPreSegmentedScenes = preSegmentScript(script, wordsPerScene, 1);
+    const allPreSegmentedScenes = preSegmentScript(script, wordsPerScene, startSceneNumber);
     const actualSceneCount = allPreSegmentedScenes.length;
     console.log(`[Generate Scenes] Pre-segmented into ${actualSceneCount} scenes`);
 
