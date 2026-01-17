@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Film, Copy, Check, Images, Download, ArrowRight, Upload, Sparkles, Clock, AlertCircle, Settings } from "lucide-react";
+import { Loader2, Film, Copy, Check, Images, Download, ArrowRight, Upload, Sparkles, Clock, AlertCircle, Settings, ImagePlus, X, User } from "lucide-react";
 import { BackgroundSceneGenerationIndicator, type SceneGenerationState } from "@/components/scenes/BackgroundSceneGenerationIndicator";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,6 +29,16 @@ export interface ScenePrompt {
   text: string;
   imagePrompt: string;
   wordCount: number;
+}
+
+// Interface para imagens de referência
+export interface ReferenceImage {
+  id: string;
+  file: File;
+  preview: string;
+  characterName: string;
+  isAnalyzing?: boolean;
+  description?: string;
 }
 
 const WORDS_PER_SCENE_OPTIONS = [
@@ -74,6 +84,10 @@ const SceneGenerator = () => {
   const [showCustomWps, setShowCustomWps] = useState(false);
   const [customWps, setCustomWps] = useState("");
   const [shouldAutoStartBatch, setShouldAutoStartBatch] = useState(false);
+  
+  // Imagens de referência para personagens
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
+  const referenceInputRef = useRef<HTMLInputElement>(null);
   
   // Cancelation ref for aborting generation
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -179,6 +193,78 @@ const SceneGenerator = () => {
     }
   };
 
+  // ===== IMAGENS DE REFERÊNCIA PARA PERSONAGENS =====
+  
+  // Converter imagem para base64
+  const imageToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        resolve(result); // Inclui o prefixo data:image/...;base64,
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Adicionar imagens de referência
+  const handleReferenceImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files) return;
+
+    const newImages: ReferenceImage[] = [];
+    
+    for (let i = 0; i < files.length && referenceImages.length + newImages.length < 5; i++) {
+      const file = files[i];
+      if (!file.type.startsWith('image/')) {
+        toast.error(`${file.name} não é uma imagem`);
+        continue;
+      }
+      
+      // Limite de 5MB por imagem
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error(`${file.name} é muito grande (máx 5MB)`);
+        continue;
+      }
+
+      const preview = URL.createObjectURL(file);
+      newImages.push({
+        id: `ref-${Date.now()}-${i}`,
+        file,
+        preview,
+        characterName: "",
+        isAnalyzing: false
+      });
+    }
+
+    if (newImages.length > 0) {
+      setReferenceImages(prev => [...prev, ...newImages]);
+      toast.success(`${newImages.length} imagem(s) adicionada(s)`);
+    }
+
+    // Reset input
+    if (referenceInputRef.current) {
+      referenceInputRef.current.value = "";
+    }
+  };
+
+  // Remover imagem de referência
+  const removeReferenceImage = (id: string) => {
+    setReferenceImages(prev => {
+      const img = prev.find(i => i.id === id);
+      if (img) URL.revokeObjectURL(img.preview);
+      return prev.filter(i => i.id !== id);
+    });
+  };
+
+  // Atualizar nome do personagem
+  const updateCharacterName = (id: string, name: string) => {
+    setReferenceImages(prev => 
+      prev.map(img => img.id === id ? { ...img, characterName: name } : img)
+    );
+  };
+
   // Calculate estimated scenes based on word count
   const wordCount = useMemo(() => {
     return script.split(/\s+/).filter(w => w).length;
@@ -263,6 +349,25 @@ const SceneGenerator = () => {
       startTime: Date.now()
     });
 
+    // Preparar imagens de referência em base64
+    let referenceCharacters: { name: string; imageBase64: string }[] = [];
+    if (referenceImages.length > 0) {
+      toast.info("Processando imagens de referência...");
+      for (const ref of referenceImages) {
+        if (ref.characterName.trim()) {
+          try {
+            const base64 = await imageToBase64(ref.file);
+            referenceCharacters.push({
+              name: ref.characterName.trim(),
+              imageBase64: base64
+            });
+          } catch (e) {
+            console.error("Erro ao processar imagem:", e);
+          }
+        }
+      }
+    }
+
     // Retry logic
     const maxRetries = 3;
     let lastError: Error | null = null;
@@ -300,6 +405,7 @@ const SceneGenerator = () => {
             wordsPerScene: parseInt(wordsPerScene),
             model: selectedModel,
             stream: true,
+            referenceCharacters, // Novo: personagens com imagens
           }),
           signal: controller.signal,
         });
@@ -697,6 +803,88 @@ const SceneGenerator = () => {
                         </div>
                       </div>
 
+                      {/* Imagens de Referência para Personagens */}
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Label className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-primary" />
+                              Imagens de Referência (Personagens)
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Adicione fotos para manter consistência visual dos personagens
+                            </p>
+                          </div>
+                          {referenceImages.length < 5 && (
+                            <>
+                              <input
+                                ref={referenceInputRef}
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onChange={handleReferenceImageUpload}
+                                className="hidden"
+                                id="reference-image-upload"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => referenceInputRef.current?.click()}
+                                className="h-8"
+                              >
+                                <ImagePlus className="w-4 h-4 mr-1" />
+                                Adicionar
+                              </Button>
+                            </>
+                          )}
+                        </div>
+
+                        {referenceImages.length > 0 ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                            {referenceImages.map((img) => (
+                              <div key={img.id} className="relative group">
+                                <div className="aspect-square rounded-lg overflow-hidden border border-border bg-secondary/50">
+                                  <img
+                                    src={img.preview}
+                                    alt={img.characterName || "Referência"}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => removeReferenceImage(img.id)}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                                <Input
+                                  placeholder="Nome do personagem"
+                                  value={img.characterName}
+                                  onChange={(e) => updateCharacterName(img.id, e.target.value)}
+                                  className="mt-2 h-8 text-xs"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div 
+                            className="border-2 border-dashed border-border/50 rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                            onClick={() => referenceInputRef.current?.click()}
+                          >
+                            <ImagePlus className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">
+                              Clique para adicionar fotos dos personagens
+                            </p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">
+                              Máximo 5 imagens • A IA usará essas referências nos prompts
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Estimated scenes info */}
                       {wordCount > 0 && (
                         <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
@@ -704,6 +892,11 @@ const SceneGenerator = () => {
                             <span className="font-medium">{wordCount}</span> palavras ÷{" "}
                             <span className="font-medium">{wordsPerScene}</span> = aproximadamente{" "}
                             <span className="font-bold text-primary">{estimatedScenes}</span> cenas
+                            {referenceImages.filter(i => i.characterName.trim()).length > 0 && (
+                              <span className="ml-2 text-primary">
+                                • {referenceImages.filter(i => i.characterName.trim()).length} personagem(s)
+                              </span>
+                            )}
                           </p>
                         </div>
                       )}
