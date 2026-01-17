@@ -28,6 +28,13 @@ interface CharacterDescription {
   name: string;
   description: string;
   seed: number;
+  fromReference?: boolean; // Indica se veio de imagem de referência
+}
+
+// Interface para personagens de referência recebidos do frontend
+interface ReferenceCharacterInput {
+  name: string;
+  imageBase64: string;
 }
 
 // NOVO: Contexto global do roteiro para consistência visual
@@ -327,6 +334,97 @@ function getDefaultVisualMap(): ScriptVisualMap {
     visualTone: "dramatic documentary",
     prohibitedVisuals: []
   };
+}
+
+// Função para analisar imagens de referência e extrair descrições de personagens
+async function analyzeReferenceImages(
+  referenceCharacters: ReferenceCharacterInput[],
+  apiUrl: string,
+  apiKey: string,
+  apiModel: string
+): Promise<CharacterDescription[]> {
+  if (!referenceCharacters || referenceCharacters.length === 0) {
+    return [];
+  }
+
+  console.log(`[Analyze Reference Images] Processing ${referenceCharacters.length} reference images...`);
+  
+  const characters: CharacterDescription[] = [];
+  
+  for (const ref of referenceCharacters) {
+    try {
+      // Usar modelo de visão para analisar a imagem
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini", // Modelo com visão
+          messages: [
+            {
+              role: "system",
+              content: `You are a visual description expert. Analyze the image and provide a DETAILED physical description of the person for use in AI image generation prompts.
+
+Focus on:
+- Age range (young adult, middle-aged, elderly)
+- Gender presentation
+- Skin tone (be specific but neutral: fair, olive, tan, dark, etc)
+- Hair: color, length, style, texture
+- Facial features: face shape, distinctive features
+- Body type if visible
+- Distinctive characteristics (beard, glasses, scars, etc)
+- Clothing style if relevant to character
+
+Return ONLY a concise English description (50-80 words) suitable for image generation prompts.
+DO NOT include the character name in the description.`
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `Describe this person named "${ref.name}" for image generation:`
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: ref.imageBase64
+                  }
+                }
+              ]
+            }
+          ],
+          max_tokens: 200,
+          temperature: 0.3
+        }),
+      });
+
+      if (!response.ok) {
+        console.error(`[Analyze Reference] Failed to analyze image for ${ref.name}:`, response.status);
+        continue;
+      }
+
+      const data = await response.json();
+      const description = data.choices?.[0]?.message?.content?.trim() || "";
+
+      if (description) {
+        characters.push({
+          name: ref.name,
+          description: description,
+          seed: Math.abs(hashCode(ref.name)) % 2147483647,
+          fromReference: true
+        });
+        console.log(`[Analyze Reference] Character "${ref.name}": ${description.substring(0, 100)}...`);
+      }
+    } catch (e) {
+      console.error(`[Analyze Reference] Error analyzing ${ref.name}:`, e);
+    }
+  }
+
+  console.log(`[Analyze Reference Images] Successfully analyzed ${characters.length}/${referenceCharacters.length} characters`);
+  return characters;
 }
 
 // Função simples de hash para gerar seed consistente
@@ -893,7 +991,8 @@ serve(async (req) => {
       maxScenes = 500,
       wpm = 140,
       includeVeo3 = false, // Novo: incluir prompts Veo3
-      stream = false // Nova opção para streaming
+      stream = false, // Nova opção para streaming
+      referenceCharacters = [] as ReferenceCharacterInput[] // NOVO: Personagens com imagens de referência
     } = body;
 
     if (!script) {
@@ -994,9 +1093,29 @@ serve(async (req) => {
 
     // OTIMIZADO: Detectar contexto, personagens E mapa visual em UMA chamada
     console.log(`[Generate Scenes] Detecting context + characters + visual map (unified call)...`);
-    const { context: scriptContext, characters, visualMap } = await detectContextAndCharacters(script, apiUrl, apiKey, apiModel);
-    console.log(`[Generate Scenes] Context: ${scriptContext.period}, Theme: ${visualMap.mainTheme}, Characters: ${characters.length}`, 
-      characters.map((c: CharacterDescription) => c.name));
+    const { context: scriptContext, characters: scriptCharacters, visualMap } = await detectContextAndCharacters(script, apiUrl, apiKey, apiModel);
+    
+    // NOVO: Analisar imagens de referência para extrair descrições de personagens
+    let referenceChars: CharacterDescription[] = [];
+    if (referenceCharacters && referenceCharacters.length > 0) {
+      console.log(`[Generate Scenes] Analyzing ${referenceCharacters.length} reference images...`);
+      referenceChars = await analyzeReferenceImages(referenceCharacters, apiUrl, apiKey, apiModel);
+    }
+    
+    // Mesclar personagens: referências têm prioridade (descrições mais precisas da imagem)
+    const allCharacters = [...referenceChars];
+    for (const scriptChar of scriptCharacters) {
+      // Só adicionar personagens do script se não houver referência com mesmo nome
+      const hasReference = referenceChars.some(r => 
+        r.name.toLowerCase() === scriptChar.name.toLowerCase()
+      );
+      if (!hasReference) {
+        allCharacters.push(scriptChar);
+      }
+    }
+    
+    console.log(`[Generate Scenes] Context: ${scriptContext.period}, Theme: ${visualMap.mainTheme}, Characters: ${allCharacters.length} (${referenceChars.length} from reference)`, 
+      allCharacters.map((c: CharacterDescription) => c.name));
 
     // PRÉ-SEGMENTAR o roteiro inteiro ANTES de chamar a IA
     // Isso garante sincronização PERFEITA: cada cena tem texto exato que será narrado
@@ -1050,7 +1169,7 @@ serve(async (req) => {
               type: 'init', 
               estimatedScenes: actualSceneCount, 
               totalBatches: sceneBatches.length,
-              characters,
+              characters: allCharacters,
               scriptContext
             })}\n\n`);
 
@@ -1077,7 +1196,7 @@ serve(async (req) => {
                   i + 1,
                   style,
                   stylePrefix,
-                  characters,
+                  allCharacters,
                   scriptContext,
                   visualMap,
                   wpm,
@@ -1235,7 +1354,7 @@ serve(async (req) => {
           i + 1,
           style,
           stylePrefix,
-          characters,
+          allCharacters,
           scriptContext,
           visualMap,
           wpm,
@@ -1310,7 +1429,7 @@ serve(async (req) => {
         totalScenes: allScenes.length,
         totalBatches: sceneBatches.length,
         creditsUsed: creditsNeeded,
-        characters: characters
+        characters: allCharacters
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
