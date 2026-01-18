@@ -118,7 +118,9 @@ async function generateImageWithImageFX(
   }
 }
 
-async function generateImageWithLovable(prompt: string, apiKey: string): Promise<{ images: any[]; message: string } | null> {
+async function generateImageWithLovable(prompt: string, apiKey: string): Promise<{ images: any[]; message: string; url?: string } | null> {
+  console.log('[Lovable AI] Generating image with gemini-2.5-flash-image-preview...');
+  
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -126,7 +128,7 @@ async function generateImageWithLovable(prompt: string, apiKey: string): Promise
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash-image",
+      model: "google/gemini-2.5-flash-image-preview",
       messages: [
         { role: "user", content: prompt },
       ],
@@ -136,7 +138,7 @@ async function generateImageWithLovable(prompt: string, apiKey: string): Promise
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("Lovable image generation error:", response.status, errorText);
+    console.error("[Lovable AI] Image generation error:", response.status, errorText);
     return null;
   }
 
@@ -144,7 +146,14 @@ async function generateImageWithLovable(prompt: string, apiKey: string): Promise
   const content = data.choices?.[0]?.message?.content;
   const images = data.choices?.[0]?.message?.images;
 
-  return { images: images || [], message: content || "" };
+  // Extract URL from images array
+  const imageUrl = images?.[0]?.image_url?.url;
+
+  return { 
+    images: images || [], 
+    message: content || "",
+    url: imageUrl
+  };
 }
 
 // ALWAYS use ImageFX for images when cookies are available
@@ -212,7 +221,7 @@ serve(async (req) => {
       imageFXAspectRatio = "IMAGE_ASPECT_RATIO_PORTRAIT";
     }
 
-    let result: { images: any[]; message: string; provider: string } | null = null;
+    let result: { images: any[]; message: string; provider: string; url?: string } | null = null;
 
     // Always try ImageFX first if user has cookies configured
     if (userId && supabaseAdmin) {
@@ -226,23 +235,26 @@ serve(async (req) => {
           result = {
             images: [{ image_url: { url: imageBase64 } }],
             message: "Imagem gerada com ImageFX",
-            provider: "imagefx"
+            provider: "imagefx",
+            url: imageBase64
           };
         } else {
-          console.log('[Image] ImageFX failed, falling back to Lovable');
+          console.log('[Image] ImageFX failed, falling back to Lovable AI');
         }
       }
     }
 
-    // Fallback to Lovable AI
+    // Fallback to Lovable AI (always works, no cookies needed)
     if (!result) {
-      console.log('[Image] Using Lovable AI');
+      console.log('[Image] Using Lovable AI as fallback');
       const lovableResult = await generateImageWithLovable(prompt, LOVABLE_API_KEY);
       
       if (lovableResult) {
         result = {
-          ...lovableResult,
-          provider: "lovable"
+          images: lovableResult.images,
+          message: lovableResult.message,
+          provider: "lovable",
+          url: lovableResult.url
         };
       }
     }
