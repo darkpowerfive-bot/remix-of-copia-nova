@@ -777,13 +777,12 @@ const [generating, setGenerating] = useState(false);
 
             const response = await fetch(functionUrl, {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'text/event-stream',
-                'Cache-Control': 'no-cache',
-                'Authorization': `Bearer ${authToken || supabaseKey}`,
-                'apikey': supabaseKey,
-              },
+               headers: {
+                 'Content-Type': 'application/json',
+                 'Accept': 'text/event-stream',
+                 'Authorization': `Bearer ${authToken || supabaseKey}`,
+                 'apikey': supabaseKey,
+               },
               body: JSON.stringify({ ...body, stream: true }),
               signal: controller.signal,
             });
