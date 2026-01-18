@@ -7098,7 +7098,10 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
       {/* Modal de Cookies Inválidos */}
       <InvalidCookieModal 
         isOpen={cookieModal.isOpen} 
-        onClose={cookieModal.close} 
+        onClose={cookieModal.close}
+        cookieIndex={cookieModal.cookieIndex}
+        totalCookies={cookieModal.totalCookies}
+        isGlobalCookie={cookieModal.isGlobalCookie}
       />
       </PermissionGate>
     </MainLayout>

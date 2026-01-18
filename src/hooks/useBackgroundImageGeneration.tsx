@@ -51,7 +51,10 @@ interface BackgroundGenerationState {
 
 interface CookieModalState {
   isOpen: boolean;
-  open: () => void;
+  cookieIndex?: number;
+  totalCookies?: number;
+  isGlobalCookie?: boolean;
+  open: (cookieIndex?: number, totalCookies?: number, isGlobalCookie?: boolean) => void;
   close: () => void;
 }
 
@@ -177,6 +180,11 @@ Reescreva o prompt de forma segura.`
 
   // Estado para modal de cookies inválidos
   const [showCookieModal, setShowCookieModal] = useState(false);
+  const [cookieErrorInfo, setCookieErrorInfo] = useState<{
+    cookieIndex?: number;
+    totalCookies?: number;
+    isGlobalCookie?: boolean;
+  }>({});
   const cookieErrorShownRef = useRef(false);
 
   // Gerar imagem apenas com ImageFX - sem fallback
@@ -184,7 +192,7 @@ Reescreva o prompt de forma segura.`
     prompt: string,
     sceneIndex: number,
     characterSeed?: number
-  ): Promise<{ success: boolean; imageUrl?: string; cookieError?: boolean }> => {
+  ): Promise<{ success: boolean; imageUrl?: string; cookieError?: boolean; cookieIndex?: number; totalCookies?: number; isGlobalCookie?: boolean }> => {
     try {
       const { data, error } = await supabase.functions.invoke("generate-imagefx", {
         body: {
@@ -199,17 +207,24 @@ Reescreva o prompt de forma segura.`
       if (error) {
         const bodyText = (error as any)?.context?.body;
         let errMsg = error.message;
+        let cookieIndex: number | undefined;
+        let totalCookies: number | undefined;
+        let isGlobalCookie: boolean | undefined;
+        
         if (bodyText) {
           try {
             const parsed = JSON.parse(bodyText);
             errMsg = parsed?.error || error.message;
+            cookieIndex = parsed?.cookieIndex;
+            totalCookies = parsed?.totalCookies;
+            isGlobalCookie = parsed?.usingGlobal;
           } catch {}
         }
         
         // Se for erro de cookies/sessão, sinalizar para mostrar modal
-        if (errMsg.includes("sessão") || errMsg.includes("cookies") || errMsg.includes("autenticação") || errMsg.includes("ImageFX")) {
-          console.log(`[Background] ImageFX cookie error detected`);
-          return { success: false, cookieError: true };
+        if (errMsg.includes("sessão") || errMsg.includes("cookies") || errMsg.includes("autenticação") || errMsg.includes("ImageFX") || errMsg.includes("inválido") || errMsg.includes("Cookie")) {
+          console.log(`[Background] ImageFX cookie error detected - Cookie ${cookieIndex}`);
+          return { success: false, cookieError: true, cookieIndex, totalCookies, isGlobalCookie };
         }
         
         throw new Error(errMsg);
@@ -217,9 +232,13 @@ Reescreva o prompt de forma segura.`
 
       if ((data as any)?.error) {
         const errMsg = (data as any).error;
-        if (errMsg.includes("sessão") || errMsg.includes("cookies") || errMsg.includes("autenticação") || errMsg.includes("ImageFX")) {
-          console.log(`[Background] ImageFX cookie error in data`);
-          return { success: false, cookieError: true };
+        const cookieIndex = (data as any)?.cookieIndex;
+        const totalCookies = (data as any)?.totalCookies;
+        const isGlobalCookie = (data as any)?.usingGlobal;
+        
+        if (errMsg.includes("sessão") || errMsg.includes("cookies") || errMsg.includes("autenticação") || errMsg.includes("ImageFX") || errMsg.includes("inválido") || errMsg.includes("Cookie")) {
+          console.log(`[Background] ImageFX cookie error in data - Cookie ${cookieIndex}`);
+          return { success: false, cookieError: true, cookieIndex, totalCookies, isGlobalCookie };
         }
         throw new Error(errMsg);
       }
@@ -237,9 +256,10 @@ Reescreva o prompt de forma segura.`
   }, []);
 
   // Função para abrir modal de cookies
-  const openCookieModal = useCallback(() => {
+  const openCookieModal = useCallback((cookieIndex?: number, totalCookies?: number, isGlobalCookie?: boolean) => {
     if (!cookieErrorShownRef.current) {
       cookieErrorShownRef.current = true;
+      setCookieErrorInfo({ cookieIndex, totalCookies, isGlobalCookie });
       setShowCookieModal(true);
     }
   }, []);
@@ -247,15 +267,21 @@ Reescreva o prompt de forma segura.`
   // Função para fechar modal de cookies
   const closeCookieModal = useCallback(() => {
     setShowCookieModal(false);
+    setCookieErrorInfo({});
     cookieErrorShownRef.current = false;
   }, []);
 
   // Expor estado do modal para componentes externos
   const getCookieModalState = useCallback(() => ({
     isOpen: showCookieModal,
+    cookieIndex: cookieErrorInfo.cookieIndex,
+    totalCookies: cookieErrorInfo.totalCookies,
+    isGlobalCookie: cookieErrorInfo.isGlobalCookie,
     open: openCookieModal,
     close: closeCookieModal,
-  }), [showCookieModal, openCookieModal, closeCookieModal]);
+  }), [showCookieModal, cookieErrorInfo, openCookieModal, closeCookieModal]);
+
+  
 
   const generateSingleImage = useCallback(async (
     sceneIndex: number, 
@@ -294,13 +320,13 @@ Reescreva o prompt de forma segura.`
         // Usar ImageFX apenas - sem fallback
         const result = await generateWithImageFX(fullPrompt, sceneIndex, characterSeed);
         
-        // Se erro de cookie, mostrar modal e parar
+        // Se erro de cookie, mostrar modal com info do cookie e parar
         if (result.cookieError) {
-          openCookieModal();
+          openCookieModal(result.cookieIndex, result.totalCookies, result.isGlobalCookie);
           cancelRef.current = true;
           return { index: sceneIndex, success: false, cookieError: true };
         }
-        
+
         if (result.success && result.imageUrl) {
           // Limpar estado de reescrita
           if (updateRewriteProgress) {

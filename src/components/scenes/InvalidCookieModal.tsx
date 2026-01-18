@@ -9,18 +9,33 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Settings, RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface InvalidCookieModalProps {
   isOpen: boolean;
   onClose: () => void;
+  cookieIndex?: number;
+  totalCookies?: number;
+  isGlobalCookie?: boolean;
 }
 
-export const InvalidCookieModal = ({ isOpen, onClose }: InvalidCookieModalProps) => {
+export const InvalidCookieModal = ({ 
+  isOpen, 
+  onClose, 
+  cookieIndex,
+  totalCookies,
+  isGlobalCookie 
+}: InvalidCookieModalProps) => {
   const navigate = useNavigate();
 
   const handleGoToSettings = () => {
     onClose();
     navigate("/settings");
+  };
+
+  const getCookieLabel = () => {
+    if (!cookieIndex) return null;
+    return `Cookie ${cookieIndex}${totalCookies ? ` de ${totalCookies}` : ''}`;
   };
 
   return (
@@ -31,21 +46,38 @@ export const InvalidCookieModal = ({ isOpen, onClose }: InvalidCookieModalProps)
             <div className="p-2 rounded-full bg-destructive/10">
               <AlertTriangle className="h-6 w-6 text-destructive" />
             </div>
-            <DialogTitle className="text-xl">Cookies do ImageFX Inválidos</DialogTitle>
+            <div className="flex flex-col gap-1">
+              <DialogTitle className="text-xl">Cookie do ImageFX Inválido</DialogTitle>
+              {cookieIndex && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="destructive" className="text-xs">
+                    {getCookieLabel()}
+                  </Badge>
+                  {isGlobalCookie && (
+                    <Badge variant="outline" className="text-xs">
+                      Cookie Global
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <DialogDescription className="text-base pt-2">
-            Os cookies do ImageFX estão inválidos ou expiraram. A geração de imagens foi interrompida.
+            {cookieIndex 
+              ? `O Cookie ${cookieIndex} do ImageFX está inválido ou expirou. A geração de imagens foi interrompida.`
+              : `Os cookies do ImageFX estão inválidos ou expiraram. A geração de imagens foi interrompida.`
+            }
           </DialogDescription>
         </DialogHeader>
 
         <div className="bg-muted/50 rounded-lg p-4 my-4 space-y-3">
-          <h4 className="font-medium text-sm">Para resolver:</h4>
+          <h4 className="font-medium text-sm">Para resolver{cookieIndex ? ` o Cookie ${cookieIndex}` : ''}:</h4>
           <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
             <li>Acesse <a href="https://labs.google/fx/tools/image-fx" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">labs.google/fx/tools/image-fx</a></li>
-            <li>Faça login com sua conta Google</li>
+            <li>Faça login com sua conta Google{cookieIndex && cookieIndex > 1 ? ` (conta ${cookieIndex})` : ''}</li>
             <li>Gere qualquer imagem de teste</li>
             <li>Copie os cookies atualizados</li>
-            <li>Cole nas Configurações do sistema</li>
+            <li>Cole nas Configurações do sistema{cookieIndex ? ` no campo Cookie ${cookieIndex}` : ''}</li>
           </ol>
         </div>
 

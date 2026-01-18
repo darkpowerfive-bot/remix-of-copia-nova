@@ -556,25 +556,52 @@ serve(async (req) => {
     }
 
     // Generate images using selected cookie
-    const images = await generateWithImageFX(selectedCookie, userId, {
-      prompt,
-      negativePrompt,
-      numberOfImages: Math.min(numberOfImages, 4), // Max 4 images
-      aspectRatio: aspectRatioValue,
-      seed,
-      model
-    });
+    try {
+      const images = await generateWithImageFX(selectedCookie, userId, {
+        prompt,
+        negativePrompt,
+        numberOfImages: Math.min(numberOfImages, 4), // Max 4 images
+        aspectRatio: aspectRatioValue,
+        seed,
+        model
+      });
 
-    console.log(`[ImageFX] Returning ${images.length} image(s) from cookie ${cookieIndex + 1}`);
+      console.log(`[ImageFX] Returning ${images.length} image(s) from cookie ${cookieIndex + 1}`);
 
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        images,
-        count: images.length 
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      return new Response(
+        JSON.stringify({ 
+          success: true,
+          images,
+          count: images.length 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    } catch (error) {
+      console.error(`[ImageFX] Error with cookie ${cookieIndex + 1}:`, error);
+      
+      const errorMessage = error instanceof Error ? error.message : "Erro inesperado";
+      
+      // Se for erro de sessão/autenticação, incluir qual cookie falhou
+      if (errorMessage.includes("sessão") || errorMessage.includes("autenticação") || errorMessage.includes("cookies") || errorMessage.includes("Atualize")) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Cookie ${cookieIndex + 1} inválido ou expirado. Atualize o Cookie ${cookieIndex + 1} nas Configurações > ImageFX.`,
+            cookieIndex: cookieIndex + 1,
+            totalCookies: cookieList.length,
+            usingGlobal: usingGlobalCookies
+          }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          error: errorMessage,
+          cookieIndex: cookieIndex + 1
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
   } catch (error) {
     console.error('[ImageFX] Error:', error);
