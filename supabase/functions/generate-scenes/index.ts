@@ -428,8 +428,10 @@ function generateVeo3Prompt(basePrompt: string, context: ScriptContext, wordCoun
   
   const cleanedPrompt = basePrompt
     .replace(/1280x720 resolution,?\s*/gi, '')
-    .replace(/16:9 aspect ratio,?\s*/gi, '')
+    .replace(/16:9 (horizontal landscape|aspect ratio),?\s*/gi, '')
+    .replace(/edge-to-edge full bleed composition,?\s*/gi, '')
     .replace(/full frame composition,?\s*/gi, '')
+    .replace(/fill entire frame without any black bars,?\s*/gi, '')
     .replace(/no text.*$/gi, '')
     .replace(/,\s*,/g, ',')
     .trim();
@@ -597,7 +599,7 @@ DIVERSITY RULES:
 - ALTERNATE between: wide/close shots, exterior/interior, objects/architecture, day/night
 
 FORMAT (EVERY PROMPT - INCLUDE CAMERA ANGLE AND LIGHTING):
-"1280x720, 16:9, [CAMERA ANGLE], ${stylePrefix || style}, [LIGHTING], [VISUAL DESCRIPTION focusing on LOCATIONS and OBJECTS, minimal human presence], ${scriptContext.atmosphere} atmosphere, no text, no watermarks"
+"16:9 horizontal landscape, edge-to-edge full bleed composition, [CAMERA ANGLE], ${stylePrefix || style}, [LIGHTING], [VISUAL DESCRIPTION focusing on LOCATIONS and OBJECTS, minimal human presence], ${scriptContext.atmosphere} atmosphere, fill entire frame without any black bars or letterboxing, no text, no watermarks"
 
 RETURN ONLY JSON:
 {"scenes":[{"number":N,"imagePrompt":"[50-70 words including camera angle and specific lighting, diverse from adjacent scenes]","emotion":"[one word]","suggestMovement":true/false}]}`;
@@ -681,7 +683,7 @@ RETURN ONLY JSON:
           const aiScene = scenesRaw.find((s: any) => s.number === originalScene.number);
           
           let finalPrompt = aiScene?.imagePrompt || 
-            `1280x720 resolution, 16:9 aspect ratio, full frame composition, ${stylePrefix || style + ' style'}, dramatic lighting, cinematic shot of ${visualMap.mainTheme}, ${visualMap.keyLocations[0] || scriptContext.setting}`;
+            `16:9 horizontal landscape, edge-to-edge full bleed composition, ${stylePrefix || style + ' style'}, dramatic lighting, cinematic shot of ${visualMap.mainTheme}, ${visualMap.keyLocations[0] || scriptContext.setting}, fill entire frame without any black bars`;
           
           // VALIDAÇÃO AUTOMÁTICA ULTRA-RIGOROSA: Detectar QUALQUER roupa/pessoa moderna
           // Lista COMPLETA para detectar roupas modernas em contextos históricos
@@ -778,7 +780,7 @@ RETURN ONLY JSON:
               const relevantObject = visualMap.keyObjects.length > 0 ? visualMap.keyObjects[objectIdx] : '';
 
               // Prompt focado em LOCAIS/OBJETOS, com diversidade visual, sem pessoas
-              finalPrompt = `1280x720 resolution, 16:9 aspect ratio, ${cameraAngle}, ${composition}, ${stylePrefix || style}, ${lighting}, ancient ${relevantLocation}${relevantObject ? ', ancient ' + relevantObject + ' artifact' : ''}, ${scriptContext.period}, ${scriptContext.atmosphere} atmosphere, documentary about ${visualMap.mainTheme}, empty scene without any people, focus on architecture and artifacts only, no humans, no modern elements, no text, no watermarks`;
+              finalPrompt = `16:9 horizontal landscape, edge-to-edge full bleed composition, ${cameraAngle}, ${composition}, ${stylePrefix || style}, ${lighting}, ancient ${relevantLocation}${relevantObject ? ', ancient ' + relevantObject + ' artifact' : ''}, ${scriptContext.period}, ${scriptContext.atmosphere} atmosphere, documentary about ${visualMap.mainTheme}, empty scene without any people, focus on architecture and artifacts only, no humans, no modern elements, fill entire frame without any black bars, no text, no watermarks`;
             } else {
               // Mesmo quando não corrige, adicionar diversidade leve sem mexer no conteúdo
               const diversity = `, ${cameraAngle}, ${composition}, ${lighting}`;
@@ -799,7 +801,7 @@ RETURN ONLY JSON:
           
           // Garantir que o estilo seja aplicado mesmo se não corrigido
           if (!styleApplied && stylePrefix) {
-            finalPrompt = finalPrompt.replace(/^1280x720[^,]*,\s*16:9[^,]*,\s*/, `1280x720 resolution, 16:9 aspect ratio, full frame composition, ${stylePrefix}, `);
+            finalPrompt = finalPrompt.replace(/^(16:9[^,]*|1280x720[^,]*),\s*(16:9[^,]*|edge-to-edge[^,]*),?\s*/, `16:9 horizontal landscape, edge-to-edge full bleed composition, ${stylePrefix}, `);
           }
           
           results.push({
@@ -892,7 +894,7 @@ RETURN ONLY JSON:
     const lighting = timeOfDay[sceneIdx % timeOfDay.length];
     const composition = visualFocus[sceneIdx % visualFocus.length];
     
-    const fallbackImagePrompt = `1280x720 resolution, 16:9 aspect ratio, ${cameraAngle}, ${composition}, ${stylePrefix || style + ' style'}, ${lighting}, ${location}${object ? ', featuring ' + object : ''}, ${scriptContext.period}, ${scriptContext.atmosphere} atmosphere, documentary about ${visualMap.mainTheme}, no text, no watermarks`;
+    const fallbackImagePrompt = `16:9 horizontal landscape, edge-to-edge full bleed composition, ${cameraAngle}, ${composition}, ${stylePrefix || style + ' style'}, ${lighting}, ${location}${object ? ', featuring ' + object : ''}, ${scriptContext.period}, ${scriptContext.atmosphere} atmosphere, documentary about ${visualMap.mainTheme}, fill entire frame without any black bars, no text, no watermarks`;
     
     // Priorizar movimento nas primeiras cenas mesmo no fallback
     const isEarlyScene = scene.number <= 5;
@@ -1305,7 +1307,7 @@ serve(async (req) => {
                         number: preScene.number,
                         text: preScene.text,
                         wordCount: preScene.wordCount,
-                        imagePrompt: `1280x720 resolution, 16:9 aspect ratio, ${cameraAngles[sceneIdx % 4]}, ${stylePrefix || style + ' style'}, ${lighting[sceneIdx % 4]}, ${visualMap.mainTheme}, ${visualMap.keyLocations[sceneIdx % Math.max(1, visualMap.keyLocations.length)] || scriptContext.setting}, ${scriptContext.period}, documentary scene, no text, no watermarks`,
+                        imagePrompt: `16:9 horizontal landscape, edge-to-edge full bleed composition, ${cameraAngles[sceneIdx % 4]}, ${stylePrefix || style + ' style'}, ${lighting[sceneIdx % 4]}, ${visualMap.mainTheme}, ${visualMap.keyLocations[sceneIdx % Math.max(1, visualMap.keyLocations.length)] || scriptContext.setting}, ${scriptContext.period}, documentary scene, fill entire frame without any black bars, no text, no watermarks`,
                         emotion: 'neutral',
                         retentionTrigger: 'continuity',
                         suggestMovement: preScene.number <= 5
@@ -1439,7 +1441,7 @@ serve(async (req) => {
             number: preScene.number,
             text: preScene.text,
             wordCount: preScene.wordCount,
-            imagePrompt: `1280x720 resolution, 16:9 aspect ratio, full frame composition, ${stylePrefix || style + ' style'}, cinematic scene: ${preScene.text.substring(0, 100)}`,
+            imagePrompt: `16:9 horizontal landscape, edge-to-edge full bleed composition, ${stylePrefix || style + ' style'}, cinematic scene: ${preScene.text.substring(0, 100)}, fill entire frame without any black bars`,
             emotion: 'neutral',
             retentionTrigger: 'continuity'
           });

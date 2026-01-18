@@ -413,7 +413,7 @@ serve(async (req) => {
       }
       
       // Build the image generation prompt
-      let imagePrompt = `${stylePromptPrefix} Create a YouTube thumbnail image (16:9 aspect ratio, 1280x720 resolution). 
+      let imagePrompt = `${stylePromptPrefix} Create a YouTube thumbnail image (16:9 horizontal landscape, edge-to-edge full bleed composition, fill entire frame without any black bars or letterboxing). 
 Style: ${style}, ${variationStyle.description}
 Topic: ${videoTitle}
 Niche: ${niche}${subNiche ? `, Sub-niche: ${subNiche}` : ""}`;
