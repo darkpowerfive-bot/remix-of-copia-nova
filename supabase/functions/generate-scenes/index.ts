@@ -1028,10 +1028,11 @@ serve(async (req) => {
 
     const wordCount = resolvedScript.split(/\s+/).filter(Boolean).length;
     const estimatedScenes = Math.min(Math.ceil(wordCount / wordsPerScene), maxScenes);
-    const scenesPerBatch = 10; // Mais estável (reduz chance de timeout por lote)
+    // OTIMIZADO: 25 cenas por batch (era 10) + processamento paralelo de 2 batches
+    const scenesPerBatch = 25;
     const totalBatches = Math.ceil(estimatedScenes / scenesPerBatch);
 
-    console.log(`[Generate Scenes] ${wordCount} words -> ${estimatedScenes} scenes in ${totalBatches} batches`);
+    console.log(`[Generate Scenes] ${wordCount} words -> ${estimatedScenes} scenes in ${totalBatches} batches (25/batch, parallel)`);
 
     // Calcular créditos (Prompts para Cenas sempre usa DeepSeek)
     const creditsNeeded = Math.ceil(totalBatches * CREDIT_PRICING.base);
@@ -1209,25 +1210,32 @@ serve(async (req) => {
 
             const allScenes: SceneResult[] = [];
 
-            for (let i = 0; i < sceneBatches.length; i++) {
+            // OTIMIZADO: Processar até 2 batches em PARALELO para dobrar a velocidade
+            const PARALLEL_BATCHES = 2;
+
+            for (let i = 0; i < sceneBatches.length; i += PARALLEL_BATCHES) {
               if (isControllerClosed) break;
 
-              const batch = sceneBatches[i];
+              // Pegar os próximos N batches para processar em paralelo
+              const batchesToProcess = sceneBatches.slice(i, i + PARALLEL_BATCHES);
               
-              console.log(`[Generate Scenes] Processing batch ${i + 1}/${sceneBatches.length} (${batch.length} scenes)`);
+              console.log(`[Generate Scenes] Processing batches ${i + 1}-${Math.min(i + PARALLEL_BATCHES, sceneBatches.length)}/${sceneBatches.length} in parallel`);
 
               // Enviar status do lote para manter cliente informado
               safeEnqueue(`data: ${JSON.stringify({ 
                 type: 'batch_start', 
                 batch: i + 1, 
-                totalBatches: sceneBatches.length 
+                totalBatches: sceneBatches.length,
+                parallelCount: batchesToProcess.length
               })}\n\n`);
 
-              try {
-                // Timeout de 60s por lote para evitar travamento
+              // Criar promises para todos os batches em paralelo
+              const batchPromises = batchesToProcess.map((batch, idx) => {
+                const batchNum = i + idx + 1;
+                
                 const batchPromise = generatePromptsForPreSegmentedScenes(
                   batch,
-                  i + 1,
+                  batchNum,
                   style,
                   stylePrefix,
                   allCharacters,
@@ -1242,67 +1250,81 @@ serve(async (req) => {
                 );
 
                 const timeoutPromise = new Promise<SceneResult[]>((_, reject) => {
-                  setTimeout(() => reject(new Error('Batch timeout')), 180000);
+                  setTimeout(() => reject(new Error(`Batch ${batchNum} timeout`)), 120000);
                 });
 
-                const batchScenes = await Promise.race([batchPromise, timeoutPromise]);
+                return Promise.race([batchPromise, timeoutPromise])
+                  .then(scenes => ({ batchNum, scenes, error: null }))
+                  .catch(error => ({ batchNum, scenes: null as SceneResult[] | null, error }));
+              });
 
-                // Enviar cada cena individualmente
-                for (const scene of batchScenes) {
-                  if (isControllerClosed) break;
-                  allScenes.push(scene);
+              // Esperar TODOS os batches paralelos completarem
+              const results = await Promise.all(batchPromises);
+
+              // Processar resultados ordenadamente
+              for (const result of results.sort((a, b) => a.batchNum - b.batchNum)) {
+                if (isControllerClosed) break;
+
+                if (result.scenes && result.scenes.length > 0) {
+                  // Sucesso: enviar cenas individualmente
+                  for (const scene of result.scenes) {
+                    if (isControllerClosed) break;
+                    allScenes.push(scene);
+                    
+                    safeEnqueue(`data: ${JSON.stringify({ 
+                      type: 'scene', 
+                      scene,
+                      current: allScenes.length,
+                      total: actualSceneCount
+                    })}\n\n`);
+                  }
+                  console.log(`[Generate Scenes] Batch ${result.batchNum} completed: ${result.scenes.length} scenes`);
+                } else {
+                  // Erro: gerar fallback para este batch
+                  console.error(`[Generate Scenes] Batch ${result.batchNum} failed:`, result.error);
                   
                   safeEnqueue(`data: ${JSON.stringify({ 
-                    type: 'scene', 
-                    scene,
-                    current: allScenes.length,
-                    total: actualSceneCount
+                    type: 'batch_retry', 
+                    batch: result.batchNum,
+                    message: 'Usando fallback para este lote'
                   })}\n\n`);
-                }
 
-                console.log(`[Generate Scenes] Batch ${i + 1} completed: ${batchScenes.length} scenes`);
-
-                // Pausa curta entre lotes
-                if (i < sceneBatches.length - 1) {
-                  await new Promise(resolve => setTimeout(resolve, 300));
+                  // Encontrar o batch original para gerar fallback
+                  const originalBatch = sceneBatches[result.batchNum - 1];
+                  if (originalBatch) {
+                    for (const preScene of originalBatch) {
+                      if (isControllerClosed) break;
+                      
+                      // Diversificação visual no fallback
+                      const sceneIdx = preScene.number - 1;
+                      const cameraAngles = ['wide shot', 'close-up', 'medium shot', 'panoramic view'];
+                      const lighting = ['golden hour', 'dramatic lighting', 'soft light', 'atmospheric haze'];
+                      
+                      const fallbackScene: SceneResult = {
+                        number: preScene.number,
+                        text: preScene.text,
+                        wordCount: preScene.wordCount,
+                        imagePrompt: `1280x720 resolution, 16:9 aspect ratio, ${cameraAngles[sceneIdx % 4]}, ${stylePrefix || style + ' style'}, ${lighting[sceneIdx % 4]}, ${visualMap.mainTheme}, ${visualMap.keyLocations[sceneIdx % Math.max(1, visualMap.keyLocations.length)] || scriptContext.setting}, ${scriptContext.period}, documentary scene, no text, no watermarks`,
+                        emotion: 'neutral',
+                        retentionTrigger: 'continuity',
+                        suggestMovement: preScene.number <= 5
+                      };
+                      allScenes.push(fallbackScene);
+                      
+                      safeEnqueue(`data: ${JSON.stringify({ 
+                        type: 'scene', 
+                        scene: fallbackScene,
+                        current: allScenes.length,
+                        total: actualSceneCount
+                      })}\n\n`);
+                    }
+                  }
                 }
-              } catch (batchError) {
-                console.error(`[Generate Scenes] Batch ${i + 1} failed:`, batchError);
-                
-                // Notificar erro do lote mas continuar com fallback
-                safeEnqueue(`data: ${JSON.stringify({ 
-                  type: 'batch_retry', 
-                  batch: i + 1,
-                  message: 'Usando fallback para este lote'
-                })}\n\n`);
+              }
 
-                // Gerar cenas com prompts genéricos contextuais
-                for (const preScene of batch) {
-                  if (isControllerClosed) break;
-                  
-                  // Diversificação visual mesmo no fallback
-                  const sceneIdx = preScene.number - 1;
-                  const cameraAngles = ['wide shot', 'close-up', 'medium shot', 'panoramic view'];
-                  const lighting = ['golden hour', 'dramatic lighting', 'soft light', 'atmospheric haze'];
-                  
-                  const fallbackScene: SceneResult = {
-                    number: preScene.number,
-                    text: preScene.text,
-                    wordCount: preScene.wordCount,
-                    imagePrompt: `1280x720 resolution, 16:9 aspect ratio, ${cameraAngles[sceneIdx % 4]}, ${stylePrefix || style + ' style'}, ${lighting[sceneIdx % 4]}, ${visualMap.mainTheme}, ${visualMap.keyLocations[sceneIdx % Math.max(1, visualMap.keyLocations.length)] || scriptContext.setting}, ${scriptContext.period}, documentary scene, no text, no watermarks`,
-                    emotion: 'neutral',
-                    retentionTrigger: 'continuity',
-                    suggestMovement: preScene.number <= 5
-                  };
-                  allScenes.push(fallbackScene);
-                  
-                  safeEnqueue(`data: ${JSON.stringify({ 
-                    type: 'scene', 
-                    scene: fallbackScene,
-                    current: allScenes.length,
-                    total: actualSceneCount
-                  })}\n\n`);
-                }
+              // Pausa mínima entre grupos de batches paralelos
+              if (i + PARALLEL_BATCHES < sceneBatches.length) {
+                await new Promise(resolve => setTimeout(resolve, 100));
               }
             }
 
