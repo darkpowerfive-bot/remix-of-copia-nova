@@ -691,9 +691,16 @@ const [generating, setGenerating] = useState(false);
     const MAX_ESTIMATED_SCENES_PER_CHUNK = 45; // ~4-5 batches (mais seguro)
     const MAX_WORDS_PER_CHUNK = Math.min(2000, wordsPerSceneNum * MAX_ESTIMATED_SCENES_PER_CHUNK);
     
-    // Dividir roteiro em partes se necessário
-    const scriptChunks = splitScriptIntoChunks(script, MAX_WORDS_PER_CHUNK);
-    const totalChunks = scriptChunks.length;
+    // Dividir roteiro em partes se necessário.
+    // OBS: quando temos scenePromptId, o backend lê o roteiro direto do banco,
+    // então não precisamos (nem devemos) mandar chunks do texto.
+    let scriptChunks = splitScriptIntoChunks(script, MAX_WORDS_PER_CHUNK);
+    let totalChunks = scriptChunks.length;
+
+    if (user) {
+      scriptChunks = [script];
+      totalChunks = 1;
+    }
     
     if (totalChunks > 1) {
       toast({
@@ -711,6 +718,34 @@ const [generating, setGenerating] = useState(false);
       let allCharacters: CharacterDescription[] = [];
       let totalCreditsUsed = 0;
       let globalSceneNumber = 1;
+
+      // Se o usuário estiver logado, salvamos o roteiro no backend 1x e enviamos só o ID.
+      // Isso elimina "Failed to fetch" por payload grande (roteiro longo + imagens em base64).
+      let scenePromptId: string | null = null;
+      if (user) {
+        const { data: created, error: createErr } = await supabase
+          .from("scene_prompts")
+          .insert([
+            {
+              user_id: user.id,
+              title: `Roteiro ${new Date().toLocaleDateString('pt-BR')}`,
+              script,
+              total_scenes: 0,
+              total_words: 0,
+              estimated_duration: null,
+              model_used: model,
+              style,
+              scenes: [],
+              credits_used: 0,
+            },
+          ])
+          .select("id")
+          .single();
+
+        if (!createErr && created?.id) {
+          scenePromptId = created.id;
+        }
+      }
 
       const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
       // Usar SSE (Server-Sent Events) para streaming
@@ -969,7 +1004,8 @@ const [generating, setGenerating] = useState(false);
 
           const result = await invokeGenerateScenesWithStreaming(
             {
-              script: chunk,
+              script: scenePromptId ? undefined : chunk,
+              scriptId: scenePromptId || undefined,
               model,
               style,
               wordsPerScene: parseInt(wordsPerScene) || 80,
@@ -1072,7 +1108,8 @@ const [generating, setGenerating] = useState(false);
           let response: any;
           try {
             response = await invokeGenerateScenesWithRetry({
-              script: chunk,
+              script: scenePromptId ? undefined : chunk,
+              scriptId: scenePromptId || undefined,
               model,
               style,
               wordsPerScene: parseInt(wordsPerScene) || 80,
@@ -1185,18 +1222,36 @@ const [generating, setGenerating] = useState(false);
 
       // Salvar no histórico
       if (user) {
-        await supabase.from("scene_prompts").insert([{
-          user_id: user.id,
-          title: `Roteiro ${new Date().toLocaleDateString('pt-BR')}`,
-          script,
-          total_scenes: enrichedScenes.length,
-          total_words: totalWords,
-          estimated_duration: estimatedDuration,
-          model_used: model,
-          style,
-          scenes: JSON.parse(JSON.stringify(enrichedScenes)),
-          credits_used: totalCreditsUsed
-        }]);
+        if (scenePromptId) {
+          await supabase
+            .from("scene_prompts")
+            .update({
+              script,
+              total_scenes: enrichedScenes.length,
+              total_words: totalWords,
+              estimated_duration: estimatedDuration,
+              model_used: model,
+              style,
+              scenes: JSON.parse(JSON.stringify(enrichedScenes)),
+              credits_used: totalCreditsUsed,
+            })
+            .eq("id", scenePromptId);
+        } else {
+          await supabase.from("scene_prompts").insert([
+            {
+              user_id: user.id,
+              title: `Roteiro ${new Date().toLocaleDateString('pt-BR')}`,
+              script,
+              total_scenes: enrichedScenes.length,
+              total_words: totalWords,
+              estimated_duration: estimatedDuration,
+              model_used: model,
+              style,
+              scenes: JSON.parse(JSON.stringify(enrichedScenes)),
+              credits_used: totalCreditsUsed,
+            },
+          ]);
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ["scene-prompts-history"] });
