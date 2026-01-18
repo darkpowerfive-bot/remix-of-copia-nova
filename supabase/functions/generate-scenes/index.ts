@@ -980,8 +980,11 @@ serve(async (req) => {
       stream = false, // Nova opção para streaming
       startSceneNumber = 1, // NOVO: numeração correta quando o roteiro é dividido em partes
       existingCharacters = [] as CharacterDescription[], // NOVO: manter consistência entre partes
-      referenceCharacters = [] as ReferenceCharacterInput[], // NOVO: Personagens com imagens de referência
+      referenceCharacters: referenceCharactersRaw = [] as ReferenceCharacterInput[], // (ignorado)
     } = body;
+
+    // Desabilitado: personagens por imagem de referência (evita payload gigante e timeouts)
+    const referenceCharacters: ReferenceCharacterInput[] = [];
 
     // Resolver o roteiro:
     // - Preferir script direto (compat)
@@ -1006,7 +1009,7 @@ serve(async (req) => {
 
     const wordCount = resolvedScript.split(/\s+/).filter(Boolean).length;
     const estimatedScenes = Math.min(Math.ceil(wordCount / wordsPerScene), maxScenes);
-    const scenesPerBatch = 15; // Processar 15 cenas por vez (aumentado de 10)
+    const scenesPerBatch = 10; // Mais estável (reduz chance de timeout por lote)
     const totalBatches = Math.ceil(estimatedScenes / scenesPerBatch);
 
     console.log(`[Generate Scenes] ${wordCount} words -> ${estimatedScenes} scenes in ${totalBatches} batches`);
@@ -1220,7 +1223,7 @@ serve(async (req) => {
                 );
 
                 const timeoutPromise = new Promise<SceneResult[]>((_, reject) => {
-                  setTimeout(() => reject(new Error('Batch timeout')), 60000);
+                  setTimeout(() => reject(new Error('Batch timeout')), 180000);
                 });
 
                 const batchScenes = await Promise.race([batchPromise, timeoutPromise]);
