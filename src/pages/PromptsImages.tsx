@@ -1005,8 +1005,8 @@ const [generating, setGenerating] = useState(false);
           const previousSceneCount = allScenes.length;
 
           // Montar payload compacto: se temos scriptId, NÃO mandamos script
-          // Imagens de referência só no 1º chunk e se não temos personagens detectados ainda
-          const sendReferenceImages = chunkIndex === 0 && allCharacters.length === 0 && referenceCharactersPayload.length > 0;
+          // Imagens de referência: enviar no 1º chunk (para extrair descrições) mesmo que já exista lista de personagens
+          const sendReferenceImages = chunkIndex === 0 && referenceCharactersPayload.length > 0;
           
           const requestBody: Record<string, unknown> = {
             model,
@@ -1125,7 +1125,8 @@ const [generating, setGenerating] = useState(false);
           let response: any;
           try {
             // Montar payload compacto: se temos scriptId, NÃO mandamos script
-            const sendReferenceImages = chunkIndex === 0 && allCharacters.length === 0 && referenceCharactersPayload.length > 0;
+            // Imagens de referência: enviar no 1º chunk (para extrair descrições) mesmo que já exista lista de personagens
+            const sendReferenceImages = chunkIndex === 0 && referenceCharactersPayload.length > 0;
             
             const requestBody: Record<string, unknown> = {
               model,

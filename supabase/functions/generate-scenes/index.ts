@@ -980,11 +980,30 @@ serve(async (req) => {
       stream = false, // Nova opção para streaming
       startSceneNumber = 1, // NOVO: numeração correta quando o roteiro é dividido em partes
       existingCharacters = [] as CharacterDescription[], // NOVO: manter consistência entre partes
-      referenceCharacters: referenceCharactersRaw = [] as ReferenceCharacterInput[], // (ignorado)
+      referenceCharacters: referenceCharactersRaw = [] as ReferenceCharacterInput[], // NOVO: Personagens com imagens de referência
     } = body;
 
-    // Desabilitado: personagens por imagem de referência (evita payload gigante e timeouts)
-    const referenceCharacters: ReferenceCharacterInput[] = [];
+    // Sanear/limitar imagens de referência (evita payloads e tempo excessivo de visão)
+    const MAX_REFERENCE_IMAGES = 3;
+    const MAX_REFERENCE_BASE64_LEN = 450_000; // ~450KB (string); o client já comprime
+
+    const referenceCharacters: ReferenceCharacterInput[] = (Array.isArray(referenceCharactersRaw)
+      ? referenceCharactersRaw
+      : [])
+      .filter((c) => c && typeof c.name === "string" && typeof c.imageBase64 === "string")
+      .map((c) => ({ name: c.name.trim(), imageBase64: c.imageBase64 }))
+      .filter((c) => c.name.length > 0 && c.imageBase64.length > 0)
+      .filter((c) => {
+        if (c.imageBase64.length <= MAX_REFERENCE_BASE64_LEN) return true;
+        console.warn(`[Generate Scenes] Reference image too large for "${c.name}" (${c.imageBase64.length} chars). Skipping.`);
+        return false;
+      })
+      .slice(0, MAX_REFERENCE_IMAGES);
+
+    if (referenceCharacters.length > 0) {
+      console.log(`[Generate Scenes] Reference characters received: ${referenceCharacters.length}`);
+    }
+
 
     // Resolver o roteiro:
     // - Preferir script direto (compat)
