@@ -55,7 +55,7 @@ CRITICAL RULES:
    - Scary content → mysterious atmospheric scenes
 3. Keep all visual descriptions: lighting, colors, camera angles, style
 4. Add: "professional cinematography, cinematic lighting, 8K quality"
-5. Keep: "1280x720, 16:9 aspect ratio, full frame"
+5. Keep: "16:9 horizontal landscape, edge-to-edge full bleed, fill entire frame without any black bars or letterboxing"
 6. Output ONLY the rewritten prompt, nothing else
 
 The goal is to create the SAME visual scene but described in a safe way.`
@@ -66,7 +66,7 @@ MANDATORY RULES:
 2. NO people, NO actions, NO specific objects that could be flagged
 3. Focus on: moods, color palettes, lighting effects, abstract compositions
 4. Use terms like: "ethereal", "atmospheric", "cinematic mood", "artistic composition"
-5. Add: "abstract digital art, 1280x720, 16:9, full frame, professional photography"
+5. Add: "abstract digital art, 16:9 horizontal landscape, edge-to-edge full bleed, professional photography, fill entire frame without any black bars"
 6. Output ONLY the abstract visual prompt
 
 Create a beautiful, safe image that captures the ESSENCE of the original scene.`;
@@ -102,9 +102,9 @@ Create a beautiful, safe image that captures the ESSENCE of the original scene.`
     }
 
     // Garantir que inclui requisitos de formato
-    const finalPrompt = rewrittenPrompt.includes("1280x720") 
+    const finalPrompt = rewrittenPrompt.includes("edge-to-edge") || rewrittenPrompt.includes("full bleed")
       ? rewrittenPrompt 
-      : `${rewrittenPrompt}, 1280x720 resolution, 16:9 aspect ratio, full frame composition, no black bars`;
+      : `${rewrittenPrompt}, 16:9 horizontal landscape, edge-to-edge full bleed composition, fill entire frame without any black bars or letterboxing`;
 
     console.log('[ImageFX] Prompt rewritten successfully');
     console.log('[ImageFX] New prompt:', finalPrompt.substring(0, 150) + '...');
