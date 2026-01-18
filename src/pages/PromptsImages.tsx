@@ -954,31 +954,34 @@ const [generating, setGenerating] = useState(false);
       // - Para roteiros grandes (ou divididos em partes), usamos streaming em cada chunk.
       const useStreaming = wordCount > 300;
 
-      // IMPORTANTÍSSIMO: não enviar as imagens de referência (base64) em TODOS os chunks.
-      // Enviamos apenas no 1º chunk para o backend extrair as descrições;
-      // nos próximos chunks, a consistência é mantida via existingCharacters.
-      //
-      // OBS: se a imagem foi adicionada antes da compressão existir (ou ficou grande demais),
-      // recomprimimos aqui para evitar "Failed to fetch" por payload muito grande.
-      const MAX_BASE64_LEN = 1_200_000; // ~0.9MB (base64 cresce ~33%)
-      const effectiveReferenceImages = await Promise.all(
-        referenceImages.map(async (img) => {
-          if (!img.base64 || img.base64.length <= MAX_BASE64_LEN) return img;
-          try {
-            const newBase64 = await imageToBase64(img.file);
-            return { ...img, base64: newBase64 };
-          } catch {
-            return img;
-          }
-        })
-      );
+      // Comprimir imagens de referência AGRESSIVAMENTE para evitar "Failed to fetch"
+      const MAX_BASE64_LEN = 300_000;
+      const MAX_REF_IMAGES = 3;
+      const compressedReferenceImages: typeof referenceImages = [];
 
-      // Atualizar state caso tenhamos recomprimido (mantém para próximas tentativas)
-      if (effectiveReferenceImages.some((img, i) => img.base64 !== referenceImages[i]?.base64)) {
-        setReferenceImages(effectiveReferenceImages);
+      for (const img of referenceImages.slice(0, MAX_REF_IMAGES)) {
+        if (!img.base64 || !img.characterName.trim()) continue;
+        let base64 = img.base64;
+        if (base64.length > MAX_BASE64_LEN) {
+          try {
+            base64 = await imageToBase64(img.file);
+          } catch {
+            // se falhar, usa o que temos
+          }
+        }
+        if (base64.length > MAX_BASE64_LEN * 1.5) {
+          console.warn(`[Reference] Imagem "${img.characterName}" muito grande, ignorando`);
+          toast({
+            title: "Imagem muito grande",
+            description: `A imagem de "${img.characterName}" é muito grande. Tente usar uma imagem menor.`,
+            variant: "destructive",
+          });
+          continue;
+        }
+        compressedReferenceImages.push({ ...img, base64 });
       }
 
-      const referenceCharactersPayload = effectiveReferenceImages
+      const referenceCharactersPayload = compressedReferenceImages
         .filter((img) => img.characterName.trim() && img.base64)
         .map((img) => ({
           name: img.characterName.trim(),
@@ -1002,24 +1005,39 @@ const [generating, setGenerating] = useState(false);
 
           const previousSceneCount = allScenes.length;
 
+          // Montar payload compacto: se temos scriptId, NÃO mandamos script
+          // Imagens de referência só no 1º chunk e se não temos personagens detectados ainda
+          const sendReferenceImages = chunkIndex === 0 && allCharacters.length === 0 && referenceCharactersPayload.length > 0;
+          
+          const requestBody: Record<string, unknown> = {
+            model,
+            style,
+            wordsPerScene: parseInt(wordsPerScene) || 80,
+            maxScenes: 500,
+            wpm: currentWpm,
+            includeVeo3: includeVeo3Prompts,
+            startSceneNumber: globalSceneNumber,
+          };
+          
+          // Script: preferir scriptId (payload menor)
+          if (scenePromptId) {
+            requestBody.scriptId = scenePromptId;
+          } else {
+            requestBody.script = chunk;
+          }
+          
+          // Personagens existentes (para consistência entre chunks)
+          if (allCharacters.length > 0) {
+            requestBody.existingCharacters = allCharacters;
+          }
+          
+          // Imagens de referência (apenas 1º chunk, se houver)
+          if (sendReferenceImages) {
+            requestBody.referenceCharacters = referenceCharactersPayload;
+          }
+
           const result = await invokeGenerateScenesWithStreaming(
-            {
-              script: scenePromptId ? undefined : chunk,
-              scriptId: scenePromptId || undefined,
-              model,
-              style,
-              wordsPerScene: parseInt(wordsPerScene) || 80,
-              maxScenes: 500,
-              wpm: currentWpm,
-              includeVeo3: includeVeo3Prompts,
-              // IMPORTANTE: numeração e consistência entre chunks
-              startSceneNumber: globalSceneNumber,
-              existingCharacters: allCharacters.length > 0 ? allCharacters : undefined,
-              referenceCharacters:
-                chunkIndex === 0 && allCharacters.length === 0
-                  ? referenceCharactersPayload
-                  : undefined,
-            },
+            requestBody,
             (batchScenes, batchNum, totalBatches, characters) => {
               // Callback para cada cena (stream) ou lote (fallback)
               for (const scene of batchScenes) {
@@ -1107,23 +1125,35 @@ const [generating, setGenerating] = useState(false);
 
           let response: any;
           try {
-            response = await invokeGenerateScenesWithRetry({
-              script: scenePromptId ? undefined : chunk,
-              scriptId: scenePromptId || undefined,
+            // Montar payload compacto: se temos scriptId, NÃO mandamos script
+            const sendReferenceImages = chunkIndex === 0 && allCharacters.length === 0 && referenceCharactersPayload.length > 0;
+            
+            const requestBody: Record<string, unknown> = {
               model,
               style,
               wordsPerScene: parseInt(wordsPerScene) || 80,
               maxScenes: 500,
               wpm: currentWpm,
               includeVeo3: includeVeo3Prompts,
-              existingCharacters: allCharacters.length > 0 ? allCharacters : undefined,
               startSceneNumber: globalSceneNumber,
               stream: false,
-              referenceCharacters:
-                chunkIndex === 0 && allCharacters.length === 0
-                  ? referenceCharactersPayload
-                  : undefined,
-            });
+            };
+            
+            if (scenePromptId) {
+              requestBody.scriptId = scenePromptId;
+            } else {
+              requestBody.script = chunk;
+            }
+            
+            if (allCharacters.length > 0) {
+              requestBody.existingCharacters = allCharacters;
+            }
+            
+            if (sendReferenceImages) {
+              requestBody.referenceCharacters = referenceCharactersPayload;
+            }
+
+            response = await invokeGenerateScenesWithRetry(requestBody);
           } finally {
             clearInterval(progressInterval);
           }
