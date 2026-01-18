@@ -339,9 +339,7 @@ function getDefaultVisualMap(): ScriptVisualMap {
 // Função para analisar imagens de referência e extrair descrições de personagens
 async function analyzeReferenceImages(
   referenceCharacters: ReferenceCharacterInput[],
-  apiUrl: string,
-  apiKey: string,
-  apiModel: string
+  lovableApiKey?: string | null
 ): Promise<CharacterDescription[]> {
   if (!referenceCharacters || referenceCharacters.length === 0) {
     return [];
@@ -353,75 +351,46 @@ async function analyzeReferenceImages(
   
   for (const ref of referenceCharacters) {
     try {
-      // Usar um modelo com visão para analisar a imagem.
-      // IMPORTANTE: O endpoint pode variar (Lovable AI Gateway vs. provedor externo).
-      // Para maximizar compatibilidade, tentamos primeiro com o modelo escolhido (apiModel)
-      // e, se falhar, usamos um fallback comumente compatível com visão.
-      const visionModelCandidates = Array.from(
-        new Set([
-          apiModel,
-          "google/gemini-3-flash-preview", // default recomendado (multimodal) no Lovable AI
-          "openai/gpt-5-mini", // fallback multimodal
-        ].filter(Boolean))
-      );
-
-      let data: any = null;
-      let lastStatus: number | null = null;
-
-      for (const visionModel of visionModelCandidates) {
-        const resp = await fetch(apiUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: visionModel,
-            messages: [
-              {
-                role: "system",
-                content: `You are a visual description expert. Analyze the image and provide a DETAILED physical description of the person for use in AI image generation prompts.
-
-Focus on:
-- Age range (young adult, middle-aged, elderly)
-- Gender presentation
-- Skin tone (be specific but neutral: fair, olive, tan, dark, etc)
-- Hair: color, length, style, texture
-- Facial features: face shape, distinctive features
-- Body type if visible
-- Distinctive characteristics (beard, glasses, scars, etc)
-- Clothing style if relevant to character
-
-Return ONLY a concise English description (50-80 words) suitable for image generation prompts.
-DO NOT include the character name in the description.`,
-              },
-              {
-                role: "user",
-                content: [
-                  { type: "text", text: `Describe this person named "${ref.name}" for image generation:` },
-                  { type: "image_url", image_url: { url: ref.imageBase64 } },
-                ],
-              },
-            ],
-            max_tokens: 200,
-            temperature: 0.3,
-          }),
-        });
-
-        if (resp.ok) {
-          data = await resp.json();
-          break;
-        }
-
-        lastStatus = resp.status;
-        const errText = await resp.text().catch(() => "");
-        console.warn(`[Analyze Reference] Vision model failed (${visionModel}) for ${ref.name}:`, lastStatus, errText?.slice(0, 200));
-      }
-
-      if (!data) {
-        console.error(`[Analyze Reference] Failed to analyze image for ${ref.name}:`, lastStatus ?? "unknown");
+      if (!lovableApiKey) {
+        console.warn("[Analyze Reference] LOVABLE_API_KEY missing; skipping reference analysis");
         continue;
       }
+
+      // Usar o gateway multimodal do Lovable (Gemini) para extrair descrição do personagem
+      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lovableApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a visual description expert. Analyze the image and provide a DETAILED physical description of the person for use in AI image generation prompts. Focus on: age range, gender presentation, skin tone, hair, facial features, body type if visible, distinctive characteristics, clothing style if relevant. Return ONLY a concise English description (50-80 words). DO NOT include the character name.",
+            },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: `Describe this person for image generation. Character label: ${ref.name}` },
+                { type: "image_url", image_url: { url: ref.imageBase64 } },
+              ],
+            },
+          ],
+          max_tokens: 220,
+          temperature: 0.2,
+        }),
+      });
+
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => "");
+        console.warn(`[Analyze Reference] Vision request failed for ${ref.name}:`, resp.status, errText?.slice(0, 300));
+        continue;
+      }
+
+      const data = await resp.json();
       const description = data.choices?.[0]?.message?.content?.trim() || "";
 
       if (description) {
@@ -429,7 +398,7 @@ DO NOT include the character name in the description.`,
           name: ref.name,
           description: description,
           seed: Math.abs(hashCode(ref.name)) % 2147483647,
-          fromReference: true
+          fromReference: true,
         });
         console.log(`[Analyze Reference] Character "${ref.name}": ${description.substring(0, 100)}...`);
       }
@@ -976,6 +945,7 @@ serve(async (req) => {
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const LAOZHANG_API_KEY = Deno.env.get("LAOZHANG_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -997,8 +967,9 @@ serve(async (req) => {
     console.log(`[Generate Scenes] User: ${userIdentifier}`);
 
     const body = await req.json();
-    const { 
-      script, 
+    const {
+      script,
+      scriptId,
       model = "gpt-4o",
       style = "cinematic",
       stylePrefix = "", // Novo: recebe o promptPrefix do estilo selecionado
@@ -1009,14 +980,31 @@ serve(async (req) => {
       stream = false, // Nova opção para streaming
       startSceneNumber = 1, // NOVO: numeração correta quando o roteiro é dividido em partes
       existingCharacters = [] as CharacterDescription[], // NOVO: manter consistência entre partes
-      referenceCharacters = [] as ReferenceCharacterInput[] // NOVO: Personagens com imagens de referência
+      referenceCharacters = [] as ReferenceCharacterInput[], // NOVO: Personagens com imagens de referência
     } = body;
 
-    if (!script) {
-      throw new Error("script is required");
+    // Resolver o roteiro:
+    // - Preferir script direto (compat)
+    // - Senão, buscar pelo scriptId (evita payload gigante no client)
+    let resolvedScript: string | null = (script || null) as string | null;
+    if (!resolvedScript && scriptId) {
+      const { data: promptRow, error: promptErr } = await supabaseAdmin
+        .from("scene_prompts")
+        .select("script")
+        .eq("id", scriptId)
+        .maybeSingle();
+
+      if (promptErr) {
+        console.error("[Generate Scenes] Failed to fetch script by scriptId:", promptErr);
+      }
+      resolvedScript = (promptRow?.script as string | null) ?? null;
     }
 
-    const wordCount = script.split(/\s+/).filter(Boolean).length;
+    if (!resolvedScript) {
+      throw new Error("script or scriptId is required");
+    }
+
+    const wordCount = resolvedScript.split(/\s+/).filter(Boolean).length;
     const estimatedScenes = Math.min(Math.ceil(wordCount / wordsPerScene), maxScenes);
     const scenesPerBatch = 15; // Processar 15 cenas por vez (aumentado de 10)
     const totalBatches = Math.ceil(estimatedScenes / scenesPerBatch);
@@ -1110,13 +1098,15 @@ serve(async (req) => {
 
     // OTIMIZADO: Detectar contexto, personagens E mapa visual em UMA chamada
     console.log(`[Generate Scenes] Detecting context + characters + visual map (unified call)...`);
-    const { context: scriptContext, characters: scriptCharacters, visualMap } = await detectContextAndCharacters(script, apiUrl, apiKey, apiModel);
+    const { context: scriptContext, characters: scriptCharacters, visualMap } = await detectContextAndCharacters(resolvedScript, apiUrl, apiKey, apiModel);
 
     // NOVO: Analisar imagens de referência para extrair descrições de personagens
+    // IMPORTANTE: o provedor de geração (DeepSeek/Laozhang) não tem visão.
+    // Para visão usamos o gateway multimodal do Lovable (Gemini), via LOVABLE_API_KEY.
     let referenceChars: CharacterDescription[] = [];
     if (referenceCharacters && referenceCharacters.length > 0) {
       console.log(`[Generate Scenes] Analyzing ${referenceCharacters.length} reference images...`);
-      referenceChars = await analyzeReferenceImages(referenceCharacters, apiUrl, apiKey, apiModel);
+      referenceChars = await analyzeReferenceImages(referenceCharacters, LOVABLE_API_KEY);
     }
 
     // Mesclar personagens com prioridade:
@@ -1141,7 +1131,7 @@ serve(async (req) => {
 
     // PRÉ-SEGMENTAR o roteiro inteiro ANTES de chamar a IA
     // Isso garante sincronização PERFEITA: cada cena tem texto exato que será narrado
-    const allPreSegmentedScenes = preSegmentScript(script, wordsPerScene, startSceneNumber);
+    const allPreSegmentedScenes = preSegmentScript(resolvedScript, wordsPerScene, startSceneNumber);
     const actualSceneCount = allPreSegmentedScenes.length;
     console.log(`[Generate Scenes] Pre-segmented into ${actualSceneCount} scenes`);
 
