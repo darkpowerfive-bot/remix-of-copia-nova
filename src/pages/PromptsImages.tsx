@@ -1397,7 +1397,7 @@ const [generating, setGenerating] = useState(false);
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
   const [regeneratingLost, setRegeneratingLost] = useState(false);
 
-  // Regenerar cenas perdidas com novos prompts similares gerados por IA
+  // Regenerar cenas perdidas com novos prompts gerados pela IA baseados no roteiro
   const handleRegenerateLostWithAI = async () => {
     const lostScenes = generatedScenes.filter(s => !s.generatedImage);
     if (lostScenes.length === 0) {
@@ -1408,33 +1408,71 @@ const [generating, setGenerating] = useState(false);
     setRegeneratingLost(true);
 
     try {
-      // Pegar algumas cenas com imagem para usar como referência de estilo
-      const successfulScenes = generatedScenes.filter(s => s.generatedImage).slice(0, 3);
-      const referencePrompts = successfulScenes.map(s => s.imagePrompt).join('\n');
+      // Pegar o estilo atual selecionado para manter consistência
+      const selectedStyle = THUMBNAIL_STYLES.find(s => s.id === style);
+      const styleDescription = selectedStyle?.promptPrefix || 'cinematic professional photography';
+      const styleName = selectedStyle?.name || 'Cinematográfico';
+      
+      // Pegar cenas com imagem para referência de consistência visual
+      const successfulScenes = generatedScenes.filter(s => s.generatedImage).slice(0, 5);
+      const referencePrompts = successfulScenes.length > 0 
+        ? successfulScenes.map(s => `Cena ${s.number}: ${s.imagePrompt}`).join('\n')
+        : '';
 
-      // Para cada cena perdida, gerar um novo prompt similar
+      // Construir contexto do roteiro completo para a IA entender a narrativa
+      const fullScriptContext = generatedScenes
+        .map(s => `[Cena ${s.number}] ${s.text}`)
+        .join('\n');
+
+      // Para cada cena perdida, gerar prompt baseado no roteiro
       const updatedScenes = [...generatedScenes];
+      let regeneratedCount = 0;
       
       for (const lostScene of lostScenes) {
         try {
-          // Usar IA para gerar prompt similar
+          // Contexto das cenas vizinhas para continuidade visual
+          const sceneIndex = generatedScenes.findIndex(s => s.number === lostScene.number);
+          const prevScene = sceneIndex > 0 ? generatedScenes[sceneIndex - 1] : null;
+          const nextScene = sceneIndex < generatedScenes.length - 1 ? generatedScenes[sceneIndex + 1] : null;
+          
+          const contextScenes = [
+            prevScene ? `Cena anterior (${prevScene.number}): "${prevScene.text}"` : '',
+            nextScene ? `Próxima cena (${nextScene.number}): "${nextScene.text}"` : ''
+          ].filter(Boolean).join('\n');
+
+          // Usar IA para gerar prompt baseado no ROTEIRO da cena
           const { data, error } = await supabase.functions.invoke('ai-assistant', {
             body: {
               messages: [
                 {
                   role: 'system',
-                  content: `Você é um especialista em prompts de imagem. Gere um prompt alternativo para a cena abaixo, mantendo o mesmo estilo visual das cenas de referência. Retorne APENAS o prompt em inglês, sem explicações.`
+                  content: `Você é um especialista em criar prompts de imagem cinematográficos para vídeos.
+
+OBJETIVO: Gerar um prompt em INGLÊS que represente EXATAMENTE o conteúdo do texto da cena.
+
+ESTILO VISUAL OBRIGATÓRIO (${styleName}):
+${styleDescription}
+
+REGRAS CRÍTICAS:
+1. O prompt DEVE representar visualmente o que acontece no texto da cena
+2. Mantenha CONSISTÊNCIA com as cenas vizinhas (mesmos personagens, ambiente, iluminação)
+3. NUNCA inclua: violência explícita, armas, sangue, nudez, conteúdo adulto, marcas registradas
+4. Sempre adicione no final: "1280x720, 16:9 aspect ratio, full frame, no black bars"
+5. Use descrições artísticas e cinematográficas
+6. Se houver pessoas, descreva como "silhouette", "figure", "person from behind" - evite rostos
+
+RETORNE APENAS o prompt em inglês, sem explicações ou formatação.`
                 },
                 {
                   role: 'user',
-                  content: `Cena ${lostScene.number} - Texto: "${lostScene.text}"
+                  content: `CENA ${lostScene.number} - TEXTO DO ROTEIRO:
+"${lostScene.text}"
 
-Prompt original que falhou: "${lostScene.imagePrompt}"
+${contextScenes ? `CONTEXTO (cenas vizinhas para continuidade):\n${contextScenes}` : ''}
 
-Prompts de referência (estilo a manter):
-${referencePrompts || 'Estilo cinematográfico, alta qualidade'}
+${referencePrompts ? `REFERÊNCIA DE ESTILO (prompts que funcionaram):\n${referencePrompts}` : ''}
 
-Gere um prompt alternativo em inglês que mantenha a mesma qualidade visual mas com uma abordagem diferente que possa funcionar melhor.`
+Crie um prompt de imagem em inglês que represente visualmente esta cena do roteiro, mantendo o estilo visual consistente.`
                 }
               ],
               model: 'gemini-2.5-flash'
@@ -1442,13 +1480,19 @@ Gere um prompt alternativo em inglês que mantenha a mesma qualidade visual mas 
           });
 
           if (!error && data?.content) {
-            const newPrompt = data.content.trim();
-            const sceneIndex = generatedScenes.findIndex(s => s.number === lostScene.number);
+            let newPrompt = data.content.trim();
+            
+            // Garantir que tenha os requisitos de formato
+            if (!newPrompt.includes('1280x720')) {
+              newPrompt = `${newPrompt}, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
+            }
+            
             if (sceneIndex !== -1) {
               updatedScenes[sceneIndex] = {
                 ...updatedScenes[sceneIndex],
                 imagePrompt: newPrompt
               };
+              regeneratedCount++;
             }
           }
         } catch (err) {
@@ -1456,12 +1500,21 @@ Gere um prompt alternativo em inglês que mantenha a mesma qualidade visual mas 
         }
       }
 
+      if (regeneratedCount === 0) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível gerar novos prompts. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Atualizar cenas com novos prompts
       updateScenes(updatedScenes);
 
       toast({
-        title: "Prompts regenerados!",
-        description: `${lostScenes.length} prompt(s) foram atualizados. Gerando imagens...`,
+        title: "✨ Prompts regenerados!",
+        description: `${regeneratedCount} prompt(s) criados baseados no roteiro. Gerando imagens...`,
       });
 
       // Iniciar geração das imagens com os novos prompts
