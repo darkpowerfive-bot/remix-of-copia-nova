@@ -1028,11 +1028,11 @@ serve(async (req) => {
 
     const wordCount = resolvedScript.split(/\s+/).filter(Boolean).length;
     const estimatedScenes = Math.min(Math.ceil(wordCount / wordsPerScene), maxScenes);
-    // OTIMIZADO: 25 cenas por batch (era 10) + processamento paralelo de 2 batches
-    const scenesPerBatch = 25;
+    // OTIMIZADO v2: 35 cenas por batch + 3 batches em paralelo para máxima velocidade
+    const scenesPerBatch = 35;
     const totalBatches = Math.ceil(estimatedScenes / scenesPerBatch);
 
-    console.log(`[Generate Scenes] ${wordCount} words -> ${estimatedScenes} scenes in ${totalBatches} batches (25/batch, parallel)`);
+    console.log(`[Generate Scenes] ${wordCount} words -> ${estimatedScenes} scenes in ${totalBatches} batches (35/batch, 3x parallel)`);
 
     // Calcular créditos (Prompts para Cenas sempre usa DeepSeek)
     const creditsNeeded = Math.ceil(totalBatches * CREDIT_PRICING.base);
@@ -1051,17 +1051,17 @@ serve(async (req) => {
     let apiKey: string;
     let apiModel: string;
 
-    // Regra: Prompts para Cenas SEMPRE usa DeepSeek (mais econômico)
+    // OTIMIZADO: Usar gpt-4.1 da Laozhang (mais rápido + melhor qualidade que deepseek-v3)
     if (LAOZHANG_API_KEY) {
       apiUrl = "https://api.laozhang.ai/v1/chat/completions";
       apiKey = LAOZHANG_API_KEY;
-      apiModel = "deepseek-v3";
-      console.log(`[Generate Scenes] Using Laozhang AI - FORCED Model: deepseek-v3 (env)`);
+      apiModel = "gpt-4.1"; // gpt-4.1 é mais rápido e melhor qualidade na Laozhang
+      console.log(`[Generate Scenes] Using Laozhang AI - Model: gpt-4.1 (env)`);
     } else if (adminApiKeys?.laozhang) {
       apiUrl = "https://api.laozhang.ai/v1/chat/completions";
       apiKey = adminApiKeys.laozhang;
-      apiModel = "deepseek-v3";
-      console.log(`[Generate Scenes] Using Laozhang AI - FORCED Model: deepseek-v3 (admin_settings)`);
+      apiModel = "gpt-4.1";
+      console.log(`[Generate Scenes] Using Laozhang AI - Model: gpt-4.1 (admin_settings)`);
     } else {
       return new Response(
         JSON.stringify({ error: "Chave DeepSeek (Laozhang) não configurada. Configure LAOZHANG_API_KEY." }),
@@ -1210,8 +1210,8 @@ serve(async (req) => {
 
             const allScenes: SceneResult[] = [];
 
-            // OTIMIZADO: Processar até 2 batches em PARALELO para dobrar a velocidade
-            const PARALLEL_BATCHES = 2;
+            // OTIMIZADO v2: Processar até 3 batches em PARALELO para triplicar a velocidade
+            const PARALLEL_BATCHES = 3;
 
             for (let i = 0; i < sceneBatches.length; i += PARALLEL_BATCHES) {
               if (isControllerClosed) break;
@@ -1249,8 +1249,9 @@ serve(async (req) => {
                   userIdentifier
                 );
 
+                // Timeout reduzido para 90s (gpt-4.1 é mais rápido)
                 const timeoutPromise = new Promise<SceneResult[]>((_, reject) => {
-                  setTimeout(() => reject(new Error(`Batch ${batchNum} timeout`)), 120000);
+                  setTimeout(() => reject(new Error(`Batch ${batchNum} timeout`)), 90000);
                 });
 
                 return Promise.race([batchPromise, timeoutPromise])
