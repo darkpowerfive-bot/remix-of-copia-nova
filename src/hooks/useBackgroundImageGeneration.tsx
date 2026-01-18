@@ -49,6 +49,12 @@ interface BackgroundGenerationState {
   rewriteProgress: RewriteProgress;
 }
 
+interface CookieModalState {
+  isOpen: boolean;
+  open: () => void;
+  close: () => void;
+}
+
 interface BackgroundImageGenerationContextType {
   state: BackgroundGenerationState;
   startGeneration: (scenes: ScenePrompt[], style: string, pendingIndexes: number[], characters?: CharacterDescription[], cookieCount?: number) => void;
@@ -57,6 +63,7 @@ interface BackgroundImageGenerationContextType {
   clearState: () => void;
   syncScenes: (scenes: ScenePrompt[]) => void;
   setCharacters: (characters: CharacterDescription[]) => void;
+  cookieModal: CookieModalState;
 }
 
 const initialRewriteProgress: RewriteProgress = {
@@ -168,13 +175,16 @@ Reescreva o prompt de forma segura.`
     }
   }, []);
 
-  // Fallback para generate-image quando ImageFX falhar
-  const generateWithFallback = useCallback(async (
+  // Estado para modal de cookies inválidos
+  const [showCookieModal, setShowCookieModal] = useState(false);
+  const cookieErrorShownRef = useRef(false);
+
+  // Gerar imagem apenas com ImageFX - sem fallback
+  const generateWithImageFX = useCallback(async (
     prompt: string,
     sceneIndex: number,
     characterSeed?: number
-  ): Promise<{ success: boolean; imageUrl?: string; usedFallback?: boolean }> => {
-    // Tentar ImageFX primeiro
+  ): Promise<{ success: boolean; imageUrl?: string; cookieError?: boolean }> => {
     try {
       const { data, error } = await supabase.functions.invoke("generate-imagefx", {
         body: {
@@ -196,10 +206,10 @@ Reescreva o prompt de forma segura.`
           } catch {}
         }
         
-        // Se for erro de cookies/sessão, tentar fallback
-        if (errMsg.includes("sessão") || errMsg.includes("cookies") || errMsg.includes("autenticação")) {
-          console.log(`[Background] ImageFX cookie error, trying fallback...`);
-          throw new Error("FALLBACK_NEEDED");
+        // Se for erro de cookies/sessão, sinalizar para mostrar modal
+        if (errMsg.includes("sessão") || errMsg.includes("cookies") || errMsg.includes("autenticação") || errMsg.includes("ImageFX")) {
+          console.log(`[Background] ImageFX cookie error detected`);
+          return { success: false, cookieError: true };
         }
         
         throw new Error(errMsg);
@@ -207,53 +217,45 @@ Reescreva o prompt de forma segura.`
 
       if ((data as any)?.error) {
         const errMsg = (data as any).error;
-        if (errMsg.includes("sessão") || errMsg.includes("cookies") || errMsg.includes("autenticação")) {
-          console.log(`[Background] ImageFX cookie error in data, trying fallback...`);
-          throw new Error("FALLBACK_NEEDED");
+        if (errMsg.includes("sessão") || errMsg.includes("cookies") || errMsg.includes("autenticação") || errMsg.includes("ImageFX")) {
+          console.log(`[Background] ImageFX cookie error in data`);
+          return { success: false, cookieError: true };
         }
         throw new Error(errMsg);
       }
 
       const url = (data as any)?.images?.[0]?.url;
       if (url) {
-        return { success: true, imageUrl: url, usedFallback: false };
+        return { success: true, imageUrl: url };
       }
       
       throw new Error("No image URL in response");
-    } catch (imageFxError: any) {
-      // Se não for erro que precisa de fallback, propagar
-      if (imageFxError.message !== "FALLBACK_NEEDED") {
-        throw imageFxError;
-      }
-      
-      // Tentar generate-image como fallback
-      console.log(`[Background] Trying generate-image fallback for scene ${sceneIndex}...`);
-      
-      try {
-        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke("generate-image", {
-          body: {
-            prompt,
-            aspectRatio: "16:9",
-            width: 1280,
-            height: 720,
-          },
-        });
-
-        if (fallbackError) throw fallbackError;
-        
-        const fallbackUrl = fallbackData?.url || fallbackData?.images?.[0]?.url;
-        if (fallbackUrl) {
-          console.log(`[Background] Fallback succeeded for scene ${sceneIndex}`);
-          return { success: true, imageUrl: fallbackUrl, usedFallback: true };
-        }
-        
-        throw new Error("No URL in fallback response");
-      } catch (fallbackErr) {
-        console.error(`[Background] Fallback also failed for scene ${sceneIndex}:`, fallbackErr);
-        throw new Error("Tanto ImageFX quanto gerador alternativo falharam");
-      }
+    } catch (error: any) {
+      console.error(`[Background] ImageFX error for scene ${sceneIndex}:`, error);
+      throw error;
     }
   }, []);
+
+  // Função para abrir modal de cookies
+  const openCookieModal = useCallback(() => {
+    if (!cookieErrorShownRef.current) {
+      cookieErrorShownRef.current = true;
+      setShowCookieModal(true);
+    }
+  }, []);
+
+  // Função para fechar modal de cookies
+  const closeCookieModal = useCallback(() => {
+    setShowCookieModal(false);
+    cookieErrorShownRef.current = false;
+  }, []);
+
+  // Expor estado do modal para componentes externos
+  const getCookieModalState = useCallback(() => ({
+    isOpen: showCookieModal,
+    open: openCookieModal,
+    close: closeCookieModal,
+  }), [showCookieModal, openCookieModal, closeCookieModal]);
 
   const generateSingleImage = useCallback(async (
     sceneIndex: number, 
@@ -261,7 +263,7 @@ Reescreva o prompt de forma segura.`
     style: string,
     characters: CharacterDescription[],
     updateRewriteProgress?: (progress: Partial<RewriteProgress>) => void
-  ): Promise<{ index: number; success: boolean; imageUrl?: string; rateLimited?: boolean; newPrompt?: string }> => {
+  ): Promise<{ index: number; success: boolean; imageUrl?: string; rateLimited?: boolean; newPrompt?: string; cookieError?: boolean }> => {
     const maxRetries = 3;
     const maxRewriteAttempts = 3;
     let retries = 0;
@@ -269,7 +271,6 @@ Reescreva o prompt de forma segura.`
     let lastError = "";
     let wasRateLimited = false;
     let currentPrompt = scenes[sceneIndex].imagePrompt;
-    let usedFallback = false;
 
     const scene = scenes[sceneIndex];
     const characterSeed = scene.characterName 
@@ -290,8 +291,15 @@ Reescreva o prompt de forma segura.`
           ? `${resolutionPrefix}, ${stylePrefix} ${currentPrompt}`
           : `${resolutionPrefix}, ${currentPrompt}`;
 
-        // Usar função com fallback automático
-        const result = await generateWithFallback(fullPrompt, sceneIndex, characterSeed);
+        // Usar ImageFX apenas - sem fallback
+        const result = await generateWithImageFX(fullPrompt, sceneIndex, characterSeed);
+        
+        // Se erro de cookie, mostrar modal e parar
+        if (result.cookieError) {
+          openCookieModal();
+          cancelRef.current = true;
+          return { index: sceneIndex, success: false, cookieError: true };
+        }
         
         if (result.success && result.imageUrl) {
           // Limpar estado de reescrita
@@ -303,10 +311,6 @@ Reescreva o prompt de forma segura.`
               newPrompt: null,
               attemptNumber: 0,
             });
-          }
-          
-          if (result.usedFallback) {
-            console.log(`[Background] Scene ${sceneIndex} generated via fallback`);
           }
           
           return { 
@@ -379,7 +383,7 @@ Reescreva o prompt de forma segura.`
     
     console.warn(`[Background] Scene ${sceneIndex} failed after ${maxRetries} retries: ${lastError}`);
     return { index: sceneIndex, success: false, rateLimited: wasRateLimited };
-  }, [rewriteBlockedPrompt, generateWithFallback]);
+  }, [rewriteBlockedPrompt, generateWithImageFX, openCookieModal]);
 
   const startGeneration = useCallback(async (
     scenes: ScenePrompt[], 
@@ -598,6 +602,8 @@ Reescreva o prompt de forma segura.`
     setState(prev => ({ ...prev, characters }));
   }, []);
 
+  const cookieModalValue = getCookieModalState();
+
   return (
     <BackgroundImageGenerationContext.Provider value={{
       state,
@@ -607,6 +613,7 @@ Reescreva o prompt de forma segura.`
       clearState,
       syncScenes,
       setCharacters,
+      cookieModal: cookieModalValue,
     }}>
       {children}
     </BackgroundImageGenerationContext.Provider>

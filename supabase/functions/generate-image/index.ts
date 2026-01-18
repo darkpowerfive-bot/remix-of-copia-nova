@@ -223,7 +223,7 @@ serve(async (req) => {
 
     let result: { images: any[]; message: string; provider: string; url?: string } | null = null;
 
-    // Always try ImageFX first if user has cookies configured
+    // SEMPRE usar ImageFX - sem fallback para Lovable AI
     if (userId && supabaseAdmin) {
       const cookies = await getUserImageFXCookies(userId, supabaseAdmin);
       
@@ -239,28 +239,19 @@ serve(async (req) => {
             url: imageBase64
           };
         } else {
-          console.log('[Image] ImageFX failed, falling back to Lovable AI');
+          // Cookies inválidos - retornar erro específico
+          throw new Error("Cookies do ImageFX inválidos. Atualize seus cookies nas Configurações.");
         }
+      } else {
+        // Sem cookies configurados
+        throw new Error("Nenhum cookie do ImageFX configurado. Configure nas Configurações.");
       }
-    }
-
-    // Fallback to Lovable AI (always works, no cookies needed)
-    if (!result) {
-      console.log('[Image] Using Lovable AI as fallback');
-      const lovableResult = await generateImageWithLovable(prompt, LOVABLE_API_KEY);
-      
-      if (lovableResult) {
-        result = {
-          images: lovableResult.images,
-          message: lovableResult.message,
-          provider: "lovable",
-          url: lovableResult.url
-        };
-      }
+    } else {
+      throw new Error("Usuário não autenticado ou erro de configuração.");
     }
 
     if (!result) {
-      throw new Error("Falha ao gerar imagem");
+      throw new Error("Falha ao gerar imagem com ImageFX");
     }
 
     console.log(`Image generated successfully with provider: ${result.provider}`);

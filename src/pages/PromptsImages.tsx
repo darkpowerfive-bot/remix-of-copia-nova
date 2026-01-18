@@ -92,6 +92,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { useBackgroundImageGeneration } from "@/hooks/useBackgroundImageGeneration";
+import { InvalidCookieModal } from "@/components/scenes/InvalidCookieModal";
 import { useApiSettings } from "@/hooks/useApiSettings";
 import { useFFmpegVideoGenerator } from "@/hooks/useFFmpegVideoGenerator";
 import { useUserCinematicPresets } from "@/hooks/useUserCinematicPresets";
@@ -231,7 +232,8 @@ const PromptsImages = () => {
     cancelGeneration: cancelBgGeneration,
     getUpdatedScenes,
     syncScenes,
-    setCharacters: setBgCharacters
+    setCharacters: setBgCharacters,
+    cookieModal
   } = useBackgroundImageGeneration();
 
   // API settings for cookie count
@@ -7091,6 +7093,12 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
         description={PROMPTS_IMAGES_TUTORIAL.description}
         steps={PROMPTS_IMAGES_TUTORIAL.steps}
         onComplete={completeTutorial}
+      />
+      
+      {/* Modal de Cookies Inválidos */}
+      <InvalidCookieModal 
+        isOpen={cookieModal.isOpen} 
+        onClose={cookieModal.close} 
       />
       </PermissionGate>
     </MainLayout>
