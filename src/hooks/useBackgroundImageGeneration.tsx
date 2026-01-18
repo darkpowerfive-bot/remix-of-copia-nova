@@ -168,6 +168,93 @@ Reescreva o prompt de forma segura.`
     }
   }, []);
 
+  // Fallback para generate-image quando ImageFX falhar
+  const generateWithFallback = useCallback(async (
+    prompt: string,
+    sceneIndex: number,
+    characterSeed?: number
+  ): Promise<{ success: boolean; imageUrl?: string; usedFallback?: boolean }> => {
+    // Tentar ImageFX primeiro
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-imagefx", {
+        body: {
+          prompt,
+          aspectRatio: "LANDSCAPE",
+          numberOfImages: 1,
+          seed: characterSeed,
+          sceneIndex,
+        },
+      });
+
+      if (error) {
+        const bodyText = (error as any)?.context?.body;
+        let errMsg = error.message;
+        if (bodyText) {
+          try {
+            const parsed = JSON.parse(bodyText);
+            errMsg = parsed?.error || error.message;
+          } catch {}
+        }
+        
+        // Se for erro de cookies/sessão, tentar fallback
+        if (errMsg.includes("sessão") || errMsg.includes("cookies") || errMsg.includes("autenticação")) {
+          console.log(`[Background] ImageFX cookie error, trying fallback...`);
+          throw new Error("FALLBACK_NEEDED");
+        }
+        
+        throw new Error(errMsg);
+      }
+
+      if ((data as any)?.error) {
+        const errMsg = (data as any).error;
+        if (errMsg.includes("sessão") || errMsg.includes("cookies") || errMsg.includes("autenticação")) {
+          console.log(`[Background] ImageFX cookie error in data, trying fallback...`);
+          throw new Error("FALLBACK_NEEDED");
+        }
+        throw new Error(errMsg);
+      }
+
+      const url = (data as any)?.images?.[0]?.url;
+      if (url) {
+        return { success: true, imageUrl: url, usedFallback: false };
+      }
+      
+      throw new Error("No image URL in response");
+    } catch (imageFxError: any) {
+      // Se não for erro que precisa de fallback, propagar
+      if (imageFxError.message !== "FALLBACK_NEEDED") {
+        throw imageFxError;
+      }
+      
+      // Tentar generate-image como fallback
+      console.log(`[Background] Trying generate-image fallback for scene ${sceneIndex}...`);
+      
+      try {
+        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke("generate-image", {
+          body: {
+            prompt,
+            aspectRatio: "16:9",
+            width: 1280,
+            height: 720,
+          },
+        });
+
+        if (fallbackError) throw fallbackError;
+        
+        const fallbackUrl = fallbackData?.url || fallbackData?.images?.[0]?.url;
+        if (fallbackUrl) {
+          console.log(`[Background] Fallback succeeded for scene ${sceneIndex}`);
+          return { success: true, imageUrl: fallbackUrl, usedFallback: true };
+        }
+        
+        throw new Error("No URL in fallback response");
+      } catch (fallbackErr) {
+        console.error(`[Background] Fallback also failed for scene ${sceneIndex}:`, fallbackErr);
+        throw new Error("Tanto ImageFX quanto gerador alternativo falharam");
+      }
+    }
+  }, []);
+
   const generateSingleImage = useCallback(async (
     sceneIndex: number, 
     scenes: ScenePrompt[], 
@@ -176,12 +263,13 @@ Reescreva o prompt de forma segura.`
     updateRewriteProgress?: (progress: Partial<RewriteProgress>) => void
   ): Promise<{ index: number; success: boolean; imageUrl?: string; rateLimited?: boolean; newPrompt?: string }> => {
     const maxRetries = 3;
-    const maxRewriteAttempts = 3; // Aumentado para 3 tentativas de reescrita
+    const maxRewriteAttempts = 3;
     let retries = 0;
     let rewriteAttempts = 0;
     let lastError = "";
     let wasRateLimited = false;
     let currentPrompt = scenes[sceneIndex].imagePrompt;
+    let usedFallback = false;
 
     const scene = scenes[sceneIndex];
     const characterSeed = scene.characterName 
@@ -196,141 +284,16 @@ Reescreva o prompt de forma segura.`
       try {
         const stylePrefix = THUMBNAIL_STYLES.find(s => s.id === style)?.promptPrefix || "";
         
-        // Forçar resolução 1280x720 e preenchimento total do quadro
         const resolutionPrefix = "1280x720 resolution, 16:9 aspect ratio, full frame composition, no black bars, no letterbox, no pillarbox, image must fill entire frame edge to edge";
         
         const fullPrompt = stylePrefix
           ? `${resolutionPrefix}, ${stylePrefix} ${currentPrompt}`
           : `${resolutionPrefix}, ${currentPrompt}`;
 
-        const { data, error } = await supabase.functions.invoke("generate-imagefx", {
-          body: {
-            prompt: fullPrompt,
-            aspectRatio: "LANDSCAPE",
-            numberOfImages: 1,
-            seed: characterSeed,
-            sceneIndex, // For deterministic cookie distribution
-          },
-        });
-
-        if (error) {
-          const bodyText = (error as any)?.context?.body;
-          let errMsg = error.message;
-          if (bodyText) {
-            try {
-              const parsed = JSON.parse(bodyText);
-              errMsg = parsed?.error || error.message;
-            } catch {}
-          }
-          
-          lastError = errMsg;
-          
-          if (errMsg.includes("autenticação") || errMsg.includes("cookies")) {
-            throw new Error("AUTH_ERROR");
-          }
-          
-          if (errMsg.includes("Limite de requisições") || errMsg.includes("429")) {
-            wasRateLimited = true;
-            const waitTime = 5000 + retries * 3000;
-            console.log(`[Background] Rate limited on scene ${sceneIndex}, waiting ${waitTime}ms (retry ${retries + 1}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-            retries++;
-            continue;
-          }
-          
-          // Detectar bloqueio de conteúdo e tentar reescrever
-          if ((errMsg.includes("blocked") || errMsg.includes("safety") || errMsg.includes("violates") || errMsg.includes("bloqueado") || errMsg.includes("política")) && rewriteAttempts < maxRewriteAttempts) {
-            rewriteAttempts++;
-            console.log(`[Background] Scene ${sceneIndex} blocked, attempting rewrite ${rewriteAttempts}/${maxRewriteAttempts}`);
-            
-            // Atualizar estado de reescrita
-            if (updateRewriteProgress) {
-              updateRewriteProgress({
-                isRewriting: true,
-                sceneNumber: scene.number,
-                originalPrompt: currentPrompt,
-                attemptNumber: rewriteAttempts,
-              });
-            }
-            
-            const rewrittenPrompt = await rewriteBlockedPrompt(currentPrompt, scene.text, rewriteAttempts);
-            
-            if (rewrittenPrompt) {
-              console.log(`[Background] Scene ${sceneIndex} rewritten prompt:`, rewrittenPrompt.substring(0, 100));
-              currentPrompt = rewrittenPrompt;
-              
-              if (updateRewriteProgress) {
-                updateRewriteProgress({
-                  newPrompt: rewrittenPrompt,
-                });
-              }
-              
-              // Aguardar um pouco antes de tentar novamente
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              continue; // Tentar novamente com o novo prompt
-            }
-          }
-          
-          const waitTime = 2000 + retries * 1000;
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-          retries++;
-          continue;
-        }
-
-        if ((data as any)?.error) {
-          const errMsg = (data as any).error;
-          lastError = errMsg;
-          
-          if (errMsg.includes("autenticação") || errMsg.includes("cookies")) {
-            throw new Error("AUTH_ERROR");
-          }
-          
-          if (errMsg.includes("Limite de requisições")) {
-            wasRateLimited = true;
-            const waitTime = 5000 + retries * 3000;
-            console.log(`[Background] Rate limited on scene ${sceneIndex}, waiting ${waitTime}ms (retry ${retries + 1}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-            retries++;
-            continue;
-          }
-          
-          // Detectar bloqueio de conteúdo e tentar reescrever
-          if ((errMsg.includes("blocked") || errMsg.includes("safety") || errMsg.includes("violates") || errMsg.includes("bloqueado") || errMsg.includes("política")) && rewriteAttempts < maxRewriteAttempts) {
-            rewriteAttempts++;
-            console.log(`[Background] Scene ${sceneIndex} blocked (data error), attempting rewrite ${rewriteAttempts}/${maxRewriteAttempts}`);
-            
-            if (updateRewriteProgress) {
-              updateRewriteProgress({
-                isRewriting: true,
-                sceneNumber: scene.number,
-                originalPrompt: currentPrompt,
-                attemptNumber: rewriteAttempts,
-              });
-            }
-            
-            const rewrittenPrompt = await rewriteBlockedPrompt(currentPrompt, scene.text, rewriteAttempts);
-            
-            if (rewrittenPrompt) {
-              currentPrompt = rewrittenPrompt;
-              
-              if (updateRewriteProgress) {
-                updateRewriteProgress({
-                  newPrompt: rewrittenPrompt,
-                });
-              }
-              
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              continue;
-            }
-          }
-          
-          retries++;
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          continue;
-        }
-
-        const url = (data as any)?.images?.[0]?.url;
-        if (url) {
+        // Usar função com fallback automático
+        const result = await generateWithFallback(fullPrompt, sceneIndex, characterSeed);
+        
+        if (result.success && result.imageUrl) {
           // Limpar estado de reescrita
           if (updateRewriteProgress) {
             updateRewriteProgress({
@@ -342,20 +305,62 @@ Reescreva o prompt de forma segura.`
             });
           }
           
-          // Retornar o novo prompt se foi reescrito
+          if (result.usedFallback) {
+            console.log(`[Background] Scene ${sceneIndex} generated via fallback`);
+          }
+          
           return { 
             index: sceneIndex, 
             success: true, 
-            imageUrl: url,
+            imageUrl: result.imageUrl,
             newPrompt: currentPrompt !== scene.imagePrompt ? currentPrompt : undefined
           };
         }
         
         retries++;
         await new Promise(resolve => setTimeout(resolve, 1500));
+        
       } catch (error: any) {
-        if (error.message === "AUTH_ERROR") throw error;
         lastError = error.message;
+        
+        // Rate limit handling
+        if (lastError.includes("Limite de requisições") || lastError.includes("429")) {
+          wasRateLimited = true;
+          const waitTime = 5000 + retries * 3000;
+          console.log(`[Background] Rate limited on scene ${sceneIndex}, waiting ${waitTime}ms`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          retries++;
+          continue;
+        }
+        
+        // Detectar bloqueio de conteúdo e tentar reescrever
+        if ((lastError.includes("blocked") || lastError.includes("safety") || lastError.includes("violates") || lastError.includes("bloqueado") || lastError.includes("política")) && rewriteAttempts < maxRewriteAttempts) {
+          rewriteAttempts++;
+          console.log(`[Background] Scene ${sceneIndex} blocked, attempting rewrite ${rewriteAttempts}/${maxRewriteAttempts}`);
+          
+          if (updateRewriteProgress) {
+            updateRewriteProgress({
+              isRewriting: true,
+              sceneNumber: scene.number,
+              originalPrompt: currentPrompt,
+              attemptNumber: rewriteAttempts,
+            });
+          }
+          
+          const rewrittenPrompt = await rewriteBlockedPrompt(currentPrompt, scene.text, rewriteAttempts);
+          
+          if (rewrittenPrompt) {
+            currentPrompt = rewrittenPrompt;
+            
+            if (updateRewriteProgress) {
+              updateRewriteProgress({ newPrompt: rewrittenPrompt });
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            continue;
+          }
+        }
+        
         retries++;
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
@@ -374,7 +379,7 @@ Reescreva o prompt de forma segura.`
     
     console.warn(`[Background] Scene ${sceneIndex} failed after ${maxRetries} retries: ${lastError}`);
     return { index: sceneIndex, success: false, rateLimited: wasRateLimited };
-  }, [rewriteBlockedPrompt]);
+  }, [rewriteBlockedPrompt, generateWithFallback]);
 
   const startGeneration = useCallback(async (
     scenes: ScenePrompt[], 
