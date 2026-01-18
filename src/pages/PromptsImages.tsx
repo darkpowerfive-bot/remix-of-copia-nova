@@ -155,6 +155,9 @@ interface ScenePrompt {
   emotion?: string; // Emoção dominante: tensão, surpresa, medo, admiração, choque, curiosidade
   retentionTrigger?: string; // Gatilho de retenção: curiosidade, quebra_padrão, antecipação, revelação, mistério
   kenBurnsMotion?: { type: string; intensity: 'subtle' | 'normal' | 'dramatic'; reason?: string }; // Movimento Ken Burns manual
+  suggestMovement?: boolean; // Se a cena se beneficia de movimento/vídeo
+  retentionMultiplier?: number; // Multiplicador de duração baseado na análise de retenção (0.7-1.4)
+  retentionReason?: string; // Motivo do ajuste de tempo
 }
 
 
@@ -212,17 +215,22 @@ const formatTimecode = (totalSeconds: number): string => {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 };
 
-// Calcular timecode baseado em posição no roteiro com WPM configurável
+// Calcular timecode baseado em posição no roteiro com WPM configurável e multiplicador de retenção
 const calculateTimecodeWithWpm = (scenes: ScenePrompt[], currentIndex: number, wpm: number): string => {
   let totalSeconds = 0;
   for (let i = 0; i < currentIndex; i++) {
-    totalSeconds += (scenes[i].wordCount / wpm) * 60;
+    const baseDuration = (scenes[i].wordCount / wpm) * 60;
+    const multiplier = scenes[i].retentionMultiplier ?? 1.0;
+    totalSeconds += baseDuration * multiplier;
   }
   return formatTimecode(totalSeconds);
 };
 
-// Converter word count para segundos com WPM configurável
-const wordCountToSecondsWithWpm = (wordCount: number, wpm: number): number => (wordCount / wpm) * 60;
+// Converter word count para segundos com WPM configurável e multiplicador de retenção opcional
+const wordCountToSecondsWithWpm = (wordCount: number, wpm: number, retentionMultiplier?: number): number => {
+  const baseDuration = (wordCount / wpm) * 60;
+  return baseDuration * (retentionMultiplier ?? 1.0);
+};
 
 const PromptsImages = () => {
   // Background image generation hook
@@ -4303,11 +4311,13 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                         number: index + 1,
                         text: scene.text,
                         wordCount: scene.wordCount,
-                        durationSeconds: Math.max(0.5, (scene.wordCount / currentWpm) * 60),
+                        durationSeconds: Math.max(0.5, wordCountToSecondsWithWpm(scene.wordCount, currentWpm, scene.retentionMultiplier)),
                         generatedImage: scene.generatedImage,
                         emotion: scene.emotion,
                         retentionTrigger: scene.retentionTrigger,
-                        kenBurnsMotion: scene.kenBurnsMotion
+                        kenBurnsMotion: scene.kenBurnsMotion,
+                        retentionMultiplier: scene.retentionMultiplier,
+                        retentionReason: scene.retentionReason
                       })) : []}
                     />
                   )}

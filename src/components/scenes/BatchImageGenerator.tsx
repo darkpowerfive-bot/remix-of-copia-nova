@@ -32,6 +32,11 @@ export interface SceneData {
   text: string;
   imagePrompt: string;
   wordCount: number;
+  emotion?: string;
+  retentionTrigger?: string;
+  suggestMovement?: boolean;
+  retentionMultiplier?: number; // Multiplicador de duração baseado na análise de retenção (0.7-1.4)
+  retentionReason?: string; // Motivo do ajuste de tempo
 }
 
 interface GeneratedImage {
