@@ -1479,20 +1479,24 @@ Crie um prompt de imagem em inglês que represente visualmente esta cena do rote
             }
           });
 
-          if (!error && data?.content) {
-            let newPrompt = data.content.trim();
+          if (!error && data) {
+            // A edge function retorna 'result' (não 'content')
+            let newPrompt = (data.result || data.content || '').toString().trim();
             
-            // Garantir que tenha os requisitos de formato
-            if (!newPrompt.includes('1280x720')) {
-              newPrompt = `${newPrompt}, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
-            }
-            
-            if (sceneIndex !== -1) {
-              updatedScenes[sceneIndex] = {
-                ...updatedScenes[sceneIndex],
-                imagePrompt: newPrompt
-              };
-              regeneratedCount++;
+            if (newPrompt) {
+              // Garantir que tenha os requisitos de formato
+              if (!newPrompt.includes('1280x720')) {
+                newPrompt = `${newPrompt}, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
+              }
+              
+              if (sceneIndex !== -1) {
+                updatedScenes[sceneIndex] = {
+                  ...updatedScenes[sceneIndex],
+                  imagePrompt: newPrompt
+                };
+                regeneratedCount++;
+                console.log(`[Regenerar] Cena ${lostScene.number}: novo prompt gerado com ${newPrompt.length} chars`);
+              }
             }
           }
         } catch (err) {
