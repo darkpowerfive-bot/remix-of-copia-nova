@@ -47,6 +47,8 @@ interface GeneratedScene {
   motionRecommended?: boolean; // Indica se a cena se beneficia de movimento (até 11s)
   videoRecommended?: boolean; // Indica se a cena precisa de vídeo AI (ação intensa)
   kenBurnsMotion?: KenBurnsMotion; // Movimento Ken Burns configurado
+  retentionMultiplier?: number; // Multiplicador de duração baseado na análise de retenção
+  retentionReason?: string; // Motivo do ajuste de tempo
 }
 
 interface ScriptPreviewTimelineProps {
@@ -76,6 +78,8 @@ interface PreviewScene {
   motionRecommended?: boolean;
   videoRecommended?: boolean;
   kenBurnsMotion?: KenBurnsMotion;
+  retentionMultiplier?: number;
+  retentionReason?: string;
 }
 
 // Mapeamento de emoções para cores
@@ -297,19 +301,23 @@ export function ScriptPreviewTimeline({
     let baseScenes: PreviewScene[] = [];
     
     if (generatedScenes.length > 0) {
-      // Usar as cenas geradas
+      // Usar as cenas geradas COM multiplicador de retenção
       let currentTime = 0;
       baseScenes = generatedScenes.map((scene, index) => {
+        // Aplicar multiplicador de retenção à duração base
+        const multiplier = scene.retentionMultiplier ?? 1.0;
+        const adjustedDuration = scene.durationSeconds * multiplier;
+        
         const startTime = currentTime;
-        const endTime = currentTime + scene.durationSeconds;
+        const endTime = currentTime + adjustedDuration;
         currentTime = endTime;
-        const motionRecommended = scene.motionRecommended ?? shouldRecommendMotion(scene.text, scene.emotion, scene.durationSeconds);
+        const motionRecommended = scene.motionRecommended ?? shouldRecommendMotion(scene.text, scene.emotion, adjustedDuration);
         const videoRecommended = scene.videoRecommended ?? shouldRecommendVideo(scene.text, scene.emotion);
         return {
           number: scene.number,
           text: scene.text,
           wordCount: scene.wordCount,
-          durationSeconds: scene.durationSeconds,
+          durationSeconds: adjustedDuration, // Duração ajustada pelo multiplicador
           startTime,
           endTime,
           generatedImage: scene.generatedImage,
@@ -318,7 +326,9 @@ export function ScriptPreviewTimeline({
           retentionTrigger: scene.retentionTrigger,
           motionRecommended,
           videoRecommended,
-          kenBurnsMotion: scene.kenBurnsMotion
+          kenBurnsMotion: scene.kenBurnsMotion,
+          retentionMultiplier: multiplier,
+          retentionReason: scene.retentionReason
         };
       });
     } else {

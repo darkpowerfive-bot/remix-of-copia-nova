@@ -56,6 +56,8 @@ interface SceneResult {
   emotion?: string; // Emoção dominante: tensão, surpresa, medo, admiração, choque, curiosidade
   retentionTrigger?: string; // Gatilho de retenção: curiosidade, quebra_padrão, antecipação, revelação, mistério
   suggestMovement?: boolean; // Indica se a cena se beneficiaria de vídeo (ação dinâmica)
+  retentionMultiplier?: number; // Multiplicador de duração para retenção (0.7 = 30% mais rápido, 1.3 = 30% mais lento)
+  retentionReason?: string; // Motivo do ajuste de tempo
 }
 
 // Função para dividir texto em partes (para processamento em lotes)
@@ -585,6 +587,34 @@ ALSO RECOMMEND suggestMovement=true for:
 TARGET: Recommend movement for AT LEAST 40-50% of all scenes, with PRIORITY on early scenes.
 The FIRST 5 scenes should almost ALWAYS have suggestMovement=true unless they are purely static informational frames.
 
+⏱️ RETENTION-BASED DURATION ANALYSIS (CRITICAL FOR ENGAGEMENT):
+Analyze EACH scene and assign a retentionMultiplier (0.7 to 1.4) based on:
+
+FASTER SCENES (0.7-0.85 multiplier) - Keep audience engaged:
+- Opening hook (first 3-5 scenes): 0.75-0.8 - grab attention FAST
+- Action sequences: 0.7-0.8 - fast cuts maintain energy
+- Tension/suspense buildup: 0.8-0.85 - keep viewers on edge
+- Transitions between topics: 0.8 - don't linger
+- Pattern breaks: 0.75 - surprise the viewer quickly
+
+NORMAL PACE (0.9-1.1 multiplier):
+- Standard narration: 1.0
+- Explanations: 0.95-1.05
+- Continuity scenes: 1.0
+
+SLOWER SCENES (1.15-1.4 multiplier) - Let moments breathe:
+- Major revelations: 1.2-1.3 - let the impact sink in
+- Emotional climaxes: 1.25-1.35 - give weight to key moments
+- Beautiful establishing shots: 1.15-1.25 - showcase visuals
+- Mystery reveals: 1.2-1.3 - build anticipation payoff
+- Conclusion/ending: 1.3-1.4 - satisfying close
+
+RULES:
+- First 5 scenes: ALWAYS use 0.75-0.85 (fast hook)
+- Revelation after buildup: 1.25-1.35 (payoff moment)
+- Never use same multiplier 3+ times in a row (vary pacing)
+- Alternate between faster and slower for rhythm
+
 🎨 VISUAL DIVERSITY REQUIREMENT (CRITICAL - MANDATORY):
 Each scene MUST have a DISTINCT visual composition. Use these techniques to ensure NO TWO CONSECUTIVE SCENES look similar:
 
@@ -602,7 +632,7 @@ FORMAT (EVERY PROMPT - INCLUDE CAMERA ANGLE AND LIGHTING):
 "16:9 horizontal landscape, edge-to-edge full bleed composition, [CAMERA ANGLE], ${stylePrefix || style}, [LIGHTING], [VISUAL DESCRIPTION focusing on LOCATIONS and OBJECTS, minimal human presence], ${scriptContext.atmosphere} atmosphere, fill entire frame without any black bars or letterboxing, no text, no watermarks"
 
 RETURN ONLY JSON:
-{"scenes":[{"number":N,"imagePrompt":"[50-70 words including camera angle and specific lighting, diverse from adjacent scenes]","emotion":"[one word]","suggestMovement":true/false}]}`;
+{"scenes":[{"number":N,"imagePrompt":"[50-70 words including camera angle and specific lighting, diverse from adjacent scenes]","emotion":"[one word: tensão/surpresa/medo/admiração/choque/curiosidade/neutral]","suggestMovement":true/false,"retentionMultiplier":0.7-1.4,"retentionReason":"[brief reason for duration adjustment]"}]}`;
 
   let lastError = null;
   const maxRetries = 2;
@@ -804,6 +834,36 @@ RETURN ONLY JSON:
             finalPrompt = finalPrompt.replace(/^(16:9[^,]*|1280x720[^,]*),\s*(16:9[^,]*|edge-to-edge[^,]*),?\s*/, `16:9 horizontal landscape, edge-to-edge full bleed composition, ${stylePrefix}, `);
           }
           
+          // Calcular multiplicador de retenção baseado na posição e conteúdo
+          const scenePosition = originalScene.number;
+          const totalScenes = scenes.length;
+          const positionPercent = scenePosition / totalScenes;
+          
+          // Multiplicador padrão baseado na posição se a IA não fornecer
+          let defaultMultiplier = 1.0;
+          let defaultReason = "ritmo padrão";
+          
+          if (scenePosition <= 5) {
+            // Primeiras cenas: rápidas para hook
+            defaultMultiplier = 0.8;
+            defaultReason = "hook inicial - capturar atenção";
+          } else if (positionPercent >= 0.9) {
+            // Últimas cenas: mais lentas para conclusão
+            defaultMultiplier = 1.25;
+            defaultReason = "conclusão - momento de reflexão";
+          } else if (aiScene?.emotion && ['choque', 'shock', 'tensão', 'tension'].includes(aiScene.emotion.toLowerCase())) {
+            defaultMultiplier = 0.85;
+            defaultReason = "tensão/choque - manter ritmo acelerado";
+          } else if (aiScene?.retentionTrigger && ['revelação', 'revelation'].includes(aiScene.retentionTrigger.toLowerCase())) {
+            defaultMultiplier = 1.2;
+            defaultReason = "revelação - deixar o impacto absorver";
+          }
+          
+          // Usar multiplicador da IA se fornecido e válido, senão usar calculado
+          const aiMultiplier = typeof aiScene?.retentionMultiplier === 'number' 
+            ? Math.max(0.7, Math.min(1.4, aiScene.retentionMultiplier)) 
+            : null;
+          
           results.push({
             number: originalScene.number,
             // CRÍTICO: Usar o texto ORIGINAL, não o da IA
@@ -826,7 +886,10 @@ RETURN ONLY JSON:
               ? true 
               : (originalScene.number <= 15 
                   ? (aiScene?.suggestMovement || /action|explosion|battle|chase|storm|wave|fire|crowd|vehicle|reveal|transform/i.test(originalScene.text))
-                  : (aiScene?.suggestMovement || false))
+                  : (aiScene?.suggestMovement || false)),
+            // NOVO: Multiplicador de retenção para ajuste de duração
+            retentionMultiplier: aiMultiplier || defaultMultiplier,
+            retentionReason: aiScene?.retentionReason || defaultReason
           });
         }
 
@@ -901,6 +964,24 @@ RETURN ONLY JSON:
     const isRetentionZone = scene.number <= 15;
     const hasDynamicContent = /action|move|run|fly|battle|storm|wave|fire|water|crowd|reveal|transform|explosion|chase|wind|rain|lightning/i.test(scene.text);
     
+    // Calcular multiplicador de retenção baseado na posição
+    const totalScenesFallback = scenes.length;
+    const positionPercent = scene.number / totalScenesFallback;
+    
+    let fallbackMultiplier = 1.0;
+    let fallbackReason = "ritmo padrão";
+    
+    if (isEarlyScene) {
+      fallbackMultiplier = 0.8;
+      fallbackReason = "hook inicial - capturar atenção";
+    } else if (positionPercent >= 0.9) {
+      fallbackMultiplier = 1.25;
+      fallbackReason = "conclusão - momento de reflexão";
+    } else if (hasDynamicContent) {
+      fallbackMultiplier = 0.85;
+      fallbackReason = "conteúdo dinâmico - ritmo acelerado";
+    }
+    
     return {
       number: scene.number,
       text: scene.text,
@@ -911,12 +992,13 @@ RETURN ONLY JSON:
       emotion: 'neutral',
       retentionTrigger: 'continuity',
       // Forçar movimento nas primeiras 5 cenas, ou se tiver conteúdo dinâmico nas primeiras 15
-      suggestMovement: isEarlyScene ? true : (isRetentionZone && hasDynamicContent)
+      suggestMovement: isEarlyScene ? true : (isRetentionZone && hasDynamicContent),
+      // Multiplicador de retenção baseado na posição
+      retentionMultiplier: fallbackMultiplier,
+      retentionReason: fallbackReason
     };
   });
 }
-
-// Função legada mantida para compatibilidade (não mais usada)
 async function generateBatchPrompts(
   chunk: string,
   batchNumber: number,
