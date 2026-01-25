@@ -363,14 +363,56 @@ const VoiceGenerator = () => {
       }
 
       if (result) {
-        // Save to database
+        // Upload audio to Supabase Storage for persistent URL
+        let savedAudioUrl: string | null = null;
+        
+        try {
+          // Convert base64 to blob
+          const byteCharacters = atob(result.audioBase64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const fileExtension = audioQuality === 'ultra' ? 'wav' : audioQuality === 'high' ? 'flac' : 'mp3';
+          const mimeType = audioQuality === 'ultra' ? 'audio/wav' : audioQuality === 'high' ? 'audio/flac' : 'audio/mpeg';
+          const audioBlob = new Blob([byteArray], { type: mimeType });
+          
+          // Generate unique filename
+          const fileName = `${user.id}/${Date.now()}_${selectedVoice}.${fileExtension}`;
+          
+          // Upload to storage
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('generated-audios')
+            .upload(fileName, audioBlob, {
+              contentType: mimeType,
+              upsert: false
+            });
+          
+          if (uploadError) {
+            console.error('Error uploading audio:', uploadError);
+            // Fallback to data URL if storage fails
+            savedAudioUrl = result.audioUrl;
+          } else {
+            // Get public URL
+            const { data: urlData } = supabase.storage
+              .from('generated-audios')
+              .getPublicUrl(uploadData.path);
+            savedAudioUrl = urlData.publicUrl;
+          }
+        } catch (uploadErr) {
+          console.error('Error processing audio for upload:', uploadErr);
+          savedAudioUrl = result.audioUrl;
+        }
+        
+        // Save to database with storage URL
         const { error: insertError } = await supabase
           .from('generated_audios')
           .insert({
             user_id: user.id,
             text: text.substring(0, 500),
             voice_id: selectedVoice,
-            audio_url: result.audioUrl || null,
+            audio_url: savedAudioUrl,
             duration: result.duration || 0
           });
 
