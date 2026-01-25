@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import { SessionIndicator } from "@/components/ui/session-indicator";
 import { useCreditDeduction } from "@/hooks/useCreditDeduction";
+import { Label } from "@/components/ui/label";
 
 interface GeneratedAudio {
   id: string;
@@ -24,21 +25,139 @@ interface GeneratedAudio {
   created_at: string | null;
 }
 
-const voices = [
-  { id: "alloy", name: "Alloy - Neutro" },
-  { id: "echo", name: "Echo - Masculino" },
-  { id: "fable", name: "Fable - Expressivo" },
-  { id: "onyx", name: "Onyx - Masculino Grave" },
-  { id: "nova", name: "Nova - Feminino" },
-  { id: "shimmer", name: "Shimmer - Feminino Suave" },
+// Lemonfox voices organized by language
+const voicesByLanguage: Record<string, { id: string; name: string; gender: string }[]> = {
+  "pt-br": [
+    { id: "heart", name: "Heart", gender: "Feminino" },
+    { id: "nova", name: "Nova", gender: "Feminino" },
+    { id: "bella", name: "Bella", gender: "Feminino" },
+    { id: "sarah", name: "Sarah", gender: "Feminino" },
+    { id: "sky", name: "Sky", gender: "Feminino" },
+    { id: "jessica", name: "Jessica", gender: "Feminino" },
+    { id: "nicole", name: "Nicole", gender: "Feminino" },
+    { id: "river", name: "River", gender: "Feminino" },
+    { id: "alloy", name: "Alloy", gender: "Neutro" },
+    { id: "echo", name: "Echo", gender: "Masculino" },
+    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+    { id: "fable", name: "Fable", gender: "Masculino" },
+    { id: "michael", name: "Michael", gender: "Masculino" },
+    { id: "adam", name: "Adam", gender: "Masculino" },
+    { id: "liam", name: "Liam", gender: "Masculino" },
+    { id: "fenrir", name: "Fenrir", gender: "Masculino" },
+    { id: "eric", name: "Eric", gender: "Masculino" },
+    { id: "puck", name: "Puck", gender: "Masculino" },
+    { id: "santa", name: "Santa", gender: "Masculino" },
+    { id: "aoede", name: "Aoede", gender: "Feminino" },
+    { id: "kore", name: "Kore", gender: "Feminino" },
+  ],
+  "en-us": [
+    { id: "heart", name: "Heart", gender: "Feminino" },
+    { id: "bella", name: "Bella", gender: "Feminino" },
+    { id: "nova", name: "Nova", gender: "Feminino" },
+    { id: "sarah", name: "Sarah", gender: "Feminino" },
+    { id: "sky", name: "Sky", gender: "Feminino" },
+    { id: "jessica", name: "Jessica", gender: "Feminino" },
+    { id: "nicole", name: "Nicole", gender: "Feminino" },
+    { id: "river", name: "River", gender: "Feminino" },
+    { id: "aoede", name: "Aoede", gender: "Feminino" },
+    { id: "kore", name: "Kore", gender: "Feminino" },
+    { id: "alloy", name: "Alloy", gender: "Neutro" },
+    { id: "michael", name: "Michael", gender: "Masculino" },
+    { id: "echo", name: "Echo", gender: "Masculino" },
+    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+    { id: "liam", name: "Liam", gender: "Masculino" },
+    { id: "fenrir", name: "Fenrir", gender: "Masculino" },
+    { id: "eric", name: "Eric", gender: "Masculino" },
+    { id: "puck", name: "Puck", gender: "Masculino" },
+    { id: "adam", name: "Adam", gender: "Masculino" },
+    { id: "santa", name: "Santa", gender: "Masculino" },
+    { id: "fable", name: "Fable", gender: "Expressivo" },
+  ],
+  "en-gb": [
+    { id: "alice", name: "Alice", gender: "Feminino" },
+    { id: "emma", name: "Emma", gender: "Feminino" },
+    { id: "isabella", name: "Isabella", gender: "Feminino" },
+    { id: "lily", name: "Lily", gender: "Feminino" },
+    { id: "daniel", name: "Daniel", gender: "Masculino" },
+    { id: "fable", name: "Fable", gender: "Masculino" },
+    { id: "george", name: "George", gender: "Masculino" },
+    { id: "lewis", name: "Lewis", gender: "Masculino" },
+  ],
+  "es": [
+    { id: "heart", name: "Heart", gender: "Feminino" },
+    { id: "nova", name: "Nova", gender: "Feminino" },
+    { id: "bella", name: "Bella", gender: "Feminino" },
+    { id: "sarah", name: "Sarah", gender: "Feminino" },
+    { id: "alloy", name: "Alloy", gender: "Neutro" },
+    { id: "michael", name: "Michael", gender: "Masculino" },
+    { id: "echo", name: "Echo", gender: "Masculino" },
+    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+    { id: "fable", name: "Fable", gender: "Expressivo" },
+  ],
+  "fr": [
+    { id: "heart", name: "Heart", gender: "Feminino" },
+    { id: "nova", name: "Nova", gender: "Feminino" },
+    { id: "bella", name: "Bella", gender: "Feminino" },
+    { id: "sarah", name: "Sarah", gender: "Feminino" },
+    { id: "alloy", name: "Alloy", gender: "Neutro" },
+    { id: "michael", name: "Michael", gender: "Masculino" },
+    { id: "echo", name: "Echo", gender: "Masculino" },
+    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+    { id: "fable", name: "Fable", gender: "Expressivo" },
+  ],
+  "it": [
+    { id: "heart", name: "Heart", gender: "Feminino" },
+    { id: "nova", name: "Nova", gender: "Feminino" },
+    { id: "bella", name: "Bella", gender: "Feminino" },
+    { id: "sarah", name: "Sarah", gender: "Feminino" },
+    { id: "alloy", name: "Alloy", gender: "Neutro" },
+    { id: "michael", name: "Michael", gender: "Masculino" },
+    { id: "echo", name: "Echo", gender: "Masculino" },
+    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+    { id: "fable", name: "Fable", gender: "Expressivo" },
+  ],
+  "ja": [
+    { id: "heart", name: "Heart", gender: "Feminino" },
+    { id: "nova", name: "Nova", gender: "Feminino" },
+    { id: "alloy", name: "Alloy", gender: "Neutro" },
+    { id: "echo", name: "Echo", gender: "Masculino" },
+    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+  ],
+  "zh": [
+    { id: "heart", name: "Heart", gender: "Feminino" },
+    { id: "nova", name: "Nova", gender: "Feminino" },
+    { id: "alloy", name: "Alloy", gender: "Neutro" },
+    { id: "echo", name: "Echo", gender: "Masculino" },
+    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+  ],
+  "hi": [
+    { id: "heart", name: "Heart", gender: "Feminino" },
+    { id: "nova", name: "Nova", gender: "Feminino" },
+    { id: "alloy", name: "Alloy", gender: "Neutro" },
+    { id: "echo", name: "Echo", gender: "Masculino" },
+    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+  ],
+};
+
+const languages = [
+  { id: "pt-br", name: "🇧🇷 Português (Brasil)", flag: "🇧🇷" },
+  { id: "en-us", name: "🇺🇸 Inglês (EUA)", flag: "🇺🇸" },
+  { id: "en-gb", name: "🇬🇧 Inglês (UK)", flag: "🇬🇧" },
+  { id: "es", name: "🇪🇸 Espanhol", flag: "🇪🇸" },
+  { id: "fr", name: "🇫🇷 Francês", flag: "🇫🇷" },
+  { id: "it", name: "🇮🇹 Italiano", flag: "🇮🇹" },
+  { id: "ja", name: "🇯🇵 Japonês", flag: "🇯🇵" },
+  { id: "zh", name: "🇨🇳 Chinês", flag: "🇨🇳" },
+  { id: "hi", name: "🇮🇳 Hindi", flag: "🇮🇳" },
 ];
 
 const VoiceGenerator = () => {
   const { user } = useAuth();
-  const { executeWithDeduction, getEstimatedCost } = useCreditDeduction();
+  const { executeWithDeduction } = useCreditDeduction();
   
   // Persisted states
   const [text, setText] = usePersistedState("voice_text", "");
+  const [selectedLanguage, setSelectedLanguage] = usePersistedState("voice_selectedLanguage", "pt-br");
   const [selectedVoice, setSelectedVoice] = usePersistedState("voice_selectedVoice", "nova");
   const [speed, setSpeed] = usePersistedState("voice_speed", [1]);
   
@@ -48,6 +167,17 @@ const VoiceGenerator = () => {
   const [loadingAudios, setLoadingAudios] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Get available voices for selected language
+  const availableVoices = voicesByLanguage[selectedLanguage] || voicesByLanguage["pt-br"];
+
+  // Reset voice when language changes if current voice is not available
+  useEffect(() => {
+    const voiceExists = availableVoices.some(v => v.id === selectedVoice);
+    if (!voiceExists && availableVoices.length > 0) {
+      setSelectedVoice(availableVoices[0].id);
+    }
+  }, [selectedLanguage, availableVoices, selectedVoice, setSelectedVoice]);
 
   useEffect(() => {
     if (user) fetchAudios();
@@ -99,10 +229,11 @@ const VoiceGenerator = () => {
           showToast: true
         },
         async () => {
-          const { data, error } = await supabase.functions.invoke('generate-tts', {
+          const { data, error } = await supabase.functions.invoke('generate-tts-lemonfox', {
             body: {
               text: text,
               voiceId: selectedVoice,
+              language: selectedLanguage,
               speed: speed[0]
             }
           });
@@ -226,31 +357,46 @@ const VoiceGenerator = () => {
               className="bg-secondary border-border min-h-40 mb-4"
             />
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div>
-                <label className="text-sm text-muted-foreground mb-2 block">Voz</label>
-                <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+                <Label className="text-sm text-muted-foreground mb-2 block">Idioma</Label>
+                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
                   <SelectTrigger className="bg-secondary border-border">
-                    <SelectValue placeholder="Selecione uma voz" />
+                    <SelectValue placeholder="Selecione o idioma" />
                   </SelectTrigger>
                   <SelectContent>
-                    {voices.map((voice) => (
-                      <SelectItem key={voice.id} value={voice.id}>
-                        {voice.name}
+                    {languages.map((lang) => (
+                      <SelectItem key={lang.id} value={lang.id}>
+                        {lang.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-sm text-muted-foreground mb-2 block">
+                <Label className="text-sm text-muted-foreground mb-2 block">Voz ({availableVoices.length} disponíveis)</Label>
+                <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+                  <SelectTrigger className="bg-secondary border-border">
+                    <SelectValue placeholder="Selecione uma voz" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableVoices.map((voice) => (
+                      <SelectItem key={voice.id} value={voice.id}>
+                        {voice.name} - {voice.gender}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground mb-2 block">
                   Velocidade: {speed[0]}x
-                </label>
+                </Label>
                 <Slider
                   value={speed}
                   onValueChange={setSpeed}
                   min={0.5}
-                  max={2}
+                  max={4}
                   step={0.1}
                   className="mt-4"
                 />
@@ -308,7 +454,7 @@ const VoiceGenerator = () => {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-foreground truncate">{audio.text}</p>
                       <p className="text-xs text-muted-foreground">
-                        Voz: {voices.find(v => v.id === audio.voice_id)?.name || audio.voice_id}
+                        Voz: {Object.values(voicesByLanguage).flat().find(v => v.id === audio.voice_id)?.name || audio.voice_id}
                       </p>
                     </div>
                     <span className="text-sm text-muted-foreground">
