@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Mic, Play, Download, Pause, Volume2, Loader2, Trash2, Headphones } from "lucide-react";
+import { Mic, Play, Download, Pause, Volume2, Loader2, Trash2, Headphones, Clock } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -203,6 +203,36 @@ const VoiceGenerator = () => {
     }
     return btoa(binary);
   };
+
+  // Calculate estimated duration based on text and speed
+  const calculateEstimatedDuration = (inputText: string, speedValue: number): string => {
+    if (!inputText.trim()) return '';
+    
+    // Count words (split by whitespace)
+    const wordCount = inputText.trim().split(/\s+/).length;
+    
+    // Calculate WPM based on speed (1x = 150 WPM)
+    const wpm = 150 * speedValue;
+    
+    // Calculate duration in seconds
+    const durationSeconds = (wordCount / wpm) * 60;
+    
+    if (durationSeconds < 60) {
+      return `~${Math.ceil(durationSeconds)}s`;
+    } else if (durationSeconds < 3600) {
+      const minutes = Math.floor(durationSeconds / 60);
+      const seconds = Math.ceil(durationSeconds % 60);
+      return `~${minutes}:${String(seconds).padStart(2, '0')}`;
+    } else {
+      const hours = Math.floor(durationSeconds / 3600);
+      const minutes = Math.floor((durationSeconds % 3600) / 60);
+      return `~${hours}h${String(minutes).padStart(2, '0')}min`;
+    }
+  };
+
+  // Get estimated duration for current text
+  const estimatedDuration = calculateEstimatedDuration(text, speed[0]);
+  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
 
   // Get available voices for selected language
   const availableVoices = voicesByLanguage[selectedLanguage] || voicesByLanguage["pt-br"];
@@ -426,7 +456,20 @@ const VoiceGenerator = () => {
       toast.error('Áudio não disponível');
       return;
     }
-    window.open(audio.audio_url, '_blank');
+    
+    try {
+      // Create a download link for base64 data URLs
+      const link = document.createElement('a');
+      link.href = audio.audio_url;
+      link.download = `audio_${audio.id.substring(0, 8)}.mp3`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Download iniciado!');
+    } catch (error) {
+      console.error('Error downloading audio:', error);
+      toast.error('Erro ao baixar áudio');
+    }
   };
 
   return (
@@ -463,8 +506,22 @@ const VoiceGenerator = () => {
               placeholder="Digite ou cole o texto que deseja converter em áudio..."
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="bg-secondary border-border min-h-40 mb-4"
+              className="bg-secondary border-border min-h-40 mb-2"
             />
+            
+            {/* Real-time duration estimate */}
+            {text.trim() && (
+              <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <span>Duração estimada: <span className="text-foreground font-medium">{estimatedDuration}</span></span>
+                </div>
+                <span>•</span>
+                <span>{wordCount.toLocaleString('pt-BR')} palavras</span>
+                <span>•</span>
+                <span>{text.length.toLocaleString('pt-BR')} caracteres</span>
+              </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div>
