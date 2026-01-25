@@ -120,19 +120,16 @@ serve(async (req) => {
     // Generate audio using Lemonfox TTS API
     console.log("Generating TTS with Lemonfox for text length:", text.length);
     
-    // Force PT-BR voices to avoid fallback accents
+    // Force PT-BR voices to avoid invalid IDs falling back to accents
     const normalizedLanguage = (language || "pt-br").toLowerCase();
     const ptBrVoices = new Set(["clara", "tiago", "bom"]);
     const lowerVoiceId = (voiceId || "").toLowerCase();
 
-    // Lemonfox: a voz "bom" frequentemente retorna sotaque incorreto; remapeamos para "tiago".
-    const remappedVoiceId =
-      normalizedLanguage === "pt-br" && lowerVoiceId === "bom" ? "tiago" : lowerVoiceId;
-
+    // If PT-BR and voice id is unknown, default to Clara.
     const resolvedVoice =
-      normalizedLanguage === "pt-br" && remappedVoiceId && !ptBrVoices.has(remappedVoiceId)
+      normalizedLanguage === "pt-br" && lowerVoiceId && !ptBrVoices.has(lowerVoiceId)
         ? "clara"
-        : (remappedVoiceId || (normalizedLanguage === "pt-br" ? "clara" : "nova"));
+        : (lowerVoiceId || (normalizedLanguage === "pt-br" ? "clara" : "nova"));
 
     const ttsResponse = await fetch("https://api.lemonfox.ai/v1/audio/speech", {
       method: "POST",
