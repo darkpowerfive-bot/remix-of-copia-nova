@@ -15,6 +15,7 @@ import { usePersistedState } from "@/hooks/usePersistedState";
 import { SessionIndicator } from "@/components/ui/session-indicator";
 import { useCreditDeduction } from "@/hooks/useCreditDeduction";
 import { Label } from "@/components/ui/label";
+import { VoiceGenerationModal } from "@/components/voice/VoiceGenerationModal";
 
 interface GeneratedAudio {
   id: string;
@@ -137,6 +138,8 @@ const VoiceGenerator = () => {
   const [loadingAudios, setLoadingAudios] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number } | null>(null);
+  const [showGenerationModal, setShowGenerationModal] = useState(false);
+  const [generationComplete, setGenerationComplete] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -255,7 +258,9 @@ const VoiceGenerator = () => {
     const multiplier = Math.ceil(totalCharacters / 100);
 
     setLoading(true);
-    setGenerationProgress(chunks.length > 1 ? { current: 0, total: chunks.length } : null);
+    setShowGenerationModal(true);
+    setGenerationComplete(false);
+    setGenerationProgress(chunks.length > 1 ? { current: 0, total: chunks.length } : { current: 1, total: 1 });
     
     try {
       const { result, success, error } = await executeWithDeduction(
@@ -350,6 +355,7 @@ const VoiceGenerator = () => {
         if (error !== 'Saldo insuficiente') {
           toast.error(error || 'Erro ao gerar áudio');
         }
+        setShowGenerationModal(false);
         return;
       }
 
@@ -367,6 +373,10 @@ const VoiceGenerator = () => {
 
         if (insertError) console.error('Error saving audio:', insertError);
 
+        // Show completion state briefly
+        setGenerationComplete(true);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
         toast.success('Áudio gerado com sucesso!');
         setText('');
         fetchAudios();
@@ -377,6 +387,7 @@ const VoiceGenerator = () => {
     } finally {
       setLoading(false);
       setGenerationProgress(null);
+      setShowGenerationModal(false);
     }
   };
 
@@ -686,6 +697,16 @@ const VoiceGenerator = () => {
         </div>
       </div>
         </PermissionGate>
+
+        {/* Voice Generation Modal */}
+        <VoiceGenerationModal
+          open={showGenerationModal}
+          onOpenChange={setShowGenerationModal}
+          progress={generationProgress}
+          voiceName={availableVoices.find(v => v.id === selectedVoice)?.name || selectedVoice}
+          estimatedDuration={estimatedDuration}
+          isComplete={generationComplete}
+        />
       </MainLayout>
     </>
   );
