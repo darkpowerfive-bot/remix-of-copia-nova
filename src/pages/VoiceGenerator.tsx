@@ -363,49 +363,10 @@ const VoiceGenerator = () => {
       }
 
       if (result) {
-        // Upload audio to Supabase Storage for persistent URL
-        let savedAudioUrl: string | null = null;
+        // Audio URL comes directly from Edge Function (uploaded to storage there)
+        const savedAudioUrl = result.audioUrl || null;
         
-        try {
-          // Convert base64 to blob
-          const byteCharacters = atob(result.audioBase64);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const fileExtension = audioQuality === 'ultra' ? 'wav' : audioQuality === 'high' ? 'flac' : 'mp3';
-          const mimeType = audioQuality === 'ultra' ? 'audio/wav' : audioQuality === 'high' ? 'audio/flac' : 'audio/mpeg';
-          const audioBlob = new Blob([byteArray], { type: mimeType });
-          
-          // Generate unique filename
-          const fileName = `${user.id}/${Date.now()}_${selectedVoice}.${fileExtension}`;
-          
-          // Upload to storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('generated-audios')
-            .upload(fileName, audioBlob, {
-              contentType: mimeType,
-              upsert: false
-            });
-          
-          if (uploadError) {
-            console.error('Error uploading audio:', uploadError);
-            // Fallback to data URL if storage fails
-            savedAudioUrl = result.audioUrl;
-          } else {
-            // Get public URL
-            const { data: urlData } = supabase.storage
-              .from('generated-audios')
-              .getPublicUrl(uploadData.path);
-            savedAudioUrl = urlData.publicUrl;
-          }
-        } catch (uploadErr) {
-          console.error('Error processing audio for upload:', uploadErr);
-          savedAudioUrl = result.audioUrl;
-        }
-        
-        // Save to database with storage URL
+        // Save to database
         const { error: insertError } = await supabase
           .from('generated_audios')
           .insert({

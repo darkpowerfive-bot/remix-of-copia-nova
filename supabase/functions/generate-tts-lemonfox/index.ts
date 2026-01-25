@@ -6,12 +6,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Credit costs for TTS operations (Lemonfox is cheaper)
+// Credit costs for TTS operations
 const TTS_CREDIT_COSTS = {
-  basic: 1,      // Up to 500 characters
-  medium: 2,     // Up to 2000 characters
-  large: 4,      // Up to 4000 characters
-  extra: 6,      // Over 4000 characters
+  basic: 1,
+  medium: 2,
+  large: 4,
+  extra: 6,
 };
 
 function calculateCreditCost(textLength: number): number {
@@ -27,7 +27,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voiceId, language, speed, quality = 'high' } = await req.json();
+    const { text, voiceId, language, speed, quality = 'high', isPreview = false } = await req.json();
 
     if (!text || text.trim().length === 0) {
       return new Response(
@@ -44,12 +44,15 @@ serve(async (req) => {
       );
     }
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
     // Get user from token
     let userId: string | null = null;
     const authHeader = req.headers.get("Authorization");
     
     if (authHeader) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
       const supabase = createClient(supabaseUrl, supabaseKey, {
         global: { headers: { Authorization: authHeader } },
@@ -59,74 +62,68 @@ serve(async (req) => {
       userId = user?.id || null;
     }
 
-    const creditsNeeded = calculateCreditCost(text.length);
+    // Skip credit check for previews
+    if (!isPreview) {
+      const creditsNeeded = calculateCreditCost(text.length);
 
-    // Check and debit credits if user is authenticated
-    if (userId) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+      if (userId) {
+        const { data: credits, error: creditsError } = await supabaseAdmin
+          .from("user_credits")
+          .select("balance")
+          .eq("user_id", userId)
+          .maybeSingle();
 
-      const { data: credits, error: creditsError } = await supabaseAdmin
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", userId)
-        .maybeSingle();
+        if (creditsError) {
+          console.error("Error fetching credits:", creditsError);
+          return new Response(
+            JSON.stringify({ error: "Unable to verify credits" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
 
-      if (creditsError) {
-        console.error("Error fetching credits:", creditsError);
-        return new Response(
-          JSON.stringify({ error: "Unable to verify credits" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        const currentBalance = credits?.balance || 0;
+        if (currentBalance < creditsNeeded) {
+          return new Response(
+            JSON.stringify({ 
+              error: "Insufficient credits", 
+              required: creditsNeeded, 
+              available: currentBalance 
+            }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Debit credits
+        await supabaseAdmin
+          .from("user_credits")
+          .update({ balance: currentBalance - creditsNeeded, updated_at: new Date().toISOString() })
+          .eq("user_id", userId);
+
+        // Log credit usage
+        await supabaseAdmin.from("credit_usage").insert({
+          user_id: userId,
+          operation_type: "tts_generation_lemonfox",
+          credits_used: creditsNeeded,
+          model_used: "lemonfox",
+          details: { text_length: text.length, voice: voiceId, language, speed }
+        });
+
+        // Log transaction
+        await supabaseAdmin.from("credit_transactions").insert({
+          user_id: userId,
+          amount: -creditsNeeded,
+          transaction_type: "debit",
+          description: `TTS Lemonfox: ${text.substring(0, 50)}...`
+        });
       }
-
-      const currentBalance = credits?.balance || 0;
-      if (currentBalance < creditsNeeded) {
-        return new Response(
-          JSON.stringify({ 
-            error: "Insufficient credits", 
-            required: creditsNeeded, 
-            available: currentBalance 
-          }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Debit credits
-      await supabaseAdmin
-        .from("user_credits")
-        .update({ balance: currentBalance - creditsNeeded, updated_at: new Date().toISOString() })
-        .eq("user_id", userId);
-
-      // Log credit usage
-      await supabaseAdmin.from("credit_usage").insert({
-        user_id: userId,
-        operation_type: "tts_generation_lemonfox",
-        credits_used: creditsNeeded,
-        model_used: "lemonfox",
-        details: { text_length: text.length, voice: voiceId, language, speed }
-      });
-
-      // Log transaction
-      await supabaseAdmin.from("credit_transactions").insert({
-        user_id: userId,
-        amount: -creditsNeeded,
-        transaction_type: "debit",
-        description: `TTS Lemonfox: ${text.substring(0, 50)}...`
-      });
     }
 
     // Generate audio using Lemonfox TTS API
     console.log("Generating TTS with Lemonfox for text length:", text.length, "language:", language, "voice:", voiceId);
     
-    // Normalize language code (Lemonfox uses lowercase)
-    // Supported languages: en-us, en-gb, ja, zh, es, fr, hi, it, pt-br
     const normalizedLanguage = (language || "pt-br").toLowerCase();
     const lowerVoiceId = (voiceId || "").toLowerCase();
 
-    // Define valid voices per language based on official Lemonfox documentation
-    // Each language has its own native voices
     const voicesByLanguage: Record<string, Set<string>> = {
       "pt-br": new Set(["clara", "tiago", "papai"]),
       "en-us": new Set(["heart", "bella", "michael", "alloy", "aoede", "kore", "jessica", "nicole", "nova", "river", "sarah", "sky", "echo", "eric", "fenrir", "liam", "onyx", "puck", "adam", "santa"]),
@@ -139,10 +136,8 @@ serve(async (req) => {
       "it": new Set(["sara", "nicola"]),
     };
 
-    // Get valid voices for the selected language (fallback to en-us voices)
     const validVoices = voicesByLanguage[normalizedLanguage] || voicesByLanguage["en-us"];
 
-    // Default voice per language if selected voice is invalid
     const defaultVoices: Record<string, string> = {
       "pt-br": "clara",
       "en-us": "nova",
@@ -155,30 +150,24 @@ serve(async (req) => {
       "it": "sara",
     };
 
-    // If voice is not valid for selected language, use default for that language
     const resolvedVoice = validVoices.has(lowerVoiceId)
       ? lowerVoiceId
       : (defaultVoices[normalizedLanguage] || "heart");
 
     console.log("Resolved voice:", resolvedVoice, "for language:", normalizedLanguage);
 
-    // Add natural pauses to text for better breathing rhythm
-    // Replace sentence endings with pause markers that TTS will interpret
+    // Add natural pauses
     const processedText = text
-      .replace(/([.!?。！？])\s+/g, '$1... ')  // Add pause after sentence endings
-      .replace(/,\s+/g, ', ')  // Preserve comma pauses
-      .replace(/\n+/g, '... ')  // Replace newlines with pauses
+      .replace(/([.!?。！？])\s+/g, '$1... ')
+      .replace(/,\s+/g, ', ')
+      .replace(/\n+/g, '... ')
       .trim();
 
-    // Determine audio format based on quality setting
-    // flac = lossless highest quality (larger files)
-    // mp3 = standard quality (smaller files, good for most uses)
-    // wav = uncompressed (largest files, best for editing)
-    const audioFormat = quality === 'ultra' ? 'wav' : quality === 'high' ? 'flac' : 'mp3';
-    const mimeType = audioFormat === 'wav' ? 'audio/wav' : audioFormat === 'flac' ? 'audio/flac' : 'audio/mpeg';
+    // ALWAYS use MP3 for Edge Functions to avoid memory issues
+    // FLAC/WAV files are too large (80MB+) and cause memory limit exceeded
+    const audioFormat = 'mp3';
+    const mimeType = 'audio/mpeg';
 
-    // Build the request body
-    // The language parameter is CRITICAL for multilingual support
     const requestBody: Record<string, unknown> = {
       input: processedText,
       voice: resolvedVoice,
@@ -187,7 +176,7 @@ serve(async (req) => {
       response_format: audioFormat,
     };
 
-    console.log("Lemonfox request body:", JSON.stringify(requestBody), "quality:", quality, "format:", audioFormat);
+    console.log("Lemonfox request body:", JSON.stringify(requestBody));
 
     const ttsResponse = await fetch("https://api.lemonfox.ai/v1/audio/speech", {
       method: "POST",
@@ -207,39 +196,117 @@ serve(async (req) => {
       );
     }
 
-    // Convert audio to base64 using chunked approach to avoid stack overflow
     const audioBuffer = await ttsResponse.arrayBuffer();
-    const uint8Array = new Uint8Array(audioBuffer);
+    const audioBytes = new Uint8Array(audioBuffer);
     
-    // Process in chunks to avoid "Maximum call stack size exceeded"
-    let binaryString = '';
-    const chunkSize = 8192; // Process 8KB at a time
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
-      binaryString += String.fromCharCode(...chunk);
+    console.log("TTS generated successfully, audio size:", audioBuffer.byteLength);
+
+    // For previews, return small base64 directly
+    if (isPreview || audioBuffer.byteLength < 500000) {
+      // Small file: convert to base64 in chunks
+      let binaryString = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < audioBytes.length; i += chunkSize) {
+        const chunk = audioBytes.subarray(i, Math.min(i + chunkSize, audioBytes.length));
+        binaryString += String.fromCharCode(...chunk);
+      }
+      const base64Audio = btoa(binaryString);
+      
+      const estimatedDuration = Math.ceil(text.split(/\s+/).length / 2.5);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          audioBase64: base64Audio,
+          audioUrl: `data:${mimeType};base64,${base64Audio}`,
+          duration: estimatedDuration,
+          creditsUsed: isPreview ? 0 : calculateCreditCost(text.length),
+          voice: resolvedVoice,
+          language: normalizedLanguage,
+          textLength: text.length,
+          provider: "lemonfox",
+          format: audioFormat
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
-    const base64Audio = btoa(binaryString);
-    
-    // Estimate duration (words / 2.5 words per second)
-    const estimatedDuration = Math.ceil(text.split(/\s+/).length / 2.5);
 
-    console.log("TTS generated successfully, audio size:", audioBuffer.byteLength, "format:", audioFormat);
+    // For larger files, upload to Supabase Storage
+    if (userId) {
+      const fileName = `${userId}/${Date.now()}_${resolvedVoice}.${audioFormat}`;
+      
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        .from('generated-audios')
+        .upload(fileName, audioBytes, {
+          contentType: mimeType,
+          upsert: false
+        });
 
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        // Fallback: try to return base64 for medium files
+        if (audioBuffer.byteLength < 2000000) {
+          let binaryString = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < audioBytes.length; i += chunkSize) {
+            const chunk = audioBytes.subarray(i, Math.min(i + chunkSize, audioBytes.length));
+            binaryString += String.fromCharCode(...chunk);
+          }
+          const base64Audio = btoa(binaryString);
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              audioBase64: base64Audio,
+              audioUrl: `data:${mimeType};base64,${base64Audio}`,
+              duration: Math.ceil(text.split(/\s+/).length / 2.5),
+              creditsUsed: calculateCreditCost(text.length),
+              voice: resolvedVoice,
+              language: normalizedLanguage,
+              textLength: text.length,
+              provider: "lemonfox",
+              format: audioFormat
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        return new Response(
+          JSON.stringify({ error: "Failed to save audio", details: uploadError.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Get public URL
+      const { data: urlData } = supabaseAdmin.storage
+        .from('generated-audios')
+        .getPublicUrl(uploadData.path);
+
+      const estimatedDuration = Math.ceil(text.split(/\s+/).length / 2.5);
+
+      console.log("Audio uploaded to storage:", urlData.publicUrl);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          audioUrl: urlData.publicUrl,
+          storagePath: uploadData.path,
+          duration: estimatedDuration,
+          creditsUsed: calculateCreditCost(text.length),
+          voice: resolvedVoice,
+          language: normalizedLanguage,
+          textLength: text.length,
+          provider: "lemonfox",
+          format: audioFormat
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // No user - return error for large files
     return new Response(
-      JSON.stringify({
-        success: true,
-        audioBase64: base64Audio,
-        audioUrl: `data:${mimeType};base64,${base64Audio}`,
-        duration: estimatedDuration,
-        creditsUsed: creditsNeeded,
-        voice: resolvedVoice,
-        language: normalizedLanguage,
-        textLength: text.length,
-        provider: "lemonfox",
-        format: audioFormat,
-        quality: quality
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: "Authentication required for large audio files" }),
+      { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (error: unknown) {
