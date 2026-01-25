@@ -144,8 +144,9 @@ const VoiceGenerator = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Maximum characters per API call (Lemonfox limit ~5000 chars for best quality)
-  const MAX_CHUNK_SIZE = 4000;
+  // Maximum characters per API call - increased to minimize chunk splits
+  // Lemonfox can handle larger texts, so we use 10000 chars for fewer transitions
+  const MAX_CHUNK_SIZE = 10000;
   
   // Split text into manageable chunks only if very long
   const splitTextIfNeeded = (inputText: string): string[] => {
