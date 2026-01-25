@@ -27,7 +27,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voiceId, language, speed } = await req.json();
+    const { text, voiceId, language, speed, quality = 'high' } = await req.json();
 
     if (!text || text.trim().length === 0) {
       return new Response(
@@ -170,6 +170,13 @@ serve(async (req) => {
       .replace(/\n+/g, '... ')  // Replace newlines with pauses
       .trim();
 
+    // Determine audio format based on quality setting
+    // flac = lossless highest quality (larger files)
+    // mp3 = standard quality (smaller files, good for most uses)
+    // wav = uncompressed (largest files, best for editing)
+    const audioFormat = quality === 'ultra' ? 'wav' : quality === 'high' ? 'flac' : 'mp3';
+    const mimeType = audioFormat === 'wav' ? 'audio/wav' : audioFormat === 'flac' ? 'audio/flac' : 'audio/mpeg';
+
     // Build the request body
     // The language parameter is CRITICAL for multilingual support
     const requestBody: Record<string, unknown> = {
@@ -177,10 +184,10 @@ serve(async (req) => {
       voice: resolvedVoice,
       language: normalizedLanguage,
       speed: speed || 1.0,
-      response_format: "mp3",
+      response_format: audioFormat,
     };
 
-    console.log("Lemonfox request body:", JSON.stringify(requestBody));
+    console.log("Lemonfox request body:", JSON.stringify(requestBody), "quality:", quality, "format:", audioFormat);
 
     const ttsResponse = await fetch("https://api.lemonfox.ai/v1/audio/speech", {
       method: "POST",
@@ -216,19 +223,21 @@ serve(async (req) => {
     // Estimate duration (words / 2.5 words per second)
     const estimatedDuration = Math.ceil(text.split(/\s+/).length / 2.5);
 
-    console.log("TTS generated successfully, audio size:", audioBuffer.byteLength);
+    console.log("TTS generated successfully, audio size:", audioBuffer.byteLength, "format:", audioFormat);
 
     return new Response(
       JSON.stringify({
         success: true,
         audioBase64: base64Audio,
-        audioUrl: `data:audio/mp3;base64,${base64Audio}`,
+        audioUrl: `data:${mimeType};base64,${base64Audio}`,
         duration: estimatedDuration,
         creditsUsed: creditsNeeded,
         voice: resolvedVoice,
         language: normalizedLanguage,
         textLength: text.length,
-        provider: "lemonfox"
+        provider: "lemonfox",
+        format: audioFormat,
+        quality: quality
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
