@@ -1,1 +1,4 @@
 project_id = "aqbpqxxcuvueqfwyhrgw"
+
+[functions.generate-tts-deepgram]
+verify_jwt = false
