@@ -125,39 +125,34 @@ serve(async (req) => {
     const normalizedLanguage = (language || "pt-br").toLowerCase();
     const lowerVoiceId = (voiceId || "").toLowerCase();
 
-    // Define valid voices per language based on Lemonfox documentation
-    // Note: For languages other than en-us, en-gb, pt-br, the API may use
-    // multilingual voices that can speak in the target language when the
-    // language parameter is set correctly
+    // Define valid voices per language based on official Lemonfox documentation
+    // Each language has its own native voices
     const voicesByLanguage: Record<string, Set<string>> = {
       "pt-br": new Set(["clara", "tiago", "papai"]),
       "en-us": new Set(["heart", "bella", "michael", "alloy", "aoede", "kore", "jessica", "nicole", "nova", "river", "sarah", "sky", "echo", "eric", "fenrir", "liam", "onyx", "puck", "adam", "santa"]),
       "en-gb": new Set(["alice", "emma", "isabella", "lily", "daniel", "fable", "george", "lewis"]),
-      // For other languages, use multilingual-capable voices from en-us
-      // The language parameter will control the spoken language
-      "es": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
-      "fr": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
-      "it": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
-      "ja": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
-      "zh": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
-      "hi": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
+      "ja": new Set(["sakura", "gongitsune", "nezumi", "tebukuro", "kumo"]),
+      "zh": new Set(["xiaobei", "xiaoni", "xiaoxiao", "xiaoyi", "yunjian", "yunxi", "yunxia", "yunyang"]),
+      "es": new Set(["dora", "alex", "noel"]),
+      "fr": new Set(["siwis"]),
+      "hi": new Set(["alpha", "beta", "omega", "psi"]),
+      "it": new Set(["sara", "nicola"]),
     };
 
     // Get valid voices for the selected language (fallback to en-us voices)
     const validVoices = voicesByLanguage[normalizedLanguage] || voicesByLanguage["en-us"];
 
     // Default voice per language if selected voice is invalid
-    // Using "heart" as default for multilingual as it tends to have better pronunciation
     const defaultVoices: Record<string, string> = {
       "pt-br": "clara",
       "en-us": "nova",
       "en-gb": "alice",
-      "es": "heart",
-      "fr": "heart",
-      "it": "heart",
-      "ja": "heart",
-      "zh": "heart",
-      "hi": "heart",
+      "ja": "sakura",
+      "zh": "xiaoxiao",
+      "es": "dora",
+      "fr": "siwis",
+      "hi": "alpha",
+      "it": "sara",
     };
 
     // If voice is not valid for selected language, use default for that language
