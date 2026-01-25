@@ -249,8 +249,21 @@ const VoiceGenerator = () => {
     }
   };
 
+  // Preview phrases for each language
+  const previewPhrases: Record<string, string> = {
+    'pt-br': 'La Casa Dark, a ferramenta número 1 de canais darks.',
+    'en-us': 'La Casa Dark, the number one tool for dark channels.',
+    'en-gb': 'La Casa Dark, the number one tool for dark channels.',
+    'ja': 'ラ・カサ・ダーク、ダークチャンネルのための最高のツール。',
+    'zh': '暗室，暗黑频道的第一工具。',
+    'es': 'La Casa Dark, la herramienta número uno para canales oscuros.',
+    'fr': 'La Casa Dark, l\'outil numéro un pour les chaînes sombres.',
+    'hi': 'ला कासा डार्क, डार्क चैनलों के लिए नंबर एक टूल।',
+    'it': 'La Casa Dark, lo strumento numero uno per i canali dark.',
+  };
+
   const handlePreviewVoice = async () => {
-    const previewText = 'La Casa Dark, a ferramenta número 1 de canais darks.';
+    const previewText = previewPhrases[selectedLanguage] || previewPhrases['pt-br'];
 
     setPreviewLoading(true);
     try {
