@@ -205,6 +205,11 @@ serve(async (req) => {
     console.log("TTS generated successfully, audio size:", audioBuffer.byteLength);
 
     // For previews, return small base64 directly
+    // Calculate accurate duration based on word count and speed
+    const wordCount = text.trim().split(/\s+/).length;
+    const wordsPerSecond = 2.5 * (speed || 1.0);
+    const estimatedDuration = Math.ceil(wordCount / wordsPerSecond);
+
     if (isPreview || audioBuffer.byteLength < 500000) {
       // Small file: convert to base64 in chunks
       let binaryString = '';
@@ -262,7 +267,7 @@ serve(async (req) => {
               success: true,
               audioBase64: base64Audio,
               audioUrl: `data:${mimeType};base64,${base64Audio}`,
-              duration: Math.ceil(text.split(/\s+/).length / 2.5),
+              duration: Math.ceil(text.trim().split(/\s+/).length / (2.5 * (speed || 1.0))),
               creditsUsed: calculateCreditCost(text.length),
               voice: resolvedVoice,
               language: normalizedLanguage,
@@ -285,7 +290,7 @@ serve(async (req) => {
         .from('generated-audios')
         .getPublicUrl(uploadData.path);
 
-      const estimatedDuration = Math.ceil(text.split(/\s+/).length / 2.5);
+      const estimatedDuration = Math.ceil(text.trim().split(/\s+/).length / (2.5 * (speed || 1.0)));
 
       console.log("Audio uploaded to storage:", urlData.publicUrl);
 
