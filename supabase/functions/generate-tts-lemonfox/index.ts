@@ -123,10 +123,11 @@ serve(async (req) => {
     // Force PT-BR voices to avoid fallback accents
     const normalizedLanguage = (language || "pt-br").toLowerCase();
     const ptBrVoices = new Set(["clara", "tiago", "bom"]);
+    const lowerVoiceId = (voiceId || "").toLowerCase();
     const resolvedVoice =
-      normalizedLanguage === "pt-br" && !ptBrVoices.has((voiceId || "").toLowerCase())
+      normalizedLanguage === "pt-br" && !ptBrVoices.has(lowerVoiceId)
         ? "clara"
-        : (voiceId || (normalizedLanguage === "pt-br" ? "clara" : "nova"));
+        : (lowerVoiceId || (normalizedLanguage === "pt-br" ? "clara" : "nova"));
 
     const ttsResponse = await fetch("https://api.lemonfox.ai/v1/audio/speech", {
       method: "POST",
