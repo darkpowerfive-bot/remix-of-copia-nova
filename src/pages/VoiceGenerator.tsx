@@ -66,52 +66,58 @@ const voicesByLanguage: Record<string, { id: string; name: string; gender: strin
     { id: "papai", name: "Papai", gender: "Masculino" },
   ],
   "es": [
+    // Spanish voices - using en-us compatible voices with es language parameter
+    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "alloy", name: "Alloy", gender: "Neutro" },
     { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "fable", name: "Fable", gender: "Masculino" },
     { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "shimmer", name: "Shimmer", gender: "Feminino" },
+    { id: "fable", name: "Fable", gender: "Masculino" },
   ],
   "fr": [
+    // French voices - using compatible voices with fr language parameter
+    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "alloy", name: "Alloy", gender: "Neutro" },
     { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "fable", name: "Fable", gender: "Masculino" },
     { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "shimmer", name: "Shimmer", gender: "Feminino" },
+    { id: "fable", name: "Fable", gender: "Masculino" },
   ],
   "it": [
+    // Italian voices - using compatible voices with it language parameter
+    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "alloy", name: "Alloy", gender: "Neutro" },
     { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "fable", name: "Fable", gender: "Masculino" },
     { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "shimmer", name: "Shimmer", gender: "Feminino" },
+    { id: "fable", name: "Fable", gender: "Masculino" },
   ],
   "ja": [
+    // Japanese voices - using compatible voices with ja language parameter
+    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "alloy", name: "Alloy", gender: "Neutro" },
     { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "fable", name: "Fable", gender: "Masculino" },
     { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "shimmer", name: "Shimmer", gender: "Feminino" },
+    { id: "fable", name: "Fable", gender: "Masculino" },
   ],
   "zh": [
+    // Chinese voices - using compatible voices with zh language parameter
+    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "alloy", name: "Alloy", gender: "Neutro" },
     { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "fable", name: "Fable", gender: "Masculino" },
     { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "shimmer", name: "Shimmer", gender: "Feminino" },
+    { id: "fable", name: "Fable", gender: "Masculino" },
   ],
   "hi": [
+    // Hindi voices - using compatible voices with hi language parameter
+    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "alloy", name: "Alloy", gender: "Neutro" },
     { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "fable", name: "Fable", gender: "Masculino" },
     { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
     { id: "shimmer", name: "Shimmer", gender: "Feminino" },
+    { id: "fable", name: "Fable", gender: "Masculino" },
   ],
 };
 
