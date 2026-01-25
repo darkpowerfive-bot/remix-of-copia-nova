@@ -60,12 +60,10 @@ const voicesByLanguage: Record<string, { id: string; name: string; gender: strin
     { id: "lewis", name: "Lewis", gender: "Masculino" },
   ],
   "pt-br": [
-    { id: "alloy", name: "Alloy", gender: "Neutro" },
-    { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "fable", name: "Fable", gender: "Masculino" },
-    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
-    { id: "shimmer", name: "Shimmer", gender: "Feminino" },
+    // PT-BR voices (per Lemonfox docs UI)
+    { id: "clara", name: "Clara", gender: "Feminino" },
+    { id: "tiago", name: "Tiago", gender: "Masculino" },
+    { id: "bom", name: "Bom", gender: "Masculino" },
   ],
   "es": [
     { id: "alloy", name: "Alloy", gender: "Neutro" },
@@ -136,7 +134,7 @@ const VoiceGenerator = () => {
   // Persisted states
   const [text, setText] = usePersistedState("voice_text", "");
   const [selectedLanguage, setSelectedLanguage] = usePersistedState("voice_selectedLanguage", "pt-br");
-  const [selectedVoice, setSelectedVoice] = usePersistedState("voice_selectedVoice", "nova");
+  const [selectedVoice, setSelectedVoice] = usePersistedState("voice_selectedVoice", "clara");
   const [speed, setSpeed] = usePersistedState("voice_speed", [1]);
   
   // Non-persisted states

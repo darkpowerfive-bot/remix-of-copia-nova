@@ -120,6 +120,14 @@ serve(async (req) => {
     // Generate audio using Lemonfox TTS API
     console.log("Generating TTS with Lemonfox for text length:", text.length);
     
+    // Force PT-BR voices to avoid fallback accents
+    const normalizedLanguage = (language || "pt-br").toLowerCase();
+    const ptBrVoices = new Set(["clara", "tiago", "bom"]);
+    const resolvedVoice =
+      normalizedLanguage === "pt-br" && !ptBrVoices.has((voiceId || "").toLowerCase())
+        ? "clara"
+        : (voiceId || (normalizedLanguage === "pt-br" ? "clara" : "nova"));
+
     const ttsResponse = await fetch("https://api.lemonfox.ai/v1/audio/speech", {
       method: "POST",
       headers: {
@@ -128,9 +136,9 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         input: text,
-        voice: voiceId || "nova",
-        // Lemonfox uses lowercase "pt-br" for Brazilian Portuguese per docs
-        language: language || "pt-br",
+        voice: resolvedVoice,
+        // Lemonfox docs: en-us/en-gb/.../pt-br (lowercase)
+        language: normalizedLanguage,
         speed: speed || 1.0,
         response_format: "mp3",
       }),
@@ -161,8 +169,8 @@ serve(async (req) => {
         audioUrl: `data:audio/mp3;base64,${base64Audio}`,
         duration: estimatedDuration,
         creditsUsed: creditsNeeded,
-        voice: voiceId || "nova",
-        language: language || "pt-br",
+        voice: resolvedVoice,
+        language: normalizedLanguage,
         textLength: text.length,
         provider: "lemonfox"
       }),
