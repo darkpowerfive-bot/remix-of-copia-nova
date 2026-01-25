@@ -65,65 +65,46 @@ const voicesByLanguage: Record<string, { id: string; name: string; gender: strin
     { id: "tiago", name: "Tiago", gender: "Masculino" },
     { id: "papai", name: "Papai", gender: "Masculino" },
   ],
-  "es": [
-    // Spanish voices - multilingual voices that support Spanish via language parameter
-    { id: "heart", name: "Heart", gender: "Feminino" },
-    { id: "bella", name: "Bella", gender: "Feminino" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
-    { id: "sarah", name: "Sarah", gender: "Feminino" },
-    { id: "alloy", name: "Alloy", gender: "Neutro" },
-    { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-  ],
-  "fr": [
-    // French voices - multilingual voices that support French via language parameter
-    { id: "heart", name: "Heart", gender: "Feminino" },
-    { id: "bella", name: "Bella", gender: "Feminino" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
-    { id: "sarah", name: "Sarah", gender: "Feminino" },
-    { id: "alloy", name: "Alloy", gender: "Neutro" },
-    { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-  ],
-  "it": [
-    // Italian voices - multilingual voices that support Italian via language parameter
-    { id: "heart", name: "Heart", gender: "Feminino" },
-    { id: "bella", name: "Bella", gender: "Feminino" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
-    { id: "sarah", name: "Sarah", gender: "Feminino" },
-    { id: "alloy", name: "Alloy", gender: "Neutro" },
-    { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-  ],
   "ja": [
-    // Japanese voices - multilingual voices that support Japanese via language parameter
-    { id: "heart", name: "Heart", gender: "Feminino" },
-    { id: "bella", name: "Bella", gender: "Feminino" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
-    { id: "sarah", name: "Sarah", gender: "Feminino" },
-    { id: "alloy", name: "Alloy", gender: "Neutro" },
-    { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+    // Japanese native voices
+    { id: "sakura", name: "Sakura", gender: "Feminino" },
+    { id: "gongitsune", name: "Gongitsune", gender: "Feminino" },
+    { id: "nezumi", name: "Nezumi", gender: "Feminino" },
+    { id: "tebukuro", name: "Tebukuro", gender: "Feminino" },
+    { id: "kumo", name: "Kumo", gender: "Masculino" },
   ],
   "zh": [
-    // Chinese voices - multilingual voices that support Chinese via language parameter
-    { id: "heart", name: "Heart", gender: "Feminino" },
-    { id: "bella", name: "Bella", gender: "Feminino" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
-    { id: "sarah", name: "Sarah", gender: "Feminino" },
-    { id: "alloy", name: "Alloy", gender: "Neutro" },
-    { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+    // Mandarin Chinese native voices
+    { id: "xiaobei", name: "Xiaobei", gender: "Feminino" },
+    { id: "xiaoni", name: "Xiaoni", gender: "Feminino" },
+    { id: "xiaoxiao", name: "Xiaoxiao", gender: "Feminino" },
+    { id: "xiaoyi", name: "Xiaoyi", gender: "Feminino" },
+    { id: "yunjian", name: "Yunjian", gender: "Masculino" },
+    { id: "yunxi", name: "Yunxi", gender: "Masculino" },
+    { id: "yunxia", name: "Yunxia", gender: "Masculino" },
+    { id: "yunyang", name: "Yunyang", gender: "Masculino" },
+  ],
+  "es": [
+    // Spanish native voices
+    { id: "dora", name: "Dora", gender: "Feminino" },
+    { id: "alex", name: "Alex", gender: "Masculino" },
+    { id: "noel", name: "Noel", gender: "Masculino" },
+  ],
+  "fr": [
+    // French native voice
+    { id: "siwis", name: "Siwis", gender: "Feminino" },
   ],
   "hi": [
-    // Hindi voices - multilingual voices that support Hindi via language parameter
-    { id: "heart", name: "Heart", gender: "Feminino" },
-    { id: "bella", name: "Bella", gender: "Feminino" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
-    { id: "sarah", name: "Sarah", gender: "Feminino" },
-    { id: "alloy", name: "Alloy", gender: "Neutro" },
-    { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
+    // Hindi native voices
+    { id: "alpha", name: "Alpha", gender: "Feminino" },
+    { id: "beta", name: "Beta", gender: "Feminino" },
+    { id: "omega", name: "Omega", gender: "Masculino" },
+    { id: "psi", name: "Psi", gender: "Masculino" },
+  ],
+  "it": [
+    // Italian native voices
+    { id: "sara", name: "Sara", gender: "Feminino" },
+    { id: "nicola", name: "Nicola", gender: "Masculino" },
   ],
 };
 
