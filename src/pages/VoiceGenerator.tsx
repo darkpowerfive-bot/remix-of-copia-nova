@@ -422,7 +422,7 @@ const VoiceGenerator = () => {
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground mb-2 block">
-                  Velocidade: {speed[0]}x
+                  Velocidade: {speed[0]}x ({Math.round(150 * speed[0])} WPM)
                 </Label>
                 <Slider
                   value={speed}
@@ -432,6 +432,10 @@ const VoiceGenerator = () => {
                   step={0.1}
                   className="mt-4"
                 />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                  <span>0.5x (75 WPM)</span>
+                  <span>4x (600 WPM)</span>
+                </div>
               </div>
             </div>
 
