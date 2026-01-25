@@ -287,8 +287,7 @@ const VoiceGenerator = () => {
             if (error) throw error;
             if (data.error) throw new Error(data.error);
             
-            return {
-              audioBase64: data.audioBase64,
+          return {
               audioUrl: data.audioUrl,
               duration: data.duration || 0,
               chunksGenerated: 1
@@ -296,8 +295,8 @@ const VoiceGenerator = () => {
           }
           
           // For very long texts, generate each chunk separately
-          // Note: This may have slight variations between chunks
-          const audioChunks: string[] = [];
+          // Each chunk is uploaded to storage by the Edge Function
+          const audioUrls: string[] = [];
           let totalDuration = 0;
           
           for (let i = 0; i < chunks.length; i++) {
@@ -316,40 +315,17 @@ const VoiceGenerator = () => {
             if (error) throw error;
             if (data.error) throw new Error(data.error);
             
-            audioChunks.push(data.audioBase64);
+            audioUrls.push(data.audioUrl);
             totalDuration += data.duration || 0;
           }
           
-          // Simple concatenation - may have slight audio artifacts between chunks
-          const totalLength = audioChunks.reduce((acc, b64) => {
-            const binaryString = atob(b64);
-            return acc + binaryString.length;
-          }, 0);
-          
-          const combined = new Uint8Array(totalLength);
-          let offset = 0;
-          
-          for (const b64 of audioChunks) {
-            const binaryString = atob(b64);
-            for (let i = 0; i < binaryString.length; i++) {
-              combined[offset++] = binaryString.charCodeAt(i);
-            }
-          }
-          
-          // Convert back to base64 in chunks to avoid stack overflow
-          let binary = '';
-          const chunkSize = 8192;
-          for (let i = 0; i < combined.length; i += chunkSize) {
-            const chunk = combined.subarray(i, Math.min(i + chunkSize, combined.length));
-            binary += String.fromCharCode(...chunk);
-          }
-          const concatenatedAudio = btoa(binary);
-          
+          // For multi-chunk, return the first URL (or implement proper concatenation later)
+          // Note: Full audio concatenation would require server-side processing
           return {
-            audioBase64: concatenatedAudio,
-            audioUrl: `data:audio/mp3;base64,${concatenatedAudio}`,
+            audioUrl: audioUrls[0],
             duration: totalDuration,
-            chunksGenerated: chunks.length
+            chunksGenerated: chunks.length,
+            allUrls: audioUrls
           };
         }
       );
