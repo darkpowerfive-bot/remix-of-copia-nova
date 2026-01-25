@@ -247,8 +247,8 @@ const VoiceGenerator = () => {
       return;
     }
 
-    if (text.length > 10000) {
-      toast.error('Texto muito longo. Máximo de 10.000 caracteres.');
+    if (text.length > 150000) {
+      toast.error('Texto muito longo. Máximo de 150.000 caracteres (~2 horas de áudio).');
       return;
     }
 
@@ -554,7 +554,7 @@ const VoiceGenerator = () => {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Máximo de 10.000 caracteres • Textos longos são divididos automaticamente para manter consistência da voz
+              Até 150.000 caracteres (~2 horas de áudio) • Textos longos são divididos automaticamente para manter consistência da voz
             </p>
           </Card>
 
