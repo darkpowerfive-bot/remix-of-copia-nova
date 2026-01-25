@@ -156,12 +156,15 @@ serve(async (req) => {
 
     console.log("Resolved voice:", resolvedVoice, "for language:", normalizedLanguage);
 
-    // Clean up text for natural TTS - no artificial pause markers
-    // The Lemonfox API handles natural pauses based on punctuation
+    // Clean up text for natural TTS - minimal processing
+    // Only normalize whitespace, keep original punctuation intact
     const processedText = text
-      .replace(/\n\n+/g, '. ') // Paragraph breaks: just a period for natural pause
-      .replace(/\n/g, ' ')     // Single line breaks: space only
-      .replace(/\s{2,}/g, ' ') // Normalize multiple spaces
+      .replace(/\r\n/g, '\n')      // Normalize line endings
+      .replace(/\n{3,}/g, '\n\n')  // Max 2 newlines
+      .replace(/\n\n/g, ' ')       // Double newline = space (natural paragraph break)
+      .replace(/\n/g, ' ')         // Single newline = space
+      .replace(/\s{2,}/g, ' ')     // Normalize multiple spaces to single
+      .replace(/\s+([.!?,;:])/g, '$1') // Remove space before punctuation
       .trim();
 
     // ALWAYS use MP3 for Edge Functions to avoid memory issues
