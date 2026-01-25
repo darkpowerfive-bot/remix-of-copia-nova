@@ -162,10 +162,18 @@ serve(async (req) => {
 
     console.log("Resolved voice:", resolvedVoice, "for language:", normalizedLanguage);
 
+    // Add natural pauses to text for better breathing rhythm
+    // Replace sentence endings with pause markers that TTS will interpret
+    const processedText = text
+      .replace(/([.!?。！？])\s+/g, '$1... ')  // Add pause after sentence endings
+      .replace(/,\s+/g, ', ')  // Preserve comma pauses
+      .replace(/\n+/g, '... ')  // Replace newlines with pauses
+      .trim();
+
     // Build the request body
     // The language parameter is CRITICAL for multilingual support
     const requestBody: Record<string, unknown> = {
-      input: text,
+      input: processedText,
       voice: resolvedVoice,
       language: normalizedLanguage,
       speed: speed || 1.0,
