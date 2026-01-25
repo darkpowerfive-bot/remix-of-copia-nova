@@ -124,10 +124,15 @@ serve(async (req) => {
     const normalizedLanguage = (language || "pt-br").toLowerCase();
     const ptBrVoices = new Set(["clara", "tiago", "bom"]);
     const lowerVoiceId = (voiceId || "").toLowerCase();
+
+    // Lemonfox: a voz "bom" frequentemente retorna sotaque incorreto; remapeamos para "tiago".
+    const remappedVoiceId =
+      normalizedLanguage === "pt-br" && lowerVoiceId === "bom" ? "tiago" : lowerVoiceId;
+
     const resolvedVoice =
-      normalizedLanguage === "pt-br" && !ptBrVoices.has(lowerVoiceId)
+      normalizedLanguage === "pt-br" && remappedVoiceId && !ptBrVoices.has(remappedVoiceId)
         ? "clara"
-        : (lowerVoiceId || (normalizedLanguage === "pt-br" ? "clara" : "nova"));
+        : (remappedVoiceId || (normalizedLanguage === "pt-br" ? "clara" : "nova"));
 
     const ttsResponse = await fetch("https://api.lemonfox.ai/v1/audio/speech", {
       method: "POST",
