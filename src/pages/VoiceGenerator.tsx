@@ -146,6 +146,12 @@ const VoiceGenerator = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Lemonfox: a voz "bom" (pt-br) está inconsistindo; remapeamos para "tiago" para garantir sotaque PT-BR.
+  const getResolvedVoiceId = (lang: string, voice: string) => {
+    if (lang.toLowerCase() === "pt-br" && voice.toLowerCase() === "bom") return "tiago";
+    return voice;
+  };
+
   // Get available voices for selected language
   const availableVoices = voicesByLanguage[selectedLanguage] || voicesByLanguage["pt-br"];
 
@@ -210,7 +216,7 @@ const VoiceGenerator = () => {
           const { data, error } = await supabase.functions.invoke('generate-tts-lemonfox', {
             body: {
               text: text,
-              voiceId: selectedVoice,
+              voiceId: getResolvedVoiceId(selectedLanguage, selectedVoice),
               language: selectedLanguage,
               speed: speed[0]
             }
@@ -264,7 +270,7 @@ const VoiceGenerator = () => {
       const { data, error } = await supabase.functions.invoke('generate-tts-lemonfox', {
         body: {
           text: previewText,
-          voiceId: selectedVoice,
+          voiceId: getResolvedVoiceId(selectedLanguage, selectedVoice),
           language: selectedLanguage,
           speed: speed[0],
           isPreview: true
