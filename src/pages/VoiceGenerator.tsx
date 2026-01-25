@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Mic, Play, Download, Pause, Volume2, Loader2, Trash2, Headphones, Clock } from "lucide-react";
+import { Mic, Play, Download, Pause, Volume2, Loader2, Trash2, Headphones, Clock, Sparkles } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -130,6 +130,7 @@ const VoiceGenerator = () => {
   const [selectedLanguage, setSelectedLanguage] = usePersistedState("voice_selectedLanguage", "pt-br");
   const [selectedVoice, setSelectedVoice] = usePersistedState("voice_selectedVoice", "clara");
   const [speed, setSpeed] = usePersistedState("voice_speed", [1]);
+  const [audioQuality, setAudioQuality] = usePersistedState<'standard' | 'high' | 'ultra'>("voice_quality", "high");
   
   // Non-persisted states
   const [loading, setLoading] = useState(false);
@@ -278,7 +279,8 @@ const VoiceGenerator = () => {
                 text: chunks[0],
                 voiceId: selectedVoice,
                 language: selectedLanguage,
-                speed: speed[0]
+                speed: speed[0],
+                quality: audioQuality
               }
             });
 
@@ -306,7 +308,8 @@ const VoiceGenerator = () => {
                 text: chunks[i],
                 voiceId: selectedVoice,
                 language: selectedLanguage,
-                speed: speed[0]
+                speed: speed[0],
+                quality: audioQuality
               }
             });
 
@@ -543,7 +546,7 @@ const VoiceGenerator = () => {
               </div>
             )}
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div>
                 <Label className="text-sm text-muted-foreground mb-2 block">Idioma</Label>
                 <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
@@ -588,6 +591,37 @@ const VoiceGenerator = () => {
                     )}
                   </Button>
                 </div>
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground mb-2 block flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  Qualidade do Áudio
+                </Label>
+                <Select value={audioQuality} onValueChange={(v) => setAudioQuality(v as 'standard' | 'high' | 'ultra')}>
+                  <SelectTrigger className="bg-secondary border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">
+                      <div className="flex flex-col">
+                        <span>Padrão (MP3)</span>
+                        <span className="text-xs text-muted-foreground">Menor arquivo, boa qualidade</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="high">
+                      <div className="flex flex-col">
+                        <span>Alta (FLAC)</span>
+                        <span className="text-xs text-muted-foreground">Sem perdas, recomendado</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="ultra">
+                      <div className="flex flex-col">
+                        <span>Ultra (WAV)</span>
+                        <span className="text-xs text-muted-foreground">Máxima qualidade, arquivo maior</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground mb-2 block">
