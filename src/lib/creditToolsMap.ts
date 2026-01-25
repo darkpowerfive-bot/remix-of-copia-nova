@@ -277,12 +277,13 @@ export const CREDIT_COSTS: Record<string, number> = {
   'scene_generation': 2,
   'generate_scenes': 2,
   
-  // 🎙️ GERADOR DE VOZ (TTS) - Custo Lemonfox: $2.50/1M chars
-  // Para 300x lucro: 1 crédito a cada 3000 caracteres (mínimo 1)
+  // 🎙️ GERADOR DE VOZ (TTS) - Custo Deepgram Aura-2: $3/1M chars
+  // Para 275x lucro: 1 crédito a cada 2500 caracteres (mínimo 1)
   'voice_generation': 1, // Base - calculado dinamicamente por calculateTTSCost()
   'generate_tts': 1,
   'tts': 1,
   'tts_generation': 1,
+  'tts_generation_deepgram': 1,
   
   // 🎨 GERAÇÃO DE IMAGENS - GRÁTIS (usa cookies ImageFX do usuário)
   'image_generation': 0,
@@ -372,13 +373,13 @@ export function calculateCostWithModel(operationType: string, model?: string): n
   return Math.ceil(baseCost * multiplier);
 }
 
-// Custos específicos para TTS baseado no tamanho do texto - Otimizado para 300x margem
-// Custo real Lemonfox: $2.50/1M chars = R$0.015/1k chars = R$0.000015/char
-// Para 300x lucro: 1 crédito (R$0.05) a cada 3000 chars
-// Cálculo: R$0.05 / (R$0.000015 * 3000) = R$0.05 / R$0.045 ≈ 1.11 → margem de ~310x
+// Custos específicos para TTS baseado no tamanho do texto - Otimizado para 275x margem
+// Custo real Deepgram Aura-2: $3/1M chars = R$0.018/1k chars = R$0.000018/char
+// Para 275x lucro: 1 crédito (R$0.05) a cada 2500 chars
+// Cálculo: R$0.05 / (R$0.000018 * 2500) = R$0.05 / R$0.045 ≈ 1.11 → margem de ~275x
 export function calculateTTSCost(textLength: number): number {
-  // 1 crédito a cada 3000 caracteres, mínimo 1 crédito
-  return Math.max(1, Math.ceil(textLength / 3000));
+  // 1 crédito a cada 2500 caracteres, mínimo 1 crédito
+  return Math.max(1, Math.ceil(textLength / 2500));
 }
 
 // Custos para geração de cenas em lote
