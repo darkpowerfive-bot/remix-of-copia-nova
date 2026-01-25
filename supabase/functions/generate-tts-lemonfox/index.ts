@@ -156,11 +156,14 @@ serve(async (req) => {
 
     console.log("Resolved voice:", resolvedVoice, "for language:", normalizedLanguage);
 
-    // Add natural pauses
+    // Add natural pauses with longer breaks between sentences
+    // Use double ellipsis for sentence endings to create a breath pause
     const processedText = text
-      .replace(/([.!?。！？])\s+/g, '$1... ')
-      .replace(/,\s+/g, ', ')
-      .replace(/\n+/g, '... ')
+      .replace(/\n\n+/g, '...... ') // Paragraph breaks: longer pause
+      .replace(/\n/g, '.... ') // Single line breaks: medium pause  
+      .replace(/([.!?。！？])\s+/g, '$1.... ') // Sentence endings: natural breath pause
+      .replace(/([,;:])\s+/g, '$1.. ') // Commas/semicolons: short pause
+      .replace(/\s{2,}/g, ' ') // Normalize multiple spaces
       .trim();
 
     // ALWAYS use MP3 for Edge Functions to avoid memory issues
