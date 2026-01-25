@@ -121,45 +121,63 @@ serve(async (req) => {
     console.log("Generating TTS with Lemonfox for text length:", text.length, "language:", language, "voice:", voiceId);
     
     // Normalize language code (Lemonfox uses lowercase)
+    // Supported languages: en-us, en-gb, ja, zh, es, fr, hi, it, pt-br
     const normalizedLanguage = (language || "pt-br").toLowerCase();
     const lowerVoiceId = (voiceId || "").toLowerCase();
 
     // Define valid voices per language based on Lemonfox documentation
+    // Note: For languages other than en-us, en-gb, pt-br, the API may use
+    // multilingual voices that can speak in the target language when the
+    // language parameter is set correctly
     const voicesByLanguage: Record<string, Set<string>> = {
       "pt-br": new Set(["clara", "tiago", "papai"]),
       "en-us": new Set(["heart", "bella", "michael", "alloy", "aoede", "kore", "jessica", "nicole", "nova", "river", "sarah", "sky", "echo", "eric", "fenrir", "liam", "onyx", "puck", "adam", "santa"]),
       "en-gb": new Set(["alice", "emma", "isabella", "lily", "daniel", "fable", "george", "lewis"]),
-      // For es, fr, it, ja, zh, hi - use generic OpenAI-compatible voices
-      "es": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
-      "fr": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
-      "it": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
-      "ja": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
-      "zh": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
-      "hi": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
+      // For other languages, use multilingual-capable voices from en-us
+      // The language parameter will control the spoken language
+      "es": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
+      "fr": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
+      "it": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
+      "ja": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
+      "zh": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
+      "hi": new Set(["heart", "bella", "nova", "sarah", "alloy", "echo", "onyx"]),
     };
 
     // Get valid voices for the selected language (fallback to en-us voices)
     const validVoices = voicesByLanguage[normalizedLanguage] || voicesByLanguage["en-us"];
 
     // Default voice per language if selected voice is invalid
+    // Using "heart" as default for multilingual as it tends to have better pronunciation
     const defaultVoices: Record<string, string> = {
       "pt-br": "clara",
       "en-us": "nova",
       "en-gb": "alice",
-      "es": "nova",
-      "fr": "nova",
-      "it": "nova",
-      "ja": "nova",
-      "zh": "nova",
-      "hi": "nova",
+      "es": "heart",
+      "fr": "heart",
+      "it": "heart",
+      "ja": "heart",
+      "zh": "heart",
+      "hi": "heart",
     };
 
     // If voice is not valid for selected language, use default for that language
     const resolvedVoice = validVoices.has(lowerVoiceId)
       ? lowerVoiceId
-      : (defaultVoices[normalizedLanguage] || "nova");
+      : (defaultVoices[normalizedLanguage] || "heart");
 
     console.log("Resolved voice:", resolvedVoice, "for language:", normalizedLanguage);
+
+    // Build the request body
+    // The language parameter is CRITICAL for multilingual support
+    const requestBody: Record<string, unknown> = {
+      input: text,
+      voice: resolvedVoice,
+      language: normalizedLanguage,
+      speed: speed || 1.0,
+      response_format: "mp3",
+    };
+
+    console.log("Lemonfox request body:", JSON.stringify(requestBody));
 
     const ttsResponse = await fetch("https://api.lemonfox.ai/v1/audio/speech", {
       method: "POST",
@@ -167,14 +185,7 @@ serve(async (req) => {
         "Authorization": `Bearer ${LEMONFOX_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        input: text,
-        voice: resolvedVoice,
-        // The language parameter controls what language the voice speaks in
-        language: normalizedLanguage,
-        speed: speed || 1.0,
-        response_format: "mp3",
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!ttsResponse.ok) {
