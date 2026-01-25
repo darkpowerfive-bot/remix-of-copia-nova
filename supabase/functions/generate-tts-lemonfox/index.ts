@@ -118,18 +118,48 @@ serve(async (req) => {
     }
 
     // Generate audio using Lemonfox TTS API
-    console.log("Generating TTS with Lemonfox for text length:", text.length);
+    console.log("Generating TTS with Lemonfox for text length:", text.length, "language:", language, "voice:", voiceId);
     
-    // Force PT-BR voices to avoid invalid IDs falling back to accents
+    // Normalize language code (Lemonfox uses lowercase)
     const normalizedLanguage = (language || "pt-br").toLowerCase();
-    const ptBrVoices = new Set(["clara", "tiago", "papai"]);
     const lowerVoiceId = (voiceId || "").toLowerCase();
 
-    // If PT-BR and voice id is unknown, default to Clara.
-    const resolvedVoice =
-      normalizedLanguage === "pt-br" && lowerVoiceId && !ptBrVoices.has(lowerVoiceId)
-        ? "clara"
-        : (lowerVoiceId || (normalizedLanguage === "pt-br" ? "clara" : "nova"));
+    // Define valid voices per language based on Lemonfox documentation
+    const voicesByLanguage: Record<string, Set<string>> = {
+      "pt-br": new Set(["clara", "tiago", "papai"]),
+      "en-us": new Set(["heart", "bella", "michael", "alloy", "aoede", "kore", "jessica", "nicole", "nova", "river", "sarah", "sky", "echo", "eric", "fenrir", "liam", "onyx", "puck", "adam", "santa"]),
+      "en-gb": new Set(["alice", "emma", "isabella", "lily", "daniel", "fable", "george", "lewis"]),
+      // For es, fr, it, ja, zh, hi - use generic OpenAI-compatible voices
+      "es": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
+      "fr": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
+      "it": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
+      "ja": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
+      "zh": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
+      "hi": new Set(["alloy", "echo", "fable", "onyx", "nova", "shimmer"]),
+    };
+
+    // Get valid voices for the selected language (fallback to en-us voices)
+    const validVoices = voicesByLanguage[normalizedLanguage] || voicesByLanguage["en-us"];
+
+    // Default voice per language if selected voice is invalid
+    const defaultVoices: Record<string, string> = {
+      "pt-br": "clara",
+      "en-us": "nova",
+      "en-gb": "alice",
+      "es": "nova",
+      "fr": "nova",
+      "it": "nova",
+      "ja": "nova",
+      "zh": "nova",
+      "hi": "nova",
+    };
+
+    // If voice is not valid for selected language, use default for that language
+    const resolvedVoice = validVoices.has(lowerVoiceId)
+      ? lowerVoiceId
+      : (defaultVoices[normalizedLanguage] || "nova");
+
+    console.log("Resolved voice:", resolvedVoice, "for language:", normalizedLanguage);
 
     const ttsResponse = await fetch("https://api.lemonfox.ai/v1/audio/speech", {
       method: "POST",
@@ -140,7 +170,7 @@ serve(async (req) => {
       body: JSON.stringify({
         input: text,
         voice: resolvedVoice,
-        // Lemonfox docs: en-us/en-gb/.../pt-br (lowercase)
+        // The language parameter controls what language the voice speaks in
         language: normalizedLanguage,
         speed: speed || 1.0,
         response_format: "mp3",
