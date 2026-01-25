@@ -136,8 +136,73 @@ const VoiceGenerator = () => {
   const [audios, setAudios] = useState<GeneratedAudio[]>([]);
   const [loadingAudios, setLoadingAudios] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [generationProgress, setGenerationProgress] = useState<{ current: number; total: number } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Split text into sentences for consistent voice quality
+  const splitIntoSentences = (inputText: string): string[] => {
+    // Split by sentence-ending punctuation while preserving the punctuation
+    const sentences = inputText
+      .split(/(?<=[.!?。！？])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+    
+    // If no sentence breaks found, split by newlines or return as single chunk
+    if (sentences.length <= 1) {
+      const byNewlines = inputText.split(/\n+/).map(s => s.trim()).filter(s => s.length > 0);
+      if (byNewlines.length > 1) return byNewlines;
+    }
+    
+    // Merge very short sentences with previous ones to avoid choppy audio
+    const mergedSentences: string[] = [];
+    let currentChunk = '';
+    
+    for (const sentence of sentences) {
+      if (currentChunk.length + sentence.length < 300) {
+        currentChunk = currentChunk ? `${currentChunk} ${sentence}` : sentence;
+      } else {
+        if (currentChunk) mergedSentences.push(currentChunk);
+        currentChunk = sentence;
+      }
+    }
+    if (currentChunk) mergedSentences.push(currentChunk);
+    
+    return mergedSentences.length > 0 ? mergedSentences : [inputText];
+  };
+
+  // Concatenate multiple audio base64 strings into one
+  const concatenateAudioBuffers = async (audioBase64Array: string[]): Promise<string> => {
+    if (audioBase64Array.length === 1) return audioBase64Array[0];
+    
+    // Convert base64 to array buffers
+    const audioBuffers: ArrayBuffer[] = [];
+    for (const base64 of audioBase64Array) {
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      audioBuffers.push(bytes.buffer);
+    }
+    
+    // Simple concatenation for MP3 files (works for streaming playback)
+    const totalLength = audioBuffers.reduce((acc, buf) => acc + buf.byteLength, 0);
+    const combined = new Uint8Array(totalLength);
+    let offset = 0;
+    
+    for (const buffer of audioBuffers) {
+      combined.set(new Uint8Array(buffer), offset);
+      offset += buffer.byteLength;
+    }
+    
+    // Convert back to base64
+    let binary = '';
+    for (let i = 0; i < combined.length; i++) {
+      binary += String.fromCharCode(combined[i]);
+    }
+    return btoa(binary);
+  };
 
   // Get available voices for selected language
   const availableVoices = voicesByLanguage[selectedLanguage] || voicesByLanguage["pt-br"];
@@ -182,37 +247,62 @@ const VoiceGenerator = () => {
       return;
     }
 
-    if (text.length > 4096) {
-      toast.error('Texto muito longo. Máximo de 4096 caracteres.');
+    if (text.length > 10000) {
+      toast.error('Texto muito longo. Máximo de 10.000 caracteres.');
       return;
     }
 
-    // TTS cobra por 100 caracteres
-    const multiplier = Math.ceil(text.length / 100);
+    // Split text into sentences for consistent voice quality
+    const sentences = splitIntoSentences(text);
+    const totalCharacters = sentences.reduce((acc, s) => acc + s.length, 0);
+    
+    // TTS charges per 100 characters
+    const multiplier = Math.ceil(totalCharacters / 100);
 
     setLoading(true);
+    setGenerationProgress({ current: 0, total: sentences.length });
+    
     try {
       const { result, success, error } = await executeWithDeduction(
         {
           operationType: 'generate_tts',
           multiplier,
-          details: { textLength: text.length, voice: selectedVoice },
+          details: { textLength: totalCharacters, voice: selectedVoice, chunks: sentences.length },
           showToast: true
         },
         async () => {
-          const { data, error } = await supabase.functions.invoke('generate-tts-lemonfox', {
-            body: {
-              text: text,
-              voiceId: selectedVoice,
-              language: selectedLanguage,
-              speed: speed[0]
-            }
-          });
-
-          if (error) throw error;
-          if (data.error) throw new Error(data.error);
+          const audioChunks: string[] = [];
+          let totalDuration = 0;
           
-          return data;
+          // Generate audio for each sentence
+          for (let i = 0; i < sentences.length; i++) {
+            setGenerationProgress({ current: i + 1, total: sentences.length });
+            
+            const { data, error } = await supabase.functions.invoke('generate-tts-lemonfox', {
+              body: {
+                text: sentences[i],
+                voiceId: selectedVoice,
+                language: selectedLanguage,
+                speed: speed[0]
+              }
+            });
+
+            if (error) throw error;
+            if (data.error) throw new Error(data.error);
+            
+            audioChunks.push(data.audioBase64);
+            totalDuration += data.duration || 0;
+          }
+          
+          // Concatenate all audio chunks
+          const concatenatedAudio = await concatenateAudioBuffers(audioChunks);
+          
+          return {
+            audioBase64: concatenatedAudio,
+            audioUrl: `data:audio/mp3;base64,${concatenatedAudio}`,
+            duration: totalDuration,
+            chunksGenerated: sentences.length
+          };
         }
       );
 
@@ -237,7 +327,8 @@ const VoiceGenerator = () => {
 
         if (insertError) console.error('Error saving audio:', insertError);
 
-        toast.success(`Áudio gerado com sucesso!`);
+        const chunksMsg = sentences.length > 1 ? ` (${sentences.length} partes)` : '';
+        toast.success(`Áudio gerado com sucesso!${chunksMsg}`);
         setText('');
         fetchAudios();
       }
@@ -246,6 +337,7 @@ const VoiceGenerator = () => {
       toast.error('Erro ao gerar áudio. Tente novamente.');
     } finally {
       setLoading(false);
+      setGenerationProgress(null);
     }
   };
 
@@ -446,15 +538,23 @@ const VoiceGenerator = () => {
                 className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {loading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {generationProgress 
+                      ? `Gerando ${generationProgress.current}/${generationProgress.total}...`
+                      : 'Processando...'
+                    }
+                  </>
                 ) : (
-                  <Play className="w-4 h-4 mr-2" />
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Gerar Áudio
+                  </>
                 )}
-                Gerar Áudio
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Máximo de 4096 caracteres por geração
+              Máximo de 10.000 caracteres • Textos longos são divididos automaticamente para manter consistência da voz
             </p>
           </Card>
 
