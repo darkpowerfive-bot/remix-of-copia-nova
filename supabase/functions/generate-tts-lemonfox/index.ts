@@ -129,7 +129,8 @@ serve(async (req) => {
       body: JSON.stringify({
         input: text,
         voice: voiceId || "nova",
-        language: language || "pt-br",
+        // Lemonfox uses "pt" for Brazilian Portuguese, not "pt-br"
+        language: language === "pt-br" ? "pt" : (language || "pt"),
         speed: speed || 1.0,
         response_format: "mp3",
       }),
