@@ -180,11 +180,13 @@ const VoiceGenerator = () => {
     // Count words (split by whitespace)
     const wordCount = inputText.trim().split(/\s+/).length;
     
-    // Calculate WPM based on speed (1x = 150 WPM)
-    const wpm = 150 * speedValue;
+    // Base speaking rate: ~2.5 words per second at 1x speed
+    // Lower speed = slower speaking = MORE time
+    // Higher speed = faster speaking = LESS time
+    const wordsPerSecond = 2.5 * speedValue;
     
     // Calculate duration in seconds
-    const durationSeconds = (wordCount / wpm) * 60;
+    const durationSeconds = wordCount / wordsPerSecond;
     
     if (durationSeconds < 60) {
       return `~${Math.ceil(durationSeconds)}s`;
