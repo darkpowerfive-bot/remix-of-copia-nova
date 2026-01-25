@@ -277,12 +277,12 @@ export const CREDIT_COSTS: Record<string, number> = {
   'scene_generation': 2,
   'generate_scenes': 2,
   
-  // 🎙️ GERADOR DE VOZ (TTS) - Custo real: ~R$0.075/1k chars (tts-1) → 2-8 créditos
-  // Até 500 chars: 2, até 2000: 3, até 4000: 5, mais: 8
-  'voice_generation': 2,
-  'generate_tts': 2,
-  'tts': 2,
-  'tts_generation': 2,
+  // 🎙️ GERADOR DE VOZ (TTS) - Custo Lemonfox: $2.50/1M chars
+  // Para 300x lucro: 1 crédito a cada 3000 caracteres (mínimo 1)
+  'voice_generation': 1, // Base - calculado dinamicamente por calculateTTSCost()
+  'generate_tts': 1,
+  'tts': 1,
+  'tts_generation': 1,
   
   // 🎨 GERAÇÃO DE IMAGENS - GRÁTIS (usa cookies ImageFX do usuário)
   'image_generation': 0,
@@ -372,13 +372,13 @@ export function calculateCostWithModel(operationType: string, model?: string): n
   return Math.ceil(baseCost * multiplier);
 }
 
-// Custos específicos para TTS baseado no tamanho do texto - Otimizado para 300%+ margem
-// Custo real: ~R$0.015/1k chars (tts-1 da OpenAI via Laozhang)
+// Custos específicos para TTS baseado no tamanho do texto - Otimizado para 300x margem
+// Custo real Lemonfox: $2.50/1M chars = R$0.015/1k chars = R$0.000015/char
+// Para 300x lucro: 1 crédito (R$0.05) a cada 3000 chars
+// Cálculo: R$0.05 / (R$0.000015 * 3000) = R$0.05 / R$0.045 ≈ 1.11 → margem de ~310x
 export function calculateTTSCost(textLength: number): number {
-  if (textLength <= 500) return 2;    // Custo ~R$0.0075 → Cobra R$0.10 (1233% margem)
-  if (textLength <= 2000) return 3;   // Custo ~R$0.03 → Cobra R$0.15 (400% margem)
-  if (textLength <= 4000) return 5;   // Custo ~R$0.06 → Cobra R$0.25 (316% margem)
-  return 8;                            // Custo ~R$0.10 → Cobra R$0.40 (300% margem)
+  // 1 crédito a cada 3000 caracteres, mínimo 1 crédito
+  return Math.max(1, Math.ceil(textLength / 3000));
 }
 
 // Custos para geração de cenas em lote

@@ -6,19 +6,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Credit costs for TTS operations
-const TTS_CREDIT_COSTS = {
-  basic: 1,
-  medium: 2,
-  large: 4,
-  extra: 6,
-};
-
+// Credit costs for TTS operations - 300x profit margin
+// Lemonfox cost: $2.50 / 1M chars = R$0.015 / 1K chars
+// 1 credit (R$0.05) per 3000 chars = ~310x margin
 function calculateCreditCost(textLength: number): number {
-  if (textLength <= 500) return TTS_CREDIT_COSTS.basic;
-  if (textLength <= 2000) return TTS_CREDIT_COSTS.medium;
-  if (textLength <= 4000) return TTS_CREDIT_COSTS.large;
-  return TTS_CREDIT_COSTS.extra;
+  // 1 crédito a cada 3000 caracteres, mínimo 1 crédito
+  return Math.max(1, Math.ceil(textLength / 3000));
 }
 
 serve(async (req) => {
