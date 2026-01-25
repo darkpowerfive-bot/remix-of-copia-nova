@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Mic, Play, Download, Pause, Volume2, Loader2, Trash2 } from "lucide-react";
+import { Mic, Play, Download, Pause, Volume2, Loader2, Trash2, Headphones } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -163,10 +163,12 @@ const VoiceGenerator = () => {
   
   // Non-persisted states
   const [loading, setLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [audios, setAudios] = useState<GeneratedAudio[]>([]);
   const [loadingAudios, setLoadingAudios] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Get available voices for selected language
   const availableVoices = voicesByLanguage[selectedLanguage] || voicesByLanguage["pt-br"];
@@ -278,6 +280,53 @@ const VoiceGenerator = () => {
     }
   };
 
+  const handlePreviewVoice = async () => {
+    const previewText = selectedLanguage === 'pt-br' 
+      ? 'Olá, esta é uma prévia da minha voz.'
+      : selectedLanguage === 'es'
+      ? 'Hola, esta es una vista previa de mi voz.'
+      : selectedLanguage === 'fr'
+      ? 'Bonjour, ceci est un aperçu de ma voix.'
+      : selectedLanguage === 'it'
+      ? 'Ciao, questa è un\'anteprima della mia voce.'
+      : selectedLanguage === 'ja'
+      ? 'こんにちは、これは私の声のプレビューです。'
+      : selectedLanguage === 'zh'
+      ? '你好，这是我声音的预览。'
+      : selectedLanguage === 'hi'
+      ? 'नमस्ते, यह मेरी आवाज का पूर्वावलोकन है।'
+      : 'Hello, this is a preview of my voice.';
+
+    setPreviewLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-tts-lemonfox', {
+        body: {
+          text: previewText,
+          voiceId: selectedVoice,
+          language: selectedLanguage,
+          speed: speed[0],
+          isPreview: true
+        }
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      if (data.audioUrl) {
+        if (previewAudioRef.current) {
+          previewAudioRef.current.pause();
+        }
+        previewAudioRef.current = new Audio(data.audioUrl);
+        previewAudioRef.current.play();
+      }
+    } catch (error) {
+      console.error('Error previewing voice:', error);
+      toast.error('Erro ao reproduzir prévia da voz');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const handlePlay = (audio: GeneratedAudio) => {
     if (!audio.audio_url) {
       toast.error('Áudio não disponível');
@@ -375,18 +424,33 @@ const VoiceGenerator = () => {
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground mb-2 block">Voz ({availableVoices.length} disponíveis)</Label>
-                <Select value={selectedVoice} onValueChange={setSelectedVoice}>
-                  <SelectTrigger className="bg-secondary border-border">
-                    <SelectValue placeholder="Selecione uma voz" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableVoices.map((voice) => (
-                      <SelectItem key={voice.id} value={voice.id}>
-                        {voice.name} - {voice.gender}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Select value={selectedVoice} onValueChange={setSelectedVoice}>
+                    <SelectTrigger className="bg-secondary border-border flex-1">
+                      <SelectValue placeholder="Selecione uma voz" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableVoices.map((voice) => (
+                        <SelectItem key={voice.id} value={voice.id}>
+                          {voice.name} - {voice.gender}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handlePreviewVoice}
+                    disabled={previewLoading}
+                    title="Ouvir prévia da voz"
+                  >
+                    {previewLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Headphones className="w-4 h-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground mb-2 block">
