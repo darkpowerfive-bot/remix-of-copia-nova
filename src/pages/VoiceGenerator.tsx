@@ -60,11 +60,10 @@ const voicesByLanguage: Record<string, { id: string; name: string; gender: strin
     { id: "lewis", name: "Lewis", gender: "Masculino" },
   ],
   "pt-br": [
-    // PT-BR voices (per Lemonfox docs UI)
+    // PT-BR voices (per Lemonfox docs)
     { id: "clara", name: "Clara", gender: "Feminino" },
     { id: "tiago", name: "Tiago", gender: "Masculino" },
-    // Lemonfox UI mostra essa voz como "Papai" (id interno: bom)
-    { id: "bom", name: "Papai", gender: "Masculino" },
+    { id: "papai", name: "Papai", gender: "Masculino" },
   ],
   "es": [
     { id: "alloy", name: "Alloy", gender: "Neutro" },

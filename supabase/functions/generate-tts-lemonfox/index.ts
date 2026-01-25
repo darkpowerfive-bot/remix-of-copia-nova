@@ -122,7 +122,7 @@ serve(async (req) => {
     
     // Force PT-BR voices to avoid invalid IDs falling back to accents
     const normalizedLanguage = (language || "pt-br").toLowerCase();
-    const ptBrVoices = new Set(["clara", "tiago", "bom"]);
+    const ptBrVoices = new Set(["clara", "tiago", "papai"]);
     const lowerVoiceId = (voiceId || "").toLowerCase();
 
     // If PT-BR and voice id is unknown, default to Clara.
