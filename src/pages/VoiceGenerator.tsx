@@ -281,21 +281,7 @@ const VoiceGenerator = () => {
   };
 
   const handlePreviewVoice = async () => {
-    const previewText = selectedLanguage === 'pt-br' 
-      ? 'Olá, esta é uma prévia da minha voz.'
-      : selectedLanguage === 'es'
-      ? 'Hola, esta es una vista previa de mi voz.'
-      : selectedLanguage === 'fr'
-      ? 'Bonjour, ceci est un aperçu de ma voix.'
-      : selectedLanguage === 'it'
-      ? 'Ciao, questa è un\'anteprima della mia voce.'
-      : selectedLanguage === 'ja'
-      ? 'こんにちは、これは私の声のプレビューです。'
-      : selectedLanguage === 'zh'
-      ? '你好，这是我声音的预览。'
-      : selectedLanguage === 'hi'
-      ? 'नमस्ते, यह मेरी आवाज का पूर्वावलोकन है।'
-      : 'Hello, this is a preview of my voice.';
+    const previewText = 'La Casa Dark, a ferramenta número 1 de canais darks.';
 
     setPreviewLoading(true);
     try {
