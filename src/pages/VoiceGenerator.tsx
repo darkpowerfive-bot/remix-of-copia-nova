@@ -26,100 +26,55 @@ interface GeneratedAudio {
   created_at: string | null;
 }
 
-// Deepgram Aura voices - correct format: aura-{name}-{lang}
-// Based on https://developers.deepgram.com/docs/tts-models
+// Lemonfox TTS voices by language
 const voicesByLanguage: Record<string, { id: string; name: string; gender: string; description?: string }[]> = {
+  "pt-br": [
+    { id: "clara", name: "Clara", gender: "Feminino", description: "Voz feminina clara e natural" },
+    { id: "tiago", name: "Tiago", gender: "Masculino", description: "Voz masculina profissional" },
+    { id: "papai", name: "Papai", gender: "Masculino", description: "Voz grave e imponente" },
+  ],
   "en-us": [
-    // Female voices - English
-    { id: "aura-asteria-en", name: "Asteria", gender: "Feminino", description: "Clara e profissional" },
-    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave e acolhedora" },
-    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Quente e envolvente" },
-    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante e sofisticada" },
-    { id: "aura-hera-en", name: "Hera", gender: "Feminino", description: "Madura e confiante" },
-    // Male voices - English
-    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Profundo e autoritário" },
-    { id: "aura-arcas-en", name: "Arcas", gender: "Masculino", description: "Jovem e dinâmico" },
-    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Equilibrado e versátil" },
-    { id: "aura-angus-en", name: "Angus", gender: "Masculino", description: "Robusto e marcante" },
-    { id: "aura-orpheus-en", name: "Orpheus", gender: "Masculino", description: "Melódico e expressivo" },
-    { id: "aura-helios-en", name: "Helios", gender: "Masculino", description: "Vibrante e energético" },
-    { id: "aura-zeus-en", name: "Zeus", gender: "Masculino", description: "Poderoso e imponente" },
+    { id: "nova", name: "Nova", gender: "Feminino", description: "Voz feminina versátil" },
+    { id: "bella", name: "Bella", gender: "Feminino", description: "Voz suave e acolhedora" },
+    { id: "jessica", name: "Jessica", gender: "Feminino", description: "Tom claro e profissional" },
+    { id: "sarah", name: "Sarah", gender: "Feminino", description: "Voz jovem e dinâmica" },
+    { id: "heart", name: "Heart", gender: "Feminino", description: "Tom caloroso" },
+    { id: "michael", name: "Michael", gender: "Masculino", description: "Voz masculina clara" },
+    { id: "adam", name: "Adam", gender: "Masculino", description: "Tom profundo e marcante" },
+    { id: "eric", name: "Eric", gender: "Masculino", description: "Voz equilibrada" },
+    { id: "liam", name: "Liam", gender: "Masculino", description: "Tom jovem e energético" },
   ],
   "en-gb": [
-    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante, tom britânico" },
-    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave e refinada" },
-    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Quente e sofisticada" },
-    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom britânico clássico" },
-    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Equilibrado e formal" },
-  ],
-  "pt-br": [
-    // Portuguese - use English voices (Deepgram doesn't have native PT-BR yet)
-    { id: "aura-stella-en", name: "Stella (Clara)", gender: "Feminino", description: "Voz clara e envolvente" },
-    { id: "aura-luna-en", name: "Luna (Suave)", gender: "Feminino", description: "Tom suave e acolhedor" },
-    { id: "aura-athena-en", name: "Athena (Elegante)", gender: "Feminino", description: "Elegante e profissional" },
-    { id: "aura-asteria-en", name: "Asteria (Neutra)", gender: "Feminino", description: "Neutra e clara" },
-    { id: "aura-hera-en", name: "Hera (Madura)", gender: "Feminino", description: "Madura e confiante" },
-    { id: "aura-orion-en", name: "Orion (Tiago)", gender: "Masculino", description: "Profundo e marcante" },
-    { id: "aura-zeus-en", name: "Zeus (Papai)", gender: "Masculino", description: "Voz grave e imponente" },
-    { id: "aura-perseus-en", name: "Perseus (Neutro)", gender: "Masculino", description: "Equilibrado e versátil" },
-    { id: "aura-arcas-en", name: "Arcas (Jovem)", gender: "Masculino", description: "Tom jovem e dinâmico" },
-    { id: "aura-helios-en", name: "Helios (Energético)", gender: "Masculino", description: "Vibrante e animado" },
+    { id: "alice", name: "Alice", gender: "Feminino", description: "Sotaque britânico elegante" },
+    { id: "emma", name: "Emma", gender: "Feminino", description: "Tom britânico suave" },
+    { id: "lily", name: "Lily", gender: "Feminino", description: "Voz refinada" },
+    { id: "daniel", name: "Daniel", gender: "Masculino", description: "Sotaque britânico clássico" },
+    { id: "george", name: "George", gender: "Masculino", description: "Tom formal" },
   ],
   "es": [
-    // Spanish - Deepgram has native Spanish voices
-    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Quente para espanhol" },
-    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave e expressiva" },
-    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante" },
-    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom profundo" },
-    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Versátil" },
-    { id: "aura-helios-en", name: "Helios", gender: "Masculino", description: "Energético" },
+    { id: "dora", name: "Dora", gender: "Feminino", description: "Voz espanhola natural" },
+    { id: "alex", name: "Alex", gender: "Masculino", description: "Tom espanhol claro" },
+    { id: "noel", name: "Noel", gender: "Masculino", description: "Voz versátil" },
   ],
   "fr": [
-    // French
-    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante para francês" },
-    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave e refinada" },
-    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Quente" },
-    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom clássico" },
-    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Equilibrado" },
-  ],
-  "de": [
-    // German
-    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Profissional" },
-    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave" },
-    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom profundo" },
-    { id: "aura-zeus-en", name: "Zeus", gender: "Masculino", description: "Imponente" },
+    { id: "siwis", name: "Siwis", gender: "Feminino", description: "Voz francesa elegante" },
   ],
   "it": [
-    // Italian
-    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Quente para italiano" },
-    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave e expressiva" },
-    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante" },
-    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom clássico" },
-    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Equilibrado" },
+    { id: "sara", name: "Sara", gender: "Feminino", description: "Voz italiana expressiva" },
+    { id: "nicola", name: "Nicola", gender: "Masculino", description: "Tom italiano clássico" },
   ],
   "ja": [
-    // Japanese
-    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave" },
-    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Clara" },
-    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante" },
-    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Profundo" },
-    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Equilibrado" },
-  ],
-  "nl": [
-    // Dutch
-    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave" },
-    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante" },
-    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Claro" },
+    { id: "sakura", name: "Sakura", gender: "Feminino", description: "Voz japonesa natural" },
+    { id: "gongitsune", name: "Gongitsune", gender: "Masculino", description: "Tom tradicional" },
   ],
   "zh": [
-    // Chinese - fallback to English
-    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave" },
-    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Clara" },
+    { id: "xiaoxiao", name: "Xiaoxiao", gender: "Feminino", description: "Voz chinesa clara" },
+    { id: "xiaobei", name: "Xiaobei", gender: "Feminino", description: "Tom suave" },
+    { id: "yunxi", name: "Yunxi", gender: "Masculino", description: "Voz masculina clara" },
   ],
   "hi": [
-    // Hindi - fallback to English
-    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave" },
-    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Profundo" },
+    { id: "alpha", name: "Alpha", gender: "Feminino", description: "Voz hindi natural" },
+    { id: "omega", name: "Omega", gender: "Masculino", description: "Tom profundo" },
   ],
 };
 
@@ -129,10 +84,8 @@ const languages = [
   { id: "en-gb", name: "🇬🇧 Inglês (UK)", flag: "🇬🇧" },
   { id: "es", name: "🇪🇸 Espanhol", flag: "🇪🇸" },
   { id: "fr", name: "🇫🇷 Francês", flag: "🇫🇷" },
-  { id: "de", name: "🇩🇪 Alemão", flag: "🇩🇪" },
   { id: "it", name: "🇮🇹 Italiano", flag: "🇮🇹" },
   { id: "ja", name: "🇯🇵 Japonês", flag: "🇯🇵" },
-  { id: "nl", name: "🇳🇱 Holandês", flag: "🇳🇱" },
   { id: "zh", name: "🇨🇳 Chinês", flag: "🇨🇳" },
   { id: "hi", name: "🇮🇳 Hindi", flag: "🇮🇳" },
 ];
