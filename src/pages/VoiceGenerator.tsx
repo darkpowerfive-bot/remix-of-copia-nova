@@ -294,7 +294,7 @@ const VoiceGenerator = () => {
         async () => {
           // If text fits in one request, send it all at once for best quality
           if (chunks.length === 1) {
-            const { data, error } = await supabase.functions.invoke('generate-tts-deepgram', {
+            const { data, error } = await supabase.functions.invoke('generate-tts-lemonfox', {
               body: {
                 text: chunks[0],
                 voiceId: selectedVoice,
@@ -321,7 +321,7 @@ const VoiceGenerator = () => {
           for (let i = 0; i < chunks.length; i++) {
             setGenerationProgress({ current: i + 1, total: chunks.length });
             
-            const { data, error } = await supabase.functions.invoke('generate-tts-deepgram', {
+            const { data, error } = await supabase.functions.invoke('generate-tts-lemonfox', {
               body: {
                 text: chunks[i],
                 voiceId: selectedVoice,
@@ -411,7 +411,7 @@ const VoiceGenerator = () => {
 
     setPreviewLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('generate-tts-deepgram', {
+      const { data, error } = await supabase.functions.invoke('generate-tts-lemonfox', {
         body: {
           text: previewText,
           voiceId: selectedVoice,
