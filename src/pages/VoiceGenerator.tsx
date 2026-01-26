@@ -26,86 +26,92 @@ interface GeneratedAudio {
   created_at: string | null;
 }
 
-// Lemonfox voices organized by language based on official documentation
-const voicesByLanguage: Record<string, { id: string; name: string; gender: string }[]> = {
+// Deepgram Aura voices - all available voices with descriptions
+const voicesByLanguage: Record<string, { id: string; name: string; gender: string; description?: string }[]> = {
   "en-us": [
-    { id: "heart", name: "Heart", gender: "Feminino" },
-    { id: "bella", name: "Bella", gender: "Feminino" },
-    { id: "nova", name: "Nova", gender: "Feminino" },
-    { id: "sarah", name: "Sarah", gender: "Feminino" },
-    { id: "sky", name: "Sky", gender: "Feminino" },
-    { id: "jessica", name: "Jessica", gender: "Feminino" },
-    { id: "nicole", name: "Nicole", gender: "Feminino" },
-    { id: "river", name: "River", gender: "Feminino" },
-    { id: "aoede", name: "Aoede", gender: "Feminino" },
-    { id: "kore", name: "Kore", gender: "Feminino" },
-    { id: "alloy", name: "Alloy", gender: "Neutro" },
-    { id: "michael", name: "Michael", gender: "Masculino" },
-    { id: "echo", name: "Echo", gender: "Masculino" },
-    { id: "onyx", name: "Onyx", gender: "Masculino Grave" },
-    { id: "liam", name: "Liam", gender: "Masculino" },
-    { id: "fenrir", name: "Fenrir", gender: "Masculino" },
-    { id: "eric", name: "Eric", gender: "Masculino" },
-    { id: "puck", name: "Puck", gender: "Masculino" },
-    { id: "adam", name: "Adam", gender: "Masculino" },
-    { id: "santa", name: "Santa", gender: "Masculino" },
+    // Female voices
+    { id: "aura-asteria-en", name: "Asteria", gender: "Feminino", description: "Clara e profissional" },
+    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave e acolhedora" },
+    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Quente e envolvente" },
+    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante e sofisticada" },
+    { id: "aura-hera-en", name: "Hera", gender: "Feminino", description: "Madura e confiante" },
+    // Male voices
+    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Profundo e autoritário" },
+    { id: "aura-arcas-en", name: "Arcas", gender: "Masculino", description: "Jovem e dinâmico" },
+    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Equilibrado e versátil" },
+    { id: "aura-angus-en", name: "Angus", gender: "Masculino", description: "Robusto e marcante" },
+    { id: "aura-orpheus-en", name: "Orpheus", gender: "Masculino", description: "Melódico e expressivo" },
+    { id: "aura-helios-en", name: "Helios", gender: "Masculino", description: "Vibrante e energético" },
+    { id: "aura-zeus-en", name: "Zeus", gender: "Masculino", description: "Poderoso e imponente" },
   ],
   "en-gb": [
-    { id: "alice", name: "Alice", gender: "Feminino" },
-    { id: "emma", name: "Emma", gender: "Feminino" },
-    { id: "isabella", name: "Isabella", gender: "Feminino" },
-    { id: "lily", name: "Lily", gender: "Feminino" },
-    { id: "daniel", name: "Daniel", gender: "Masculino" },
-    { id: "fable", name: "Fable", gender: "Masculino" },
-    { id: "george", name: "George", gender: "Masculino" },
-    { id: "lewis", name: "Lewis", gender: "Masculino" },
+    // UK English - same voices work well
+    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante, sotaque britânico" },
+    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave e refinada" },
+    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Quente e sofisticada" },
+    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom britânico clássico" },
+    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Equilibrado e formal" },
   ],
   "pt-br": [
-    // PT-BR voices (per Lemonfox docs)
-    { id: "clara", name: "Clara", gender: "Feminino" },
-    { id: "tiago", name: "Tiago", gender: "Masculino" },
-    { id: "papai", name: "Papai", gender: "Masculino" },
+    // PT-BR - voices that work well with Portuguese
+    { id: "aura-stella-en", name: "Stella (Clara)", gender: "Feminino", description: "Voz clara e envolvente" },
+    { id: "aura-luna-en", name: "Luna (Suave)", gender: "Feminino", description: "Tom suave e acolhedor" },
+    { id: "aura-athena-en", name: "Athena (Elegante)", gender: "Feminino", description: "Elegante e profissional" },
+    { id: "aura-asteria-en", name: "Asteria (Neutra)", gender: "Feminino", description: "Neutra e clara" },
+    { id: "aura-hera-en", name: "Hera (Madura)", gender: "Feminino", description: "Madura e confiante" },
+    { id: "aura-orion-en", name: "Orion (Tiago)", gender: "Masculino", description: "Profundo e marcante" },
+    { id: "aura-zeus-en", name: "Zeus (Papai)", gender: "Masculino", description: "Voz grave e imponente" },
+    { id: "aura-perseus-en", name: "Perseus (Neutro)", gender: "Masculino", description: "Equilibrado e versátil" },
+    { id: "aura-arcas-en", name: "Arcas (Jovem)", gender: "Masculino", description: "Tom jovem e dinâmico" },
+    { id: "aura-helios-en", name: "Helios (Energético)", gender: "Masculino", description: "Vibrante e animado" },
   ],
   "ja": [
-    // Japanese native voices
-    { id: "sakura", name: "Sakura", gender: "Feminino" },
-    { id: "gongitsune", name: "Gongitsune", gender: "Feminino" },
-    { id: "nezumi", name: "Nezumi", gender: "Feminino" },
-    { id: "tebukuro", name: "Tebukuro", gender: "Feminino" },
-    { id: "kumo", name: "Kumo", gender: "Masculino" },
+    // Japanese - voices that work with Japanese text
+    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave para japonês" },
+    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Clara e expressiva" },
+    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante" },
+    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom profundo" },
+    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Equilibrado" },
   ],
   "zh": [
-    // Mandarin Chinese native voices
-    { id: "xiaobei", name: "Xiaobei", gender: "Feminino" },
-    { id: "xiaoni", name: "Xiaoni", gender: "Feminino" },
-    { id: "xiaoxiao", name: "Xiaoxiao", gender: "Feminino" },
-    { id: "xiaoyi", name: "Xiaoyi", gender: "Feminino" },
-    { id: "yunjian", name: "Yunjian", gender: "Masculino" },
-    { id: "yunxi", name: "Yunxi", gender: "Masculino" },
-    { id: "yunxia", name: "Yunxia", gender: "Masculino" },
-    { id: "yunyang", name: "Yunyang", gender: "Masculino" },
+    // Chinese - voices that work with Mandarin
+    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave para mandarim" },
+    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Clara e natural" },
+    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Profissional" },
+    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom autoritário" },
+    { id: "aura-arcas-en", name: "Arcas", gender: "Masculino", description: "Jovem e dinâmico" },
   ],
   "es": [
-    // Spanish native voices
-    { id: "dora", name: "Dora", gender: "Feminino" },
-    { id: "alex", name: "Alex", gender: "Masculino" },
-    { id: "noel", name: "Noel", gender: "Masculino" },
+    // Spanish
+    { id: "aura-stella-en", name: "Stella (Dora)", gender: "Feminino", description: "Quente para espanhol" },
+    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave e expressiva" },
+    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante" },
+    { id: "aura-orion-en", name: "Orion (Alex)", gender: "Masculino", description: "Tom profundo" },
+    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Versátil" },
+    { id: "aura-helios-en", name: "Helios", gender: "Masculino", description: "Energético" },
   ],
   "fr": [
-    // French native voice
-    { id: "siwis", name: "Siwis", gender: "Feminino" },
+    // French
+    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante para francês" },
+    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave e refinada" },
+    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Quente" },
+    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom clássico" },
+    { id: "aura-perseus-en", name: "Perseus", gender: "Masculino", description: "Equilibrado" },
   ],
   "hi": [
-    // Hindi native voices
-    { id: "alpha", name: "Alpha", gender: "Feminino" },
-    { id: "beta", name: "Beta", gender: "Feminino" },
-    { id: "omega", name: "Omega", gender: "Masculino" },
-    { id: "psi", name: "Psi", gender: "Masculino" },
+    // Hindi
+    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave para hindi" },
+    { id: "aura-stella-en", name: "Stella", gender: "Feminino", description: "Clara" },
+    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom profundo" },
+    { id: "aura-arcas-en", name: "Arcas", gender: "Masculino", description: "Jovem e dinâmico" },
   ],
   "it": [
-    // Italian native voices
-    { id: "sara", name: "Sara", gender: "Feminino" },
-    { id: "nicola", name: "Nicola", gender: "Masculino" },
+    // Italian
+    { id: "aura-stella-en", name: "Stella (Sara)", gender: "Feminino", description: "Quente para italiano" },
+    { id: "aura-luna-en", name: "Luna", gender: "Feminino", description: "Suave e expressiva" },
+    { id: "aura-athena-en", name: "Athena", gender: "Feminino", description: "Elegante" },
+    { id: "aura-orion-en", name: "Orion", gender: "Masculino", description: "Tom clássico italiano" },
+    { id: "aura-perseus-en", name: "Perseus (Nicola)", gender: "Masculino", description: "Equilibrado" },
   ],
 };
 
@@ -550,12 +556,29 @@ const VoiceGenerator = () => {
                     <SelectTrigger className="bg-secondary border-border flex-1">
                       <SelectValue placeholder="Selecione uma voz" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {availableVoices.map((voice) => (
-                        <SelectItem key={voice.id} value={voice.id}>
-                          {voice.name} - {voice.gender}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="max-h-80">
+                      {/* Group by gender */}
+                      {['Feminino', 'Masculino'].map((gender) => {
+                        const voicesInGroup = availableVoices.filter(v => v.gender === gender);
+                        if (voicesInGroup.length === 0) return null;
+                        return (
+                          <div key={gender}>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
+                              {gender === 'Feminino' ? '👩 Vozes Femininas' : '👨 Vozes Masculinas'}
+                            </div>
+                            {voicesInGroup.map((voice) => (
+                              <SelectItem key={voice.id} value={voice.id}>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{voice.name}</span>
+                                  {voice.description && (
+                                    <span className="text-xs text-muted-foreground">{voice.description}</span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   <Button
@@ -564,6 +587,7 @@ const VoiceGenerator = () => {
                     onClick={handlePreviewVoice}
                     disabled={previewLoading}
                     title="Ouvir prévia da voz"
+                    className="shrink-0"
                   >
                     {previewLoading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -572,6 +596,12 @@ const VoiceGenerator = () => {
                     )}
                   </Button>
                 </div>
+                {/* Show selected voice description */}
+                {availableVoices.find(v => v.id === selectedVoice)?.description && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {availableVoices.find(v => v.id === selectedVoice)?.description}
+                  </p>
+                )}
               </div>
               <div>
                 <Label className="text-sm text-muted-foreground mb-2 block flex items-center gap-1.5">
