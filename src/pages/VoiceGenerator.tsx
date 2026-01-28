@@ -289,11 +289,19 @@ const VoiceGenerator = () => {
             audioUrls.push(data.audioUrl);
             totalDuration += data.duration || 0;
           }
-          
-          // For multi-chunk, return the first URL (or implement proper concatenation later)
-          // Note: Full audio concatenation would require server-side processing
+
+          // Merge chunks server-side into a single MP3 so download/playback includes the full script
+          const { data: concatData, error: concatError } = await supabase.functions.invoke('concat-mp3', {
+            body: {
+              urls: audioUrls,
+              voiceId: selectedVoice,
+            }
+          });
+          if (concatError) throw concatError;
+          if (concatData?.error) throw new Error(concatData.error);
+
           return {
-            audioUrl: audioUrls[0],
+            audioUrl: concatData?.audioUrl || audioUrls[0],
             duration: totalDuration,
             chunksGenerated: chunks.length,
             allUrls: audioUrls
