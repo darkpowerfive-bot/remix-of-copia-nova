@@ -744,6 +744,18 @@ const Analytics = () => {
     });
   };
 
+  // Clear channel data function
+  const clearChannelData = () => {
+    setAnalyticsData(null);
+    setChannelUrl("");
+    setManualNiche(null);
+    setChecklistItems({});
+    toast({
+      title: "Dados limpos",
+      description: "Os dados do canal foram removidos da sessão",
+    });
+  };
+
   // Export Weekly PDF Report - La Casa Core Branding
   const exportWeeklyPDF = async () => {
     if (!analyticsData) return;
@@ -1571,6 +1583,15 @@ const Analytics = () => {
                     >
                       <FileText className="w-4 h-4" />
                       <span className="hidden md:inline">PDF</span>
+                    </Button>
+                    <Button
+                      onClick={clearChannelData}
+                      variant="ghost"
+                      size="sm"
+                      className="flex items-center justify-center gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="hidden md:inline">Limpar</span>
                     </Button>
                   </div>
                 </div>
