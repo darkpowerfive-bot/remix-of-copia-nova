@@ -487,14 +487,35 @@ serve(async (req) => {
 
     let result;
     
-    // Try DownSub API first
+    // ALWAYS try to get video details from YouTube Data API first (for accurate views, comments, daysAgo)
+    const youtubeApiDetails = await fetchVideoDetailsFromAPI(videoId);
+    console.log("[Main] YouTube API details:", youtubeApiDetails ? "success" : "failed");
+    
+    // Try DownSub API for transcription
     try {
       result = await fetchFromDownSub(videoUrl);
       console.log("DownSub fetch successful");
+      
+      // Override with YouTube API data if available (more accurate)
+      if (youtubeApiDetails) {
+        result.videoDetails = {
+          ...result.videoDetails,
+          ...youtubeApiDetails,
+          // Keep thumbnail from DownSub if YouTube API doesn't have it
+          thumbnail: youtubeApiDetails.thumbnail || result.videoDetails.thumbnail,
+        };
+        console.log("[Main] Merged with YouTube API data - Views:", result.videoDetails.views, "Comments:", result.videoDetails.comments, "Days:", result.videoDetails.daysAgo);
+      }
     } catch (downsubError) {
       console.error("DownSub failed, using fallback:", downsubError);
       // Fallback to YouTube scraping
       result = await fetchYouTubeTranscriptFallback(videoId);
+      
+      // Override with YouTube API data if available
+      if (youtubeApiDetails) {
+        result.videoDetails = youtubeApiDetails;
+        console.log("[Main] Using YouTube API data from fallback - Views:", result.videoDetails.views, "Comments:", result.videoDetails.comments, "Days:", result.videoDetails.daysAgo);
+      }
     }
 
     return new Response(
