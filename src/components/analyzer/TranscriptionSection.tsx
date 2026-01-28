@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,17 +56,31 @@ interface VideoDetails {
 interface TranscriptionSectionProps {
   onCreateAgent: (formula: ScriptFormulaAnalysis | null, transcription: string) => void;
   videoUrl?: string;
+  externalTranscription?: string;
+  onTranscriptionChange?: (transcription: string) => void;
 }
 
-export const TranscriptionSection = ({ onCreateAgent, videoUrl }: TranscriptionSectionProps) => {
+export const TranscriptionSection = ({ 
+  onCreateAgent, 
+  videoUrl, 
+  externalTranscription,
+  onTranscriptionChange 
+}: TranscriptionSectionProps) => {
   const { deduct, usePlatformCredits } = useCreditDeduction();
-  const [transcription, setTranscription] = useState("");
+  const [transcription, setTranscription] = useState(externalTranscription || "");
   const [analyzing, setAnalyzing] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [formulaAnalysis, setFormulaAnalysis] = useState<ScriptFormulaAnalysis | null>(null);
   const [videoDetails, setVideoDetails] = useState<VideoDetails | null>(null);
   const [noSubtitlesMessage, setNoSubtitlesMessage] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  // Sync with external transcription when it changes
+  React.useEffect(() => {
+    if (externalTranscription && externalTranscription !== transcription) {
+      setTranscription(externalTranscription);
+    }
+  }, [externalTranscription]);
   
   const ANALYSIS_CREDITS = 5; // analyze_script_formula = 5 créditos
 
