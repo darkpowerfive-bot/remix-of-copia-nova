@@ -107,6 +107,15 @@ serve(async (req) => {
       offset += c.byteLength;
     }
 
+    // Calculate duration from FINAL merged file size (192kbps = 24KB/sec)
+    const estimateMp3Duration = (bytes: number): number => {
+      const kbps = 192;
+      const bytesPerSecond = (kbps * 1000) / 8;
+      return Math.ceil(bytes / bytesPerSecond);
+    };
+    const finalDuration = estimateMp3Duration(totalBytes);
+    console.log("[concat-mp3] Final merged size:", totalBytes, "bytes, duration:", finalDuration, "seconds");
+
     const fileName = `${userId}/${Date.now()}_${(voiceId || "voice").toString().toLowerCase()}_full.mp3`;
 
     const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
@@ -131,7 +140,13 @@ serve(async (req) => {
     console.log("[concat-mp3] Uploaded merged audio:", urlData.publicUrl);
 
     return new Response(
-      JSON.stringify({ success: true, audioUrl: urlData.publicUrl, storagePath: uploadData.path }),
+      JSON.stringify({ 
+        success: true, 
+        audioUrl: urlData.publicUrl, 
+        storagePath: uploadData.path,
+        duration: finalDuration,
+        totalBytes: totalBytes
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error: unknown) {
