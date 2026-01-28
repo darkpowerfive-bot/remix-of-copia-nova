@@ -183,7 +183,24 @@ const Analytics = () => {
   const [analyticsData, setAnalyticsData] = usePersistedState<YouTubeAnalytics | null>("analytics_data", null);
   const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
   const [checklistItems, setChecklistItems] = usePersistedState<Record<string, boolean>>("analytics_checklist", {});
-  const [manualNiche, setManualNiche] = usePersistedState<{ niche: string; subNiche: string; microNiche: string } | null>("analytics_manual_niche", null);
+  const [manualNicheByChannel, setManualNicheByChannel] = usePersistedState<Record<string, { niche: string; subNiche: string; microNiche: string }>>("analytics_manual_niche_by_channel", {});
+  
+  // Get current channel's manual niche (based on channel ID from analyticsData)
+  const currentChannelId = analyticsData?.channel?.id || "";
+  const manualNiche = currentChannelId ? manualNicheByChannel[currentChannelId] || null : null;
+  
+  const setManualNiche = (niche: { niche: string; subNiche: string; microNiche: string } | null) => {
+    if (!currentChannelId) return;
+    if (niche) {
+      setManualNicheByChannel(prev => ({ ...prev, [currentChannelId]: niche }));
+    } else {
+      setManualNicheByChannel(prev => {
+        const updated = { ...prev };
+        delete updated[currentChannelId];
+        return updated;
+      });
+    }
+  };
   const [isNicheDialogOpen, setIsNicheDialogOpen] = useState(false);
   const [editingNiche, setEditingNiche] = useState({ niche: '', subNiche: '', microNiche: '' });
   const [newGoal, setNewGoal] = useState({
@@ -746,9 +763,16 @@ const Analytics = () => {
 
   // Clear channel data function
   const clearChannelData = () => {
+    // Remove manual niche for current channel before clearing
+    if (currentChannelId) {
+      setManualNicheByChannel(prev => {
+        const updated = { ...prev };
+        delete updated[currentChannelId];
+        return updated;
+      });
+    }
     setAnalyticsData(null);
     setChannelUrl("");
-    setManualNiche(null);
     setChecklistItems({});
     toast({
       title: "Dados limpos",
