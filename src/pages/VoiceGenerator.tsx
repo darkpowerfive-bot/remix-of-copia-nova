@@ -299,9 +299,12 @@ const VoiceGenerator = () => {
           if (concatError) throw concatError;
           if (concatData?.error) throw new Error(concatData.error);
 
+          // Use duration from concatenated file (accurate) instead of sum of estimates
+          const finalDuration = concatData?.duration || totalDuration;
+
           return {
             audioUrl: concatData?.audioUrl || audioUrls[0],
-            duration: totalDuration,
+            duration: finalDuration,
             chunksGenerated: chunks.length,
             allUrls: audioUrls
           };
