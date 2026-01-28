@@ -227,14 +227,14 @@ const Analytics = () => {
     enabled: !!user,
   });
 
-  // Fetch monitored channels for quick selection
+  // Fetch monitored channels for quick selection (with niche data)
   const { data: monitoredChannels } = useQuery({
     queryKey: ["monitored-channels", user?.id],
     queryFn: async () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from("monitored_channels")
-        .select("id, channel_url, channel_name")
+        .select("id, channel_url, channel_name, niche, subniche, micronicho")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -684,6 +684,31 @@ const Analytics = () => {
       if (data.error) throw new Error(data.error);
 
       setAnalyticsData(data);
+      
+      // Load niche data from monitored_channels if available and not already set
+      const newChannelId = data.channel?.id;
+      if (newChannelId && !manualNicheByChannel[newChannelId]) {
+        // Try to find niche data from monitored channels
+        const matchingChannel = monitoredChannels?.find(ch => {
+          // Match by channel URL or by extracting channel ID from URL
+          const normalizedUrl = channelUrl.toLowerCase();
+          const monitoredUrl = ch.channel_url?.toLowerCase() || "";
+          return normalizedUrl.includes(monitoredUrl) || monitoredUrl.includes(normalizedUrl) ||
+                 normalizedUrl === monitoredUrl;
+        });
+        
+        if (matchingChannel && (matchingChannel.niche || matchingChannel.subniche || matchingChannel.micronicho)) {
+          setManualNicheByChannel(prev => ({
+            ...prev,
+            [newChannelId]: {
+              niche: matchingChannel.niche || "",
+              subNiche: matchingChannel.subniche || "",
+              microNiche: matchingChannel.micronicho || "",
+            }
+          }));
+        }
+      }
+      
       toast({
         title: "Analytics carregado!",
         description: `Dados do canal ${data.channel.name} obtidos com sucesso`,
