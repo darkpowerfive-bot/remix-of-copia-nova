@@ -106,7 +106,7 @@ const MONTHLY_PLANS = [
     originalPrice: 149.90,
     features: [
       { label: "60-120 transcrições/mês", included: true },
-      { label: "Claude + Sonnet: Ilimitado", included: true },
+      { label: "IA Premium Ilimitada", included: true },
       { label: "Multilíngua IA", included: true },
       { label: "360+ análises", included: true },
       { label: "10 agentes operacionais", included: true },
