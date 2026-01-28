@@ -1272,7 +1272,12 @@ const VideoAnalyzer = () => {
           {/* Transcription Section */}
           {videoInfo && (
             <div className="mt-8">
-              <TranscriptionSection onCreateAgent={handleCreateAgent} videoUrl={videoUrl} />
+              <TranscriptionSection 
+                onCreateAgent={handleCreateAgent} 
+                videoUrl={videoUrl}
+                externalTranscription={currentTranscription}
+                onTranscriptionChange={setCurrentTranscription}
+              />
             </div>
           )}
 
