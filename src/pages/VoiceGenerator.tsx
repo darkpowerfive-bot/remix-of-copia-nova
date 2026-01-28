@@ -114,9 +114,8 @@ const VoiceGenerator = () => {
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Maximum characters per API call
-  // Lemonfox API doesn't specify a limit, but we use 6000 for reliability
-  // This balances fewer chunk splits with API stability
-  const MAX_CHUNK_SIZE = 6000;
+  // Use 4000 chars to ensure complete generation without API timeouts
+  const MAX_CHUNK_SIZE = 4000;
   
   // Split text into manageable chunks only if very long
   const splitTextIfNeeded = (inputText: string): string[] => {
@@ -434,20 +433,27 @@ const VoiceGenerator = () => {
     }
   };
 
-  const handleDownload = (audio: GeneratedAudio) => {
+  const handleDownload = async (audio: GeneratedAudio) => {
     if (!audio.audio_url) {
       toast.error('Áudio não disponível');
       return;
     }
     
     try {
-      // Create a download link for base64 data URLs
+      // Fetch the audio file and create a blob to force download
+      const response = await fetch(audio.audio_url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
       const link = document.createElement('a');
-      link.href = audio.audio_url;
+      link.href = blobUrl;
       link.download = `audio_${audio.id.substring(0, 8)}.mp3`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // Clean up blob URL
+      URL.revokeObjectURL(blobUrl);
       toast.success('Download iniciado!');
     } catch (error) {
       console.error('Error downloading audio:', error);
