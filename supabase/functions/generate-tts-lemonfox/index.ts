@@ -198,11 +198,18 @@ serve(async (req) => {
     
     console.log("TTS generated successfully, audio size:", audioBuffer.byteLength);
 
-    // For previews, return small base64 directly
-    // Calculate accurate duration based on word count and speed
-    const wordCount = text.trim().split(/\s+/).length;
-    const wordsPerSecond = 2.5 * (speed || 1.0);
-    const estimatedDuration = Math.ceil(wordCount / wordsPerSecond);
+    // Helper function to estimate MP3 duration from file size
+    // MP3 at 128kbps = 16KB per second, at 192kbps = 24KB per second
+    // Lemonfox typically uses high quality ~192kbps
+    const estimateMp3Duration = (bytes: number): number => {
+      const kbps = 192; // Approximate bitrate
+      const bytesPerSecond = (kbps * 1000) / 8;
+      return Math.ceil(bytes / bytesPerSecond);
+    };
+
+    // Calculate duration from actual file size (more accurate than word count)
+    const actualDuration = estimateMp3Duration(audioBuffer.byteLength);
+    console.log("Audio duration estimated from file size:", actualDuration, "seconds, file size:", audioBuffer.byteLength);
 
     if (isPreview || audioBuffer.byteLength < 500000) {
       // Small file: convert to base64 in chunks
@@ -213,15 +220,13 @@ serve(async (req) => {
         binaryString += String.fromCharCode(...chunk);
       }
       const base64Audio = btoa(binaryString);
-      
-      const estimatedDuration = Math.ceil(text.split(/\s+/).length / 2.5);
 
       return new Response(
         JSON.stringify({
           success: true,
           audioBase64: base64Audio,
           audioUrl: `data:${mimeType};base64,${base64Audio}`,
-          duration: estimatedDuration,
+          duration: actualDuration,
           creditsUsed: isPreview ? 0 : calculateCreditCost(text.length),
           voice: resolvedVoice,
           language: normalizedLanguage,
@@ -261,7 +266,7 @@ serve(async (req) => {
               success: true,
               audioBase64: base64Audio,
               audioUrl: `data:${mimeType};base64,${base64Audio}`,
-              duration: Math.ceil(text.trim().split(/\s+/).length / (2.5 * (speed || 1.0))),
+              duration: actualDuration,
               creditsUsed: calculateCreditCost(text.length),
               voice: resolvedVoice,
               language: normalizedLanguage,
@@ -284,8 +289,6 @@ serve(async (req) => {
         .from('generated-audios')
         .getPublicUrl(uploadData.path);
 
-      const estimatedDuration = Math.ceil(text.trim().split(/\s+/).length / (2.5 * (speed || 1.0)));
-
       console.log("Audio uploaded to storage:", urlData.publicUrl);
 
       return new Response(
@@ -293,7 +296,7 @@ serve(async (req) => {
           success: true,
           audioUrl: urlData.publicUrl,
           storagePath: uploadData.path,
-          duration: estimatedDuration,
+          duration: actualDuration,
           creditsUsed: calculateCreditCost(text.length),
           voice: resolvedVoice,
           language: normalizedLanguage,
