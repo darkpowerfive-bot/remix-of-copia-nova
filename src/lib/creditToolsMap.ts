@@ -31,6 +31,18 @@ export const CREDIT_TOOLS_MAP: Record<string, { name: string; icon: string; desc
     description: 'Geração de thumbnail com IA' 
   },
   
+  // Análise de Estilo de Thumbnails
+  'thumbnail_style_analysis': { 
+    name: 'Análise de Estilo', 
+    icon: '🎨', 
+    description: 'Análise de estilo de thumbnails' 
+  },
+  'analyze_thumbnail_style': { 
+    name: 'Análise de Estilo', 
+    icon: '🎨', 
+    description: 'Análise de estilo de thumbnails' 
+  },
+  
   // Gerador de Scripts
   'script_generation': { 
     name: 'Gerador de Scripts', 
@@ -94,16 +106,21 @@ export const CREDIT_TOOLS_MAP: Record<string, { name: string; icon: string; desc
     description: 'Geração de prompt de imagem' 
   },
   
-  // Transcrição de Vídeo
+  // Transcrição de Vídeo / Buscar Transcrição
   'transcription': { 
-    name: 'Transcrição de Vídeo', 
+    name: 'Buscar Transcrição', 
     icon: '📃', 
-    description: 'Transcrição automática de vídeo' 
+    description: 'Buscar transcrição automática de vídeo' 
   },
   'transcribe_video': { 
-    name: 'Transcrição de Vídeo', 
+    name: 'Buscar Transcrição', 
     icon: '📃', 
-    description: 'Transcrição automática de vídeo' 
+    description: 'Buscar transcrição automática de vídeo' 
+  },
+  'fetch_transcription': { 
+    name: 'Buscar Transcrição', 
+    icon: '📃', 
+    description: 'Buscar transcrição automática de vídeo' 
   },
   
   // Análise de Canal
@@ -259,14 +276,20 @@ export const AI_MODELS_MAP: Record<string, string> = {
 // Custos otimizados para 300% de margem de lucro baseado nos preços da Laozhang API
 // Referência: 1 crédito = R$0.05 | Margem: 300%+
 export const CREDIT_COSTS: Record<string, number> = {
-  // 🧠 ANÁLISE DE TÍTULOS - Custo real: ~R$0.002 (gpt-4.1-mini) → 3 créditos = R$0.15 (7500% margem)
+  // 🧠 ANÁLISE DE TÍTULOS - 3 créditos por IA, 12 se multimodal
   'title_analysis': 3,
   'analyze_titles': 3,
   'analyze_video_titles': 3,
+  'title_analysis_multimodal': 12,
+  'analyze_titles_multimodal': 12,
   
-  // 🖼️ GERADOR DE THUMBNAILS - Custo real: ~R$0.05 (gpt-4o-image) → 4 créditos = R$0.20 (300% margem)
-  'thumbnail_generation': 4,
-  'generate_thumbnail': 4,
+  // 🖼️ GERADOR DE THUMBNAILS - 3 créditos
+  'thumbnail_generation': 3,
+  'generate_thumbnail': 3,
+  
+  // 🎨 ANÁLISE DE ESTILO DE THUMBNAILS - 2 créditos
+  'thumbnail_style_analysis': 2,
+  'analyze_thumbnail_style': 2,
   
   // 📝 GERADOR DE SCRIPTS - Custo real: ~R$0.005/min (gpt-4.1-mini) → 1 crédito/min = R$0.05 (900% margem)
   'script_generation': 1,
@@ -295,9 +318,10 @@ export const CREDIT_COSTS: Record<string, number> = {
   'image_prompt': 1,
   'generate_prompts': 1,
   
-  // 📃 TRANSCRIÇÃO DE VÍDEO - Custo real: ~R$0.015/min (whisper-1) → 2 créditos = R$0.10 (566% margem)
-  'transcription': 2,
-  'transcribe_video': 2,
+  // 📃 TRANSCRIÇÃO DE VÍDEO / BUSCAR TRANSCRIÇÃO - 5 créditos
+  'transcription': 5,
+  'transcribe_video': 5,
+  'fetch_transcription': 5,
   
   // 📺 ANÁLISE DE CANAL - Custo real: ~R$0.005 (gpt-4.1-mini) → 3 créditos = R$0.15 (3000% margem)
   'channel_analysis': 3,
@@ -380,6 +404,26 @@ export function calculateCostWithModel(operationType: string, model?: string): n
 export function calculateTTSCost(textLength: number): number {
   // 1 crédito a cada 2500 caracteres, mínimo 1 crédito
   return Math.max(1, Math.ceil(textLength / 2500));
+}
+
+// Custo para análise de títulos (3 normal, 12 multimodal)
+export function calculateTitleAnalysisCost(isMultimodal: boolean = false): number {
+  return isMultimodal ? 12 : 3;
+}
+
+// Custo para análise de estilo de thumbnails
+export function calculateThumbnailStyleCost(): number {
+  return CREDIT_COSTS['thumbnail_style_analysis'] || 2;
+}
+
+// Custo para buscar transcrição
+export function calculateTranscriptionCost(): number {
+  return CREDIT_COSTS['transcription'] || 5;
+}
+
+// Custo para gerar thumbnail
+export function calculateThumbnailGenerationCost(): number {
+  return CREDIT_COSTS['thumbnail_generation'] || 3;
 }
 
 // Custos para geração de cenas em lote
