@@ -64,29 +64,51 @@ export const CREDIT_TOOLS_MAP: Record<string, { name: string; icon: string; desc
   'scene_generation': { 
     name: 'Gerador de Cenas', 
     icon: '🎬', 
-    description: 'Geração de descrição de cenas' 
+    description: 'Geração de prompts de cenas (0.5 crédito/cena)' 
   },
   'generate_scenes': { 
     name: 'Gerador de Cenas', 
     icon: '🎬', 
-    description: 'Geração de descrição de cenas' 
+    description: 'Geração de prompts de cenas (0.5 crédito/cena)' 
+  },
+  'scene_prompt': { 
+    name: 'Prompt de Cena', 
+    icon: '🎬', 
+    description: 'Geração de prompt individual para cena' 
   },
   
-  // Gerador de Voz (TTS)
+  // Personagens Consistentes
+  'add_character': { 
+    name: 'Adicionar Personagem', 
+    icon: '👤', 
+    description: 'Análise de referência de personagem consistente' 
+  },
+  'character_reference': { 
+    name: 'Referência de Personagem', 
+    icon: '👤', 
+    description: 'Adicionar imagem de referência para consistência' 
+  },
+  'consistent_character': { 
+    name: 'Personagem Consistente', 
+    icon: '👤', 
+    description: 'Manter consistência visual do personagem' 
+  },
+  
+  // Gerador de Voz (TTS) - 2 créditos por minuto
   'voice_generation': { 
     name: 'Gerador de Voz', 
     icon: '🎙️', 
-    description: 'Conversão de texto para áudio (TTS)' 
+    description: 'Conversão de texto para áudio (2 créditos/min)' 
   },
   'generate_tts': { 
     name: 'Gerador de Voz', 
     icon: '🎙️', 
-    description: 'Conversão de texto para áudio (TTS)' 
+    description: 'Conversão de texto para áudio (2 créditos/min)' 
   },
   'tts': { 
     name: 'Gerador de Voz', 
     icon: '🎙️', 
-    description: 'Conversão de texto para áudio (TTS)' 
+    description: 'Conversão de texto para áudio (2 créditos/min)' 
   },
   
   // Gerador de Imagens / Prompts de Imagem
@@ -180,11 +202,21 @@ export const CREDIT_TOOLS_MAP: Record<string, { name: string; icon: string; desc
     description: 'Geração de vídeo com IA' 
   },
   
-  // Análise de Fórmula de Script
+  // Análise de Fórmula Viral - 3 créditos
   'analyze_script_formula': { 
-    name: 'Análise de Fórmula', 
+    name: 'Analisar Fórmula Viral', 
     icon: '🧪', 
-    description: 'Análise de fórmula de script' 
+    description: 'Análise de fórmula viral do roteiro (3 créditos)' 
+  },
+  'formula_analysis': { 
+    name: 'Analisar Fórmula Viral', 
+    icon: '🧪', 
+    description: 'Análise de fórmula viral (3 créditos)' 
+  },
+  'analyze_formula': { 
+    name: 'Analisar Fórmula Viral', 
+    icon: '🧪', 
+    description: 'Análise de fórmula viral (3 créditos)' 
   },
   
   // Exploração de Nicho
@@ -352,17 +384,22 @@ export const CREDIT_COSTS: Record<string, number> = {
   'viral_script': 1,
   'roteiro_viral': 1,
   
-  // 🎬 GERADOR DE CENAS - Custo real: ~R$0.002/lote (gpt-4.1-mini) → 2 créditos = R$0.10 (5000% margem)
-  'scene_generation': 2,
-  'generate_scenes': 2,
+  // 🎬 GERADOR DE CENAS - 0.5 crédito por prompt (cada cena)
+  'scene_generation': 0.5,
+  'generate_scenes': 0.5,
+  'scene_prompt': 0.5,
   
-  // 🎙️ GERADOR DE VOZ (TTS) - Custo Deepgram Aura-2: $3/1M chars
-  // Para 275x lucro: 1 crédito a cada 2500 caracteres (mínimo 1)
-  'voice_generation': 1, // Base - calculado dinamicamente por calculateTTSCost()
-  'generate_tts': 1,
-  'tts': 1,
-  'tts_generation': 1,
-  'tts_generation_deepgram': 1,
+  // 👤 ADICIONAR PERSONAGENS CONSISTENTES - 5 créditos
+  'add_character': 5,
+  'character_reference': 5,
+  'consistent_character': 5,
+  
+  // 🎙️ GERADOR DE VOZ (TTS) - 2 créditos por minuto
+  'voice_generation': 2, // Base - calculado dinamicamente por calculateVoiceCost()
+  'generate_tts': 2,
+  'tts': 2,
+  'tts_generation': 2,
+  'tts_generation_deepgram': 2,
   
   // 🎨 GERAÇÃO DE IMAGENS - GRÁTIS (usa cookies ImageFX do usuário)
   'image_generation': 0,
@@ -403,14 +440,17 @@ export const CREDIT_COSTS: Record<string, number> = {
   'video_generation': 25,
   'ready_video': 25,
   
-  // 🧪 ANÁLISE DE FÓRMULA DE AGENTE - Custo real: ~R$0.01 → 5 créditos = R$0.25 (2500% margem)
-  'analyze_script_formula': 5,
-  'formula_analysis_agent': 5,
+  // 🧪 ANÁLISE DE FÓRMULA VIRAL - 3 créditos
+  'analyze_script_formula': 3,
+  'formula_analysis': 3,
+  'analyze_formula': 3,
+  'formula_analysis_agent': 3,
   
-  // 🤖 CRIAR AGENTES VIRAIS - 25 créditos
+  // 🤖 CRIAR AGENTES VIRAIS - 25 créditos (pode ser +25 se criado após análise de fórmula)
   'create_agent': 25,
   'agent_creation': 25,
   'create_viral_agent': 25,
+  'create_agent_from_formula': 25,
   
   // 🔍 EXPLORAÇÃO DE NICHO - 5 créditos
   'explore_niche': 5,
@@ -463,13 +503,17 @@ export function calculateCostWithModel(operationType: string, model?: string): n
   return Math.ceil(baseCost * multiplier);
 }
 
-// Custos específicos para TTS baseado no tamanho do texto - Otimizado para 275x margem
-// Custo real Deepgram Aura-2: $3/1M chars = R$0.018/1k chars = R$0.000018/char
-// Para 275x lucro: 1 crédito (R$0.05) a cada 2500 chars
-// Cálculo: R$0.05 / (R$0.000018 * 2500) = R$0.05 / R$0.045 ≈ 1.11 → margem de ~275x
+// Custos para TTS - 2 créditos por minuto de áudio
+// Estimativa: ~150 palavras/minuto = ~900 caracteres/minuto
 export function calculateTTSCost(textLength: number): number {
-  // 1 crédito a cada 2500 caracteres, mínimo 1 crédito
-  return Math.max(1, Math.ceil(textLength / 2500));
+  // ~900 caracteres por minuto, 2 créditos por minuto
+  const estimatedMinutes = textLength / 900;
+  return Math.max(1, Math.ceil(estimatedMinutes * 2));
+}
+
+// Custo para voz por minuto (para exibição na UI)
+export function calculateVoiceCost(durationMinutes: number): number {
+  return Math.max(1, Math.ceil(durationMinutes * 2));
 }
 
 // Custo para análise de títulos (3 normal, 12 multimodal)
@@ -512,22 +556,21 @@ export function calculateAnalyticsCost(): number {
   return CREDIT_COSTS['youtube_analytics'] || 2;
 }
 
-// Custos para geração de cenas em lote
+// Custos para geração de cenas - 0.5 crédito por prompt/cena
 export function calculateSceneBatchCost(sceneCount: number, model?: string): number {
-  const baseCostPer10 = CREDIT_COSTS['scene_generation'] || 2;
-  const batches = Math.ceil(sceneCount / 10);
-  const baseCost = batches * baseCostPer10;
-  
-  if (!model) return baseCost;
-  
-  const modelLower = model.toLowerCase();
-  if (modelLower.includes('claude') || modelLower.includes('gpt')) {
-    return Math.ceil(baseCost * 1.5);
-  } else if (modelLower.includes('gemini')) {
-    return Math.ceil(baseCost * 1.2);
-  }
-  
-  return baseCost;
+  // 0.5 crédito por cena/prompt
+  const baseCost = sceneCount * 0.5;
+  return Math.max(1, Math.ceil(baseCost));
+}
+
+// Custo para adicionar personagens consistentes
+export function calculateCharacterReferenceCost(): number {
+  return CREDIT_COSTS['add_character'] || 5;
+}
+
+// Custo para analisar fórmula viral
+export function calculateFormulaAnalysisCost(): number {
+  return CREDIT_COSTS['analyze_script_formula'] || 3;
 }
 
 // Custos para geração de script baseado na duração
