@@ -67,7 +67,8 @@ export const ScriptAgentModal = ({
   const estimatedWords = Math.round(parseInt(duration) * 130);
   const partDuration = Math.round(parseInt(duration) / parseInt(parts));
   const durationNum = parseInt(duration) || 5;
-  const estimatedCredits = Math.ceil(durationNum * 2.8);
+  // 1 crédito por minuto (independente do modelo)
+  const estimatedCredits = Math.max(1, Math.ceil(durationNum));
 
   const handleGenerateScript = async () => {
     if (!videoTitle.trim()) {
@@ -87,7 +88,7 @@ export const ScriptAgentModal = ({
     if (usePlatformCredits !== false) {
       deductionResult = await deduct({
         operationType: 'script_generation',
-        customAmount: estimatedCredits,
+        multiplier: durationNum,
         modelUsed: aiModel,
         details: { title: videoTitle, duration }
       });

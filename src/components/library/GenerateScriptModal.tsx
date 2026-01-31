@@ -86,23 +86,8 @@ export const GenerateScriptModal = ({
   const estimatedWords = targetDuration * wordsPerMinute;
   const estimatedParts = Math.max(1, Math.ceil(targetDuration / 3));
   
-  // Credit calculation based on CREDIT_PRICING from documentation
-  // SCRIPT_PER_MINUTE: { base: 2, gemini: 2.4, claude: 2.8 }
-  const getCreditsForModel = () => {
-    switch (aiModel) {
-      case "gemini-flash":
-        return Math.ceil(targetDuration * 2.4);
-      case "gemini-pro":
-        return Math.ceil(targetDuration * 2.6);
-      case "claude-sonnet":
-        return Math.ceil(targetDuration * 2.8);
-      case "gpt-5":
-        return Math.ceil(targetDuration * 3.0);
-      default:
-        return Math.ceil(targetDuration * 2);
-    }
-  };
-  const estimatedCredits = getCreditsForModel();
+  // 1 crédito por minuto (independente do modelo)
+  const estimatedCredits = Math.max(1, Math.ceil(targetDuration));
 
   // Result state
   const [generatedScript, setGeneratedScript] = useState<string | null>(null);
