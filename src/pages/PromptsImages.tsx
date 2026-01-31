@@ -4098,6 +4098,15 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
   // Função para verificar sincronia entre cena visual e narração com correção automática
   // Custo: 5 créditos (usa DeepSeek R1 via Laozhang)
   const handleVerifySyncAndFix = async () => {
+    if (!user) {
+      toast({
+        title: "Faça login",
+        description: "Você precisa estar logado para verificar sincronia.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (generatedScenes.length === 0) {
       toast({
         title: "Sem cenas",
@@ -4131,8 +4140,7 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
     try {
       // Debitar créditos antes da análise
       const deductionResult = await deductCredits({
-        operationType: 'ai_assistant',
-        customAmount: SYNC_CREDITS_COST,
+        operationType: 'sync_verification',
         modelUsed: 'deepseek-r1',
         details: { 
           feature: 'sync_verification',
