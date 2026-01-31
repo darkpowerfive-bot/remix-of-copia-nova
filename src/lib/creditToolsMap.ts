@@ -189,16 +189,70 @@ export const CREDIT_TOOLS_MAP: Record<string, { name: string; icon: string; desc
   
   // Exploração de Nicho
   'explore_niche': { 
-    name: 'Exploração de Nicho', 
+    name: 'Explorador de Nicho', 
     icon: '🔍', 
     description: 'Exploração de nicho de mercado' 
   },
+  'niche_exploration': { 
+    name: 'Explorador de Nicho', 
+    icon: '🔍', 
+    description: 'Exploração de nicho de mercado' 
+  },
+  'find_subniches': { 
+    name: 'Encontrar Subnichos', 
+    icon: '🔍', 
+    description: 'Busca por subnichos promissores' 
+  },
   
-  // Busca de Canais
+  // Analisador de Concorrência
+  'competitor_analysis': { 
+    name: 'Analisador de Concorrência', 
+    icon: '📊', 
+    description: 'Análise de canal concorrente' 
+  },
+  'analyze_competitor': { 
+    name: 'Analisador de Concorrência', 
+    icon: '📊', 
+    description: 'Análise de canal concorrente' 
+  },
   'search_channels': { 
-    name: 'Busca de Canais', 
+    name: 'Analisador de Concorrência', 
     icon: '🔎', 
-    description: 'Busca de canais similares' 
+    description: 'Busca e análise de canais' 
+  },
+  
+  // Criação de Agentes Virais
+  'create_agent': { 
+    name: 'Criar Agente Viral', 
+    icon: '🤖', 
+    description: 'Criação de agente de IA personalizado' 
+  },
+  'agent_creation': { 
+    name: 'Criar Agente Viral', 
+    icon: '🤖', 
+    description: 'Criação de agente de IA personalizado' 
+  },
+  'create_viral_agent': { 
+    name: 'Criar Agente Viral', 
+    icon: '🤖', 
+    description: 'Criação de agente viral personalizado' 
+  },
+  
+  // Analytics do YouTube
+  'youtube_analytics': { 
+    name: 'Analytics do YouTube', 
+    icon: '📈', 
+    description: 'Análise de métricas do canal' 
+  },
+  'channel_analytics': { 
+    name: 'Analytics do YouTube', 
+    icon: '📈', 
+    description: 'Análise de métricas do canal' 
+  },
+  'analytics_reload': { 
+    name: 'Recarregar Analytics', 
+    icon: '🔄', 
+    description: 'Atualização de dados do canal' 
   },
   
   // Análise Viral
@@ -291,10 +345,12 @@ export const CREDIT_COSTS: Record<string, number> = {
   'thumbnail_style_analysis': 2,
   'analyze_thumbnail_style': 2,
   
-  // 📝 GERADOR DE SCRIPTS - Custo real: ~R$0.005/min (gpt-4.1-mini) → 1 crédito/min = R$0.05 (900% margem)
+  // 📝 GERADOR DE SCRIPTS/ROTEIROS VIRAIS - 1 crédito por minuto de roteiro
   'script_generation': 1,
   'generate_script': 1,
   'generate_script_with_formula': 1,
+  'viral_script': 1,
+  'roteiro_viral': 1,
   
   // 🎬 GERADOR DE CENAS - Custo real: ~R$0.002/lote (gpt-4.1-mini) → 2 créditos = R$0.10 (5000% margem)
   'scene_generation': 2,
@@ -351,18 +407,28 @@ export const CREDIT_COSTS: Record<string, number> = {
   'analyze_script_formula': 5,
   'formula_analysis_agent': 5,
   
-  // 🔍 EXPLORAÇÃO DE NICHO - Custo real: ~R$0.005 → 3 créditos = R$0.15 (3000% margem)
-  'explore_niche': 3,
+  // 🤖 CRIAR AGENTES VIRAIS - 25 créditos
+  'create_agent': 25,
+  'agent_creation': 25,
+  'create_viral_agent': 25,
   
-  // 🔎 BUSCA DE CANAIS - Custo real: ~R$0.003 → 2 créditos = R$0.10 (3300% margem)
-  'search_channels': 2,
+  // 🔍 EXPLORAÇÃO DE NICHO - 5 créditos
+  'explore_niche': 5,
+  'niche_exploration': 5,
+  'find_subniches': 5,
+  
+  // 🔎 ANALISADOR DE CONCORRÊNCIA - 5 créditos
+  'competitor_analysis': 5,
+  'analyze_competitor': 5,
+  'search_channels': 5,
   
   // 📈 ANÁLISE VIRAL - Custo real: ~R$0.005 → 3 créditos = R$0.15 (3000% margem)
   'viral_analysis': 3,
   
-  // 📊 ANÁLISE DE MÚLTIPLOS CANAIS - Custo real: ~R$0.02 → 8 créditos = R$0.40 (2000% margem)
-  'analyze_multiple_channels': 8,
-  'multi_channel_analysis': 8,
+  // 📊 ANALYTICS DO YOUTUBE - 2 créditos por recarga
+  'youtube_analytics': 2,
+  'channel_analytics': 2,
+  'analytics_reload': 2,
 };
 
 // Multiplicadores por modelo (conforme documentação backend)
@@ -424,6 +490,26 @@ export function calculateTranscriptionCost(): number {
 // Custo para gerar thumbnail
 export function calculateThumbnailGenerationCost(): number {
   return CREDIT_COSTS['thumbnail_generation'] || 3;
+}
+
+// Custo para explorador de nicho
+export function calculateNicheExplorerCost(): number {
+  return CREDIT_COSTS['explore_niche'] || 5;
+}
+
+// Custo para analisador de concorrência
+export function calculateCompetitorAnalysisCost(): number {
+  return CREDIT_COSTS['competitor_analysis'] || 5;
+}
+
+// Custo para criar agente viral
+export function calculateCreateAgentCost(): number {
+  return CREDIT_COSTS['create_agent'] || 25;
+}
+
+// Custo para analytics (por recarga)
+export function calculateAnalyticsCost(): number {
+  return CREDIT_COSTS['youtube_analytics'] || 2;
 }
 
 // Custos para geração de cenas em lote
