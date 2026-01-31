@@ -23,7 +23,7 @@ const CREDIT_PRICING = {
   
   // 🎬 VÍDEO & ROTEIRO
   READY_VIDEO: { base: 10, gemini: 12, claude: 15 },
-  SCRIPT_PER_MINUTE: { base: 2, gemini: 2.4, claude: 2.8 }, // Por minuto de vídeo
+  SCRIPT_PER_MINUTE: { base: 1, gemini: 1, claude: 1 }, // 1 crédito por minuto (fixo)
   
   // 🖼️ IMAGENS & CENAS
   IMAGE_PROMPT: { base: 1, gemini: 2, claude: 3 }, // Por imagem
