@@ -273,13 +273,12 @@ Você deve:
     return languages[code] || code;
   };
   
-  const getCreditsForModel = () => {
+  // Custo fixo: 1 crédito por minuto de roteiro
+  const getCreditsForScript = () => {
     const durationNum = parseInt(scriptDuration || "1");
-    if (selectedModel.includes("gemini")) return Math.ceil(durationNum * 2.4);
-    if (selectedModel.includes("gpt") || selectedModel.includes("claude")) return Math.ceil(durationNum * 2.8);
-    return Math.ceil(durationNum * 2);
+    return durationNum; // 1 crédito por minuto
   };
-  const estimatedCredits = getCreditsForModel();
+  const estimatedCredits = getCreditsForScript();
 
   // Generate auto triggers based on niche and title
   const handleGenerateTriggers = async () => {
