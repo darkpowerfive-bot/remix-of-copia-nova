@@ -40,6 +40,9 @@ function calculateCreditsForOperation(
   model: string, 
   details?: { duration?: number; scenes?: number }
 ): number {
+  // Operações já debitadas no frontend (não debitar aqui)
+  if (operationType === 'sync_verification') return 0;
+
   // Determinar chave do modelo conforme documentação (seção 4.2)
   let modelKey: 'base' | 'gemini' | 'claude' = 'base';
   if (model?.includes('gemini')) modelKey = 'gemini';
@@ -492,6 +495,11 @@ serve(async (req) => {
 
     // Dashboard insight é gratuito (não debita créditos)
     if (type === "dashboard_insight") {
+      shouldDebitCredits = false;
+    }
+
+    // Sync verification: débito de créditos é feito no frontend (evita débito duplo)
+    if (type === 'sync_verification') {
       shouldDebitCredits = false;
     }
 
@@ -1425,12 +1433,23 @@ Forneça uma dica personalizada baseada nessas estatísticas.`;
 
     if (apiProvider === 'gemini' && userApiKeyToUse) {
       // Gemini API has a different request format
+      const shouldUseProvidedMessages = type === 'sync_verification' && Array.isArray(messages) && messages.length > 0;
+      const combinedText = shouldUseProvidedMessages
+        ? (messages as any[])
+            .map((m) => {
+              const role = m?.role ? String(m.role).toUpperCase() : 'USER';
+              const content = m?.content ? String(m.content) : '';
+              return `${role}: ${content}`;
+            })
+            .join('\n\n')
+        : `${systemPrompt}\n\n${userPrompt}`;
+
       response = await fetch(apiUrl, {
         method: "POST",
         headers: requestHeaders,
         body: JSON.stringify({
           contents: [
-            { role: "user", parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }
+            { role: "user", parts: [{ text: combinedText }] }
           ],
           generationConfig: {
             temperature: 0.7,
@@ -1447,10 +1466,13 @@ Forneça uma dica personalizada baseada nessas estatísticas.`;
 
       const payload: Record<string, unknown> = {
         model: selectedModel,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+        messages:
+          type === 'sync_verification' && Array.isArray(messages) && messages.length > 0
+            ? messages
+            : [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
       };
 
       // Token limit differences

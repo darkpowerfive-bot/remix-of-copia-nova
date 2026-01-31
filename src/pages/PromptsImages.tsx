@@ -4170,6 +4170,7 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
       // Chamar IA para analisar sincronia - Usando DeepSeek R1 via Laozhang
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
+          type: 'sync_verification',
           messages: [
             {
               role: 'system',
