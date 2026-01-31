@@ -568,6 +568,21 @@ serve(async (req) => {
 
       console.log(`[ImageFX] Returning ${images.length} image(s) from cookie ${cookieIndex + 1}`);
 
+      // Save generated images to database for tracking/dashboard
+      try {
+        for (const image of images) {
+          await supabaseAdmin.from('generated_images').insert({
+            user_id: userId,
+            prompt: prompt.substring(0, 1000), // Limit prompt length
+            image_url: image.url?.substring(0, 100) || null // Store truncated reference (base64 is too large)
+          });
+        }
+        console.log(`[ImageFX] Saved ${images.length} image(s) to generated_images table`);
+      } catch (saveError) {
+        console.error('[ImageFX] Error saving to generated_images:', saveError);
+        // Don't fail the request if save fails
+      }
+
       return new Response(
         JSON.stringify({ 
           success: true,
