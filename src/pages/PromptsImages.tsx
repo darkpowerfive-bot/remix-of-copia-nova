@@ -109,6 +109,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, addBrandingFooter } from "@/lib/utils";
 import { useActivityLog } from "@/hooks/useActivityLog";
+import { useCreditDeduction } from "@/hooks/useCreditDeduction";
 import { THUMBNAIL_STYLES, THUMBNAIL_STYLE_CATEGORIES } from "@/lib/thumbnailStyles";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -641,6 +642,7 @@ const [generating, setGenerating] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { logActivity } = useActivityLog();
+  const { deduct: deductCredits, checkBalance } = useCreditDeduction();
 
   // Buscar histórico de prompts de cenas
   const { data: sceneHistory, isLoading: loadingHistory } = useQuery({
@@ -4094,11 +4096,25 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
   };
 
   // Função para verificar sincronia entre cena visual e narração com correção automática
+  // Custo: 5 créditos (usa DeepSeek R1 via Laozhang)
   const handleVerifySyncAndFix = async () => {
     if (generatedScenes.length === 0) {
       toast({
         title: "Sem cenas",
         description: "Gere as cenas primeiro antes de verificar sincronia",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Verificar e debitar créditos usando useCreditDeduction
+    const SYNC_CREDITS_COST = 5;
+    const { hasBalance, currentBalance } = await checkBalance(SYNC_CREDITS_COST);
+    
+    if (!hasBalance) {
+      toast({
+        title: "Créditos insuficientes",
+        description: `Você precisa de ${SYNC_CREDITS_COST} créditos para verificar sincronia. Você tem ${Math.ceil(currentBalance)}.`,
         variant: "destructive"
       });
       return;
@@ -4113,6 +4129,28 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
     });
 
     try {
+      // Debitar créditos antes da análise
+      const deductionResult = await deductCredits({
+        operationType: 'ai_assistant',
+        customAmount: SYNC_CREDITS_COST,
+        modelUsed: 'deepseek-r1',
+        details: { 
+          feature: 'sync_verification',
+          scenes_count: generatedScenes.length 
+        },
+        showToast: false
+      });
+
+      if (!deductionResult.success) {
+        toast({
+          title: "Erro ao debitar créditos",
+          description: deductionResult.error || "Não foi possível processar os créditos",
+          variant: "destructive"
+        });
+        setShowSyncVerificationModal(false);
+        return;
+      }
+
       // Preparar dados das cenas para análise
       const scenesData = generatedScenes.map(scene => ({
         number: scene.number,
@@ -4121,7 +4159,7 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
         hasImage: !!scene.generatedImage
       }));
 
-      // Chamar IA para analisar sincronia
+      // Chamar IA para analisar sincronia - Usando DeepSeek R1 via Laozhang
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
           messages: [
@@ -4146,7 +4184,7 @@ REGRAS PARA IDENTIFICAR INCONGRUÊNCIAS:
 
 Para cada cena com incongruência, forneça um prompt corrigido em INGLÊS que ilustre LITERALMENTE a narração.
 
-RESPONDA EM JSON:
+RESPONDA EM JSON VÁLIDO:
 {
   "analysis": [
     {
@@ -4170,14 +4208,20 @@ NARRAÇÃO: "${s.narration}"
 PROMPT ATUAL: "${s.imagePrompt}"
 ---`).join('\n')}
 
-Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Responda em JSON.`
+Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Responda APENAS em JSON válido, sem texto adicional.`
             }
           ],
-          model: 'gemini-2.5-pro'
+          model: 'deepseek-r1'
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        // Reembolsar em caso de erro
+        if (deductionResult.shouldRefund) {
+          await deductionResult.refund();
+        }
+        throw error;
+      }
 
       // Parsear resposta
       let analysisResult: { analysis: Array<{ sceneNumber: number; status: string; issue?: string; severity?: string; suggestedPrompt?: string }> };
@@ -4191,6 +4235,10 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
         }
       } catch (parseErr) {
         console.error('Erro ao parsear resposta:', parseErr);
+        // Reembolsar em caso de erro de parse
+        if (deductionResult.shouldRefund) {
+          await deductionResult.refund();
+        }
         toast({
           title: "Erro na análise",
           description: "Não foi possível interpretar a resposta da IA",
