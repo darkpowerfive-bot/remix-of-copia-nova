@@ -356,6 +356,7 @@ const [generating, setGenerating] = useState(false);
   
   // Sync Verification Modal
   const [showSyncVerificationModal, setShowSyncVerificationModal] = useState(false);
+  const [syncVerificationProgress, setSyncVerificationProgress] = useState<{ percent: number; label: string } | null>(null);
   const [syncVerificationResult, setSyncVerificationResult] = useState<{
     analyzing: boolean;
     mismatchedScenes: Array<{
@@ -4130,6 +4131,7 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
     }
 
     setShowSyncVerificationModal(true);
+    setSyncVerificationProgress({ percent: 5, label: 'Preparando análise…' });
     setSyncVerificationResult({
       analyzing: true,
       mismatchedScenes: [],
@@ -4139,6 +4141,7 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
 
     try {
       // Debitar créditos antes da análise
+      setSyncVerificationProgress({ percent: 15, label: 'Verificando créditos…' });
       const deductionResult = await deductCredits({
         operationType: 'sync_verification',
         modelUsed: 'deepseek-r1',
@@ -4160,6 +4163,7 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
       }
 
       // Preparar dados das cenas para análise
+      setSyncVerificationProgress({ percent: 35, label: 'Enviando cenas para análise…' });
       const scenesData = generatedScenes.map(scene => ({
         number: scene.number,
         narration: scene.text,
@@ -4224,6 +4228,8 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
         }
       });
 
+      setSyncVerificationProgress({ percent: 70, label: 'Processando resposta…' });
+
       if (error) {
         // Reembolsar em caso de erro
         if (deductionResult.shouldRefund) {
@@ -4235,12 +4241,23 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
       // Parsear resposta
       let analysisResult: { analysis: Array<{ sceneNumber: number; status: string; issue?: string; severity?: string; suggestedPrompt?: string }> };
       try {
-        const content = data.result || data.content || '';
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          analysisResult = JSON.parse(jsonMatch[0]);
+        const raw = (data as any)?.result ?? (data as any)?.content ?? '';
+
+        // Alguns providers já retornam o JSON como objeto
+        if (raw && typeof raw === 'object') {
+          analysisResult = raw as any;
         } else {
-          throw new Error('Resposta não contém JSON válido');
+          const content = typeof raw === 'string' ? raw : JSON.stringify(raw ?? '');
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            analysisResult = JSON.parse(jsonMatch[0]);
+          } else {
+            throw new Error('Resposta não contém JSON válido');
+          }
+        }
+
+        if (!analysisResult || !Array.isArray((analysisResult as any).analysis)) {
+          throw new Error('JSON inválido: campo "analysis" ausente');
         }
       } catch (parseErr) {
         console.error('Erro ao parsear resposta:', parseErr);
@@ -4250,12 +4267,14 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
         }
         toast({
           title: "Erro na análise",
-          description: "Não foi possível interpretar a resposta da IA",
+          description: parseErr instanceof Error ? parseErr.message : "Não foi possível interpretar a resposta da IA",
           variant: "destructive"
         });
         setShowSyncVerificationModal(false);
         return;
       }
+
+      setSyncVerificationProgress({ percent: 90, label: 'Finalizando…' });
 
       // Separar cenas sincronizadas e com problemas
       const mismatched = analysisResult.analysis
@@ -4283,6 +4302,8 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
         totalScenes: generatedScenes.length
       });
 
+      setSyncVerificationProgress({ percent: 100, label: 'Concluído' });
+
       if (mismatched.length === 0) {
         toast({
           title: "✅ Todas as cenas sincronizadas!",
@@ -4299,10 +4320,13 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
       console.error('Erro na verificação de sincronia:', error);
       toast({
         title: "Erro",
-        description: "Não foi possível analisar a sincronia das cenas",
+        description: error instanceof Error ? error.message : "Não foi possível analisar a sincronia das cenas",
         variant: "destructive"
       });
       setShowSyncVerificationModal(false);
+    } finally {
+      // limpa a barra quando fechar o modal; se manter aberto, ainda fica em 100%.
+      // (se fecharmos aqui, o usuário não vê o estado final)
     }
   };
 
@@ -7566,7 +7590,16 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
       </Dialog>
       
       {/* Modal de Verificação de Sincronia */}
-      <Dialog open={showSyncVerificationModal} onOpenChange={setShowSyncVerificationModal}>
+      <Dialog
+        open={showSyncVerificationModal}
+        onOpenChange={(open) => {
+          setShowSyncVerificationModal(open);
+          if (!open) {
+            setSyncVerificationResult(null);
+            setSyncVerificationProgress(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -7586,6 +7619,14 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
                 <br />
                 <span className="text-xs">Verificando correspondência entre imagens e narração</span>
               </p>
+
+              <div className="w-full max-w-md space-y-2">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{syncVerificationProgress?.label ?? 'Analisando…'}</span>
+                  <span>{syncVerificationProgress?.percent ?? 0}%</span>
+                </div>
+                <Progress value={syncVerificationProgress?.percent ?? 0} />
+              </div>
             </div>
           ) : syncVerificationResult ? (
             <div className="space-y-4">
