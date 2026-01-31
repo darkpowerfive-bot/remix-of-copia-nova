@@ -3920,19 +3920,114 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
         }
       }
       
-      // ADICIONAR: Verificar todas as cenas sem imagem e incluir na geração
+      // ADICIONAR: Verificar todas as cenas sem imagem (falhas/perdidas) e regenerar prompts com IA
       if (regenerateImages) {
-        updatedScenes.forEach((scene, index) => {
-          if (!scene.generatedImage && !improvedIndexes.includes(index)) {
-            improvedIndexes.push(index);
-            updatedScenes[index] = {
-              ...scene,
-              generatingImage: true
-            };
-          }
-        });
+        const scenesWithoutImage = updatedScenes
+          .map((scene, index) => ({ scene, index }))
+          .filter(({ scene, index }) => !scene.generatedImage && !improvedIndexes.includes(index));
         
-        // Ordenar índices
+        if (scenesWithoutImage.length > 0) {
+          toast({
+            title: "🔄 Regenerando prompts perdidos...",
+            description: `Criando ${scenesWithoutImage.length} novo(s) prompt(s) fiéis à narração`,
+          });
+          
+          // Pegar o estilo atual selecionado para manter consistência
+          const selectedStyle = THUMBNAIL_STYLES.find(s => s.id === style);
+          const styleDescription = selectedStyle?.promptPrefix || 'cinematic professional photography';
+          const styleName = selectedStyle?.name || 'Cinematográfico';
+          
+          // Pegar cenas com imagem para referência de consistência visual
+          const successfulScenes = updatedScenes.filter(s => s.generatedImage).slice(0, 5);
+          const referencePrompts = successfulScenes.length > 0 
+            ? successfulScenes.map(s => `Cena ${s.number}: ${s.imagePrompt}`).join('\n')
+            : '';
+          
+          // Para cada cena sem imagem, gerar prompt baseado no roteiro (FIDELIDADE AO TEXTO)
+          for (const { scene, index } of scenesWithoutImage) {
+            try {
+              // Contexto das cenas vizinhas para continuidade visual
+              const prevScene = index > 0 ? updatedScenes[index - 1] : null;
+              const nextScene = index < updatedScenes.length - 1 ? updatedScenes[index + 1] : null;
+              
+              const contextScenes = [
+                prevScene ? `Cena anterior (${prevScene.number}): "${prevScene.text}"` : '',
+                nextScene ? `Próxima cena (${nextScene.number}): "${nextScene.text}"` : ''
+              ].filter(Boolean).join('\n');
+
+              // Usar IA para gerar prompt baseado no TEXTO EXATO da cena (narração)
+              const { data, error } = await supabase.functions.invoke('ai-assistant', {
+                body: {
+                  messages: [
+                    {
+                      role: 'system',
+                      content: `Você é um especialista em criar prompts de imagem cinematográficos para vídeos narrados.
+
+OBJETIVO: Gerar um prompt em INGLÊS que ilustre LITERALMENTE o conteúdo do texto de narração.
+
+ESTILO VISUAL OBRIGATÓRIO (${styleName}):
+${styleDescription}
+
+REGRAS CRÍTICAS - FIDELIDADE À NARRAÇÃO:
+1. LEIA o texto da narração e identifique: objetos, ações, locais, personagens MENCIONADOS
+2. O prompt DEVE representar visualmente o que o NARRADOR ESTÁ FALANDO, não uma interpretação genérica
+3. Se o narrador menciona "pergaminhos antigos", o prompt DEVE ter pergaminhos antigos
+4. Se o narrador menciona "uma floresta escura", o prompt DEVE ter floresta escura
+5. NUNCA crie imagens genéricas ou apenas temáticas - ilustre o CONTEÚDO ESPECÍFICO
+6. Mantenha CONSISTÊNCIA com as cenas vizinhas (mesmos personagens, ambiente, iluminação)
+7. NUNCA inclua: violência explícita, armas, sangue, nudez, conteúdo adulto, marcas registradas
+8. Sempre adicione no final: "1280x720, 16:9 aspect ratio, full frame, no black bars"
+9. Use descrições artísticas e cinematográficas
+10. Se houver pessoas, descreva como "silhouette", "figure", "person" - evite rostos
+
+AUTO-VERIFICAÇÃO: Ao criar o prompt, pergunte-se: "Se alguém ouvir a narração e ver esta imagem, fará sentido imediato?"
+
+RETORNE APENAS o prompt em inglês, sem explicações ou formatação.`
+                    },
+                    {
+                      role: 'user',
+                      content: `CENA ${scene.number} - TEXTO DA NARRAÇÃO (O QUE O NARRADOR ESTÁ FALANDO):
+"${scene.text}"
+
+${contextScenes ? `CONTEXTO (cenas vizinhas para continuidade visual):\n${contextScenes}` : ''}
+
+${referencePrompts ? `REFERÊNCIA DE ESTILO (prompts que funcionaram):\n${referencePrompts}` : ''}
+
+Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador está falando nesta cena.`
+                    }
+                  ],
+                  model: 'gemini-2.5-flash'
+                }
+              });
+
+              if (!error && data) {
+                let newPrompt = (data.result || data.content || '').toString().trim();
+                
+                if (newPrompt) {
+                  // Garantir que tenha os requisitos de formato
+                  if (!newPrompt.includes('1280x720')) {
+                    newPrompt = `${newPrompt}, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
+                  }
+                  
+                  updatedScenes[index] = {
+                    ...updatedScenes[index],
+                    imagePrompt: newPrompt,
+                    generatingImage: true
+                  };
+                  
+                  console.log(`[Melhorar+Regenerar] Cena ${scene.number}: novo prompt fiel à narração gerado`);
+                }
+              }
+            } catch (err) {
+              console.warn(`Erro ao gerar novo prompt para cena ${scene.number}:`, err);
+            }
+            
+            // Sempre adicionar ao índice de regeneração
+            improvedIndexes.push(index);
+          }
+        }
+        
+        // Ordenar índices para processamento ordenado
         improvedIndexes.sort((a, b) => a - b);
       }
       
