@@ -145,16 +145,21 @@ export const CREDIT_TOOLS_MAP: Record<string, { name: string; icon: string; desc
     description: 'Buscar transcrição automática de vídeo' 
   },
   
-  // Análise de Canal
+  // Análise de Canais - 25 créditos total
   'channel_analysis': { 
-    name: 'Análise de Canal', 
+    name: 'Análise de Canais', 
     icon: '📺', 
-    description: 'Análise completa de canal do YouTube' 
+    description: 'Análise completa de até 5 canais (25 créditos total)' 
   },
   'analyze_channel': { 
-    name: 'Análise de Canal', 
+    name: 'Análise de Canais', 
     icon: '📺', 
-    description: 'Análise completa de canal do YouTube' 
+    description: 'Análise completa de até 5 canais (25 créditos total)' 
+  },
+  'analyze_multiple_channels': { 
+    name: 'Análise de Canais', 
+    icon: '📺', 
+    description: 'Análise comparativa de até 5 canais (25 créditos total)' 
   },
   
   // Análise de Transcrição
@@ -294,13 +299,6 @@ export const CREDIT_TOOLS_MAP: Record<string, { name: string; icon: string; desc
     description: 'Análise de potencial viral' 
   },
   
-  // Análise de Múltiplos Canais
-  'analyze_multiple_channels': { 
-    name: 'Análise de Canais', 
-    icon: '📊', 
-    description: 'Análise comparativa de múltiplos canais' 
-  },
-  
   // Transações administrativas
   'add': { 
     name: 'Adição de Créditos', 
@@ -416,9 +414,11 @@ export const CREDIT_COSTS: Record<string, number> = {
   'transcribe_video': 5,
   'fetch_transcription': 5,
   
-  // 📺 ANÁLISE DE CANAL - Custo real: ~R$0.005 (gpt-4.1-mini) → 3 créditos = R$0.15 (3000% margem)
-  'channel_analysis': 3,
-  'analyze_channel': 3,
+  // 📺 ANÁLISE DE CANAIS - 25 créditos total para até 5 canais
+  'channel_analysis': 25,
+  'analyze_channel': 25,
+  'analyze_multiple_channels': 25,
+  'multi_channel_analysis': 25,
   
   // 📄 ANÁLISE DE TRANSCRIÇÃO - Custo real: ~R$0.003 (gpt-4.1-mini) → 3 créditos = R$0.15 (5000% margem)
   'transcript_analysis': 3,
