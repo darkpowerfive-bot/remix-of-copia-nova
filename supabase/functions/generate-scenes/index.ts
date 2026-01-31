@@ -1208,11 +1208,60 @@ serve(async (req) => {
     const { context: scriptContext, characters: scriptCharacters, visualMap } = await detectContextAndCharacters(resolvedScript, apiUrl, apiKey, apiModel);
 
     // NOVO: Analisar imagens de referência para extrair descrições de personagens
+    // CUSTO: 5 créditos para consistência de personagens (conforme mapa de créditos)
     // IMPORTANTE: o provedor de geração (DeepSeek/Laozhang) não tem visão.
     // Para visão usamos o gateway multimodal do Lovable (Gemini), via LOVABLE_API_KEY.
     let referenceChars: CharacterDescription[] = [];
+    const REFERENCE_IMAGE_CREDITS = 5; // Custo fixo para análise de personagens consistentes
+    
     if (referenceCharacters && referenceCharacters.length > 0) {
-      console.log(`[Generate Scenes] Analyzing ${referenceCharacters.length} reference images...`);
+      console.log(`[Generate Scenes] Analyzing ${referenceCharacters.length} reference images (${REFERENCE_IMAGE_CREDITS} credits)...`);
+      
+      // Verificar e debitar créditos para análise de referência
+      if (userId && usePlatformCredits) {
+        const { data: refCreditData } = await supabaseAdmin
+          .from("user_credits")
+          .select("balance")
+          .eq("user_id", userId)
+          .single();
+
+        const refBalance = refCreditData?.balance ?? 0;
+        
+        if (refBalance < REFERENCE_IMAGE_CREDITS) {
+          return new Response(
+            JSON.stringify({ error: `Créditos insuficientes para análise de personagens. Necessário: ${REFERENCE_IMAGE_CREDITS}, Disponível: ${refBalance}` }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Debitar créditos
+        await supabaseAdmin
+          .from("user_credits")
+          .update({ balance: refBalance - REFERENCE_IMAGE_CREDITS })
+          .eq("user_id", userId);
+
+        // Registrar uso
+        await supabaseAdmin.from("credit_usage").insert({
+          user_id: userId,
+          operation_type: "character_consistency",
+          credits_used: REFERENCE_IMAGE_CREDITS,
+          model_used: "gemini-2.5-flash",
+          details: { 
+            reference_count: referenceCharacters.length,
+            character_names: referenceCharacters.map(r => r.name)
+          }
+        });
+
+        await supabaseAdmin.from("credit_transactions").insert({
+          user_id: userId,
+          amount: -REFERENCE_IMAGE_CREDITS,
+          transaction_type: "debit",
+          description: `Análise de ${referenceCharacters.length} personagem(s) consistente(s)`
+        });
+        
+        console.log(`[Generate Scenes] Deducted ${REFERENCE_IMAGE_CREDITS} credits for character analysis`);
+      }
+      
       referenceChars = await analyzeReferenceImages(referenceCharacters, LOVABLE_API_KEY);
     }
 
