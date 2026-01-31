@@ -475,8 +475,13 @@ Retorne APENAS os 8 gatilhos, um por linha, sem numeração, hífens ou explica�
           : "Gerando roteiro com IA...");
 
         // Build prompt for this part
+        const languageInstruction = scriptLanguage !== 'pt-BR' 
+          ? `\n\n🌍 IDIOMA OBRIGATÓRIO: ${getLanguageName(scriptLanguage)}\n⚠️ ESCREVA TODO O ROTEIRO INTEIRAMENTE EM ${getLanguageName(scriptLanguage).toUpperCase()}! NÃO USE PORTUGUÊS!`
+          : '';
+        
         const prompt = `
 ${numParts > 1 ? `GERE A PARTE ${partIndex + 1} DE ${numParts} de um` : 'GERE um'} ROTEIRO DE NARRAÇÃO PARA VOICE-OVER.
+${languageInstruction}
 
 TÍTULO DO VÍDEO: "${scriptTitle}"
 
@@ -497,8 +502,7 @@ ${!isLastPart ? '- NÃO conclua ainda - deixe um gancho para a continuação' : 
 2. O texto deve ser LIDO EM VOZ ALTA naturalmente
 3. Sem colchetes, parênteses ou instruções técnicas
 4. Apenas o que o narrador deve FALAR
-
-IDIOMA: ${getLanguageName(scriptLanguage)}
+5. IDIOMA: ${getLanguageName(scriptLanguage)} - ESCREVA INTEIRAMENTE NESTE IDIOMA!
 
 ${isFirstPart && ctaInicio ? 'INCLUIR CTA NO INÍCIO' : ''}
 ${isLastPart && ctaFinal ? 'INCLUIR CTA NO FINAL' : ''}
@@ -520,7 +524,7 @@ ${(() => {
 
 ${agent.formula_structure?.instructions ? `\n📋 INSTRUÇÕES ESPECÍFICAS:\n${agent.formula_structure.instructions}` : ''}
 
-GERE AGORA ${numParts > 1 ? `A PARTE ${partIndex + 1}` : 'O ROTEIRO COMPLETO'} DE NARRAÇÃO:
+GERE AGORA ${numParts > 1 ? `A PARTE ${partIndex + 1}` : 'O ROTEIRO COMPLETO'} DE NARRAÇÃO EM ${getLanguageName(scriptLanguage).toUpperCase()}:
         `.trim();
 
         const { data, error } = await supabase.functions.invoke("ai-assistant", {
