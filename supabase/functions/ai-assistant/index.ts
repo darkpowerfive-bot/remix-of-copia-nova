@@ -34,6 +34,93 @@ const CREDIT_PRICING = {
   FORMULA_ANALYSIS_AGENT: { base: 10, gemini: 12, claude: 14 }
 };
 
+function tryExtractJsonBlock(raw: string): string | null {
+  if (!raw) return null;
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) return fenced[1].trim();
+  // Best-effort: capture the outermost object
+  const obj = raw.match(/\{[\s\S]*\}/);
+  if (obj?.[0]) return obj[0].trim();
+  return null;
+}
+
+async function repairSyncVerificationJson({
+  apiUrl,
+  requestHeaders,
+  apiProvider,
+  selectedModel,
+  rawContent,
+}: {
+  apiUrl: string;
+  requestHeaders: Record<string, string>;
+  apiProvider: 'openai' | 'gemini' | 'laozhang' | 'lovable';
+  selectedModel: string;
+  rawContent: string;
+}): Promise<{ analysis: Array<{ sceneNumber: number; status: 'synced' | 'mismatched'; issue?: string; severity?: 'low' | 'medium' | 'high'; suggestedPrompt?: string }> }> {
+  // Ask the model to output ONLY valid JSON.
+  // NOTE: This is only used when the first output is malformed/truncated.
+  const systemRepair =
+    'You are a strict JSON repair tool. Output ONLY valid JSON. Do not add markdown. Do not add commentary.';
+  const userRepair = `Fix and normalize the following content into VALID JSON with this exact shape:
+{
+  "analysis": [
+    {
+      "sceneNumber": 1,
+      "status": "mismatched" | "synced",
+      "issue": "..." (optional),
+      "severity": "low" | "medium" | "high" (optional),
+      "suggestedPrompt": "..." (optional, only when mismatched)
+    }
+  ]
+}
+
+CONTENT TO FIX:\n\n${rawContent}`;
+
+  if (apiProvider === 'gemini') {
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: `${systemRepair}\n\n${userRepair}` }] }],
+        generationConfig: { temperature: 0.0, maxOutputTokens: 8192 },
+      }),
+    });
+    if (!resp.ok) throw new Error(`JSON repair failed (gemini): ${resp.status} ${await resp.text()}`);
+    const d = await resp.json();
+    const text = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const extracted = tryExtractJsonBlock(text) ?? text;
+    return JSON.parse(extracted);
+  }
+
+  // OpenAI-compatible (OpenAI, Laozhang, Lovable gateway)
+  const payload: Record<string, unknown> = {
+    model: selectedModel,
+    messages: [
+      { role: 'system', content: systemRepair },
+      { role: 'user', content: userRepair },
+    ],
+    max_tokens: 8192,
+    temperature: 0.0,
+  };
+
+  // Lovable gateway OpenAI family uses max_completion_tokens
+  if (apiProvider === 'lovable' && String(selectedModel).startsWith('openai/')) {
+    delete (payload as any).max_tokens;
+    (payload as any).max_completion_tokens = 8192;
+  }
+
+  const resp = await fetch(apiUrl, {
+    method: 'POST',
+    headers: requestHeaders,
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) throw new Error(`JSON repair failed: ${resp.status} ${await resp.text()}`);
+  const d = await resp.json();
+  const repaired = d.choices?.[0]?.message?.content || '';
+  const extracted = tryExtractJsonBlock(repaired) ?? repaired;
+  return JSON.parse(extracted);
+}
+
 // Função para calcular créditos por operação conforme documentação (seção 4.3)
 function calculateCreditsForOperation(
   operationType: string, 
@@ -1462,7 +1549,9 @@ Forneça uma dica personalizada baseada nessas estatísticas.`;
       const longOutput = type === "viral-script" || type === "generate_script_with_formula" || type === "agent_chat";
       // Increase max_tokens for analyze_video_titles to avoid truncated JSON
       const isAnalyzeTitles = type === "analyze_video_titles";
-      const maxOut = longOutput ? 8192 : (isAnalyzeTitles ? 4096 : 2048);
+      const isSyncVerification = type === 'sync_verification';
+      // Sync verification can include hundreds of scenes: avoid truncation.
+      const maxOut = (longOutput || isSyncVerification) ? 8192 : (isAnalyzeTitles ? 4096 : 2048);
 
       const payload: Record<string, unknown> = {
         model: selectedModel,
@@ -1538,19 +1627,39 @@ Forneça uma dica personalizada baseada nessas estatísticas.`;
     console.log("[AI Assistant] AI response received, length:", content?.length);
 
     // Try to parse as JSON if expected
-    let result = content;
-    if (content && (content.includes('{') || content.includes('['))) {
+    let result: unknown = content;
+    if (type === 'sync_verification') {
+      // For sync_verification we MUST return valid JSON to the client.
+      // First attempt: parse extracted JSON.
       try {
-        // Extract JSON from markdown code blocks if present
-        const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch) {
-          result = JSON.parse(jsonMatch[1].trim());
-        } else {
-          result = JSON.parse(content);
-        }
+        const extracted = tryExtractJsonBlock(content) ?? content;
+        result = JSON.parse(extracted);
+      } catch (e) {
+        console.warn('[AI Assistant] sync_verification returned invalid JSON, attempting repair...');
+        // Second attempt: repair using the same provider/model.
+        result = await repairSyncVerificationJson({
+          apiUrl,
+          requestHeaders,
+          apiProvider,
+          selectedModel,
+          rawContent: content,
+        });
+      }
+    } else if (content && (content.includes('{') || content.includes('['))) {
+      try {
+        const extracted = tryExtractJsonBlock(content);
+        result = JSON.parse((extracted ?? content).trim());
       } catch {
         // If JSON parsing fails, return as string
         result = content;
+      }
+    }
+
+    if (type === 'sync_verification') {
+      const ok = !!result && typeof result === 'object' && Array.isArray((result as any).analysis);
+      console.log(`[AI Assistant] sync_verification JSON valid: ${ok}`);
+      if (!ok) {
+        throw new Error('sync_verification: backend could not produce valid JSON');
       }
     }
 
