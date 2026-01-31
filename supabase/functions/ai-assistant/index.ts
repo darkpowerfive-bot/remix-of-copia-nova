@@ -719,8 +719,34 @@ Forneça uma dica personalizada baseada nessas estatísticas.`;
         
         console.log(`[AI Assistant] Script Duration - Min: ${scriptMinDuration}, Target: ${scriptTargetDuration}, Max: ${scriptMaxDuration}`);
         console.log(`[AI Assistant] Script Words - Min: ${minWords}, Target: ${targetWords}, Max: ${maxWords}`);
+        console.log(`[AI Assistant] Script Language: ${language || 'pt-BR'}`);
+        
+        // Map language code to full language name for better AI understanding
+        const languageNames: Record<string, string> = {
+          "pt-BR": "Português do Brasil",
+          "en-US": "English (American)",
+          "en-GB": "English (British)",
+          "es": "Español",
+          "es-MX": "Español Mexicano",
+          "fr": "Français",
+          "de": "Deutsch",
+          "it": "Italiano",
+          "ja": "日本語 (Japanese)",
+          "ko": "한국어 (Korean)",
+          "zh": "中文 (Chinese)",
+          "ru": "Русский (Russian)",
+          "ar": "العربية (Arabic)",
+          "hi": "हिन्दी (Hindi)",
+          "nl": "Nederlands",
+          "pl": "Polski",
+          "tr": "Türkçe"
+        };
+        const scriptLanguageName = languageNames[language] || language || "Português do Brasil";
         
         systemPrompt = `Você é um roteirista profissional especializado em criar ROTEIROS PUROS PARA NARRAÇÃO (VOICE-OVER) de vídeos virais para YouTube.
+        
+        🌍 IDIOMA DO ROTEIRO: ${scriptLanguageName}
+        ⚠️ REGRA CRÍTICA DE IDIOMA: TODO o roteiro DEVE ser escrito em ${scriptLanguageName}. NÃO use português se o idioma selecionado for outro. ESCREVA INTEIRAMENTE no idioma especificado.
         
         🎯 OBJETIVO: Gerar APENAS o texto que será narrado - SEM instruções de produção, SEM marcações técnicas, SEM colchetes com direções.
         
@@ -746,6 +772,7 @@ Forneça uma dica personalizada baseada nessas estatísticas.`;
         2. NUNCA gere mais de ${maxWords} palavras (${scriptMaxDuration} minutos)
         3. O IDEAL é gerar entre ${minWords} e ${targetWords} palavras
         4. Antes de finalizar, CONTE as palavras e ajuste se necessário!
+        5. ESCREVA TODO O ROTEIRO EM ${scriptLanguageName.toUpperCase()}!
         
         ✅ O QUE INCLUIR:
         - Hook poderoso nos primeiros 30 segundos que prenda a atenção
@@ -791,7 +818,8 @@ Forneça uma dica personalizada baseada nessas estatísticas.`;
         Cada parágrafo deve fluir naturalmente para o próximo.
         O texto deve soar como uma história contada, não como um roteiro técnico.
         
-        IMPORTANTE: O narrador vai ler EXATAMENTE o que você escrever. Não inclua NADA além do texto narrado.`;
+        IMPORTANTE: O narrador vai ler EXATAMENTE o que você escrever. Não inclua NADA além do texto narrado.
+        LEMBRE-SE: ESCREVA TUDO EM ${scriptLanguageName.toUpperCase()}!`;
         break;
 
       case "generate_script":
