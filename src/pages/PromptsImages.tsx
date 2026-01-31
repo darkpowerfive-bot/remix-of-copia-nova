@@ -4238,36 +4238,67 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
         throw error;
       }
 
-      // Parsear resposta
+      // Parsear resposta com sistema robusto de fallback
       let analysisResult: { analysis: Array<{ sceneNumber: number; status: string; issue?: string; severity?: string; suggestedPrompt?: string }> };
       try {
         const raw = (data as any)?.result ?? (data as any)?.content ?? '';
 
         // Alguns providers já retornam o JSON como objeto
-        if (raw && typeof raw === 'object') {
+        if (raw && typeof raw === 'object' && Array.isArray((raw as any).analysis)) {
           analysisResult = raw as any;
         } else {
           const content = typeof raw === 'string' ? raw : JSON.stringify(raw ?? '');
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          
+          // Tentar primeiro o parse direto do JSON
+          const jsonMatch = content.match(/\{[\s\S]*"analysis"[\s\S]*\[[\s\S]*\][\s\S]*\}/);
           if (jsonMatch) {
-            analysisResult = JSON.parse(jsonMatch[0]);
+            try {
+              analysisResult = JSON.parse(jsonMatch[0]);
+            } catch (jsonErr) {
+              // Fallback: extrair cenas individuais via regex se JSON estiver truncado/malformado
+              console.warn('JSON malformado, usando fallback de extração por regex');
+              const sceneMatches = content.matchAll(/"sceneNumber"\s*:\s*(\d+)\s*,\s*"status"\s*:\s*"(synced|mismatched)"(?:\s*,\s*"issue"\s*:\s*"([^"]*)")?(?:\s*,\s*"severity"\s*:\s*"(low|medium|high)")?(?:\s*,\s*"suggestedPrompt"\s*:\s*"([^"]*)")?/g);
+              
+              const extractedAnalysis: Array<{ sceneNumber: number; status: string; issue?: string; severity?: string; suggestedPrompt?: string }> = [];
+              for (const match of sceneMatches) {
+                extractedAnalysis.push({
+                  sceneNumber: parseInt(match[1]),
+                  status: match[2],
+                  issue: match[3] || undefined,
+                  severity: match[4] || undefined,
+                  suggestedPrompt: match[5]?.replace(/\\"/g, '"').replace(/\\n/g, '\n') || undefined
+                });
+              }
+              
+              if (extractedAnalysis.length > 0) {
+                analysisResult = { analysis: extractedAnalysis };
+                console.log(`[SyncVerification] Extraídas ${extractedAnalysis.length} cenas via regex fallback`);
+              } else {
+                throw new Error('Não foi possível extrair dados de sincronia da resposta');
+              }
+            }
           } else {
-            throw new Error('Resposta não contém JSON válido');
+            throw new Error('Resposta não contém estrutura JSON válida');
           }
         }
 
         if (!analysisResult || !Array.isArray((analysisResult as any).analysis)) {
-          throw new Error('JSON inválido: campo "analysis" ausente');
+          throw new Error('JSON inválido: campo "analysis" ausente ou vazio');
+        }
+
+        // Validar que temos dados suficientes
+        if (analysisResult.analysis.length === 0) {
+          throw new Error('Análise retornou array vazio');
         }
       } catch (parseErr) {
-        console.error('Erro ao parsear resposta:', parseErr);
+        console.error('Erro ao parsear resposta:', parseErr, 'Raw data:', (data as any)?.result?.substring?.(0, 500) || data);
         // Reembolsar em caso de erro de parse
         if (deductionResult.shouldRefund) {
           await deductionResult.refund();
         }
         toast({
           title: "Erro na análise",
-          description: parseErr instanceof Error ? parseErr.message : "Não foi possível interpretar a resposta da IA",
+          description: parseErr instanceof Error ? parseErr.message : "Não foi possível interpretar a resposta da IA. Tente novamente.",
           variant: "destructive"
         });
         setShowSyncVerificationModal(false);
