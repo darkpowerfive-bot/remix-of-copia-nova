@@ -58,6 +58,7 @@ interface ScriptPreviewTimelineProps {
   className?: string;
   onSyncAudio?: (newWpm: number) => void;
   onLockedDurationChange?: (lockedSeconds: number | null) => void;
+  initialLockedDuration?: number | null; // Valor inicial para persistência
   generatedScenes?: GeneratedScene[];
   onImproveScenes?: (sceneNumbers: number[], improvementType: string, regenerateImages?: boolean) => void;
   onGenerateMissingImages?: (sceneNumbers: number[]) => void;
@@ -180,6 +181,7 @@ export function ScriptPreviewTimeline({
   className = "",
   onSyncAudio,
   onLockedDurationChange,
+  initialLockedDuration,
   generatedScenes = [],
   onImproveScenes,
   onGenerateMissingImages,
@@ -188,10 +190,26 @@ export function ScriptPreviewTimeline({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [audioDuration, setAudioDuration] = useState("");
-  const [isDurationLocked, setIsDurationLocked] = useState(false);
-  const [lockedDurationSeconds, setLockedDurationSeconds] = useState<number | null>(null);
+  const [isDurationLocked, setIsDurationLocked] = useState(initialLockedDuration !== null && initialLockedDuration !== undefined && initialLockedDuration > 0);
+  const [lockedDurationSeconds, setLockedDurationSeconds] = useState<number | null>(initialLockedDuration ?? null);
   const [isImproving, setIsImproving] = useState(false);
   const [regenerateAfterImprove, setRegenerateAfterImprove] = useState(true);
+  
+  // Sincronizar quando o valor inicial mudar (restauração de sessão)
+  useEffect(() => {
+    if (initialLockedDuration !== undefined) {
+      const hasValidDuration = initialLockedDuration !== null && initialLockedDuration > 0;
+      setIsDurationLocked(hasValidDuration);
+      setLockedDurationSeconds(initialLockedDuration);
+      
+      // Se tem duração válida, formatar para exibição
+      if (hasValidDuration) {
+        const mins = Math.floor(initialLockedDuration / 60);
+        const secs = Math.floor(initialLockedDuration % 60);
+        setAudioDuration(`${mins}:${String(secs).padStart(2, '0')}`);
+      }
+    }
+  }, [initialLockedDuration]);
   
   // Estado do modal de geração de vídeo
   const [videoModalOpen, setVideoModalOpen] = useState(false);
@@ -602,11 +620,7 @@ export function ScriptPreviewTimeline({
     toast.success(`✅ Sincronizado e travado! WPM: ${clampedWpm} | Duração: ${formatTimecode(durationSeconds)} | ${totalWords} palavras`);
   };
 
-  if (!script.trim() || previewScenes.length === 0) {
-    return null;
-  }
-
-  // Calcular cenas sem imagem
+  // Calcular cenas sem imagem (deve ficar antes do early return para respeitar regras de hooks)
   const missingScenesCount = useMemo(() => {
     if (generatedScenes.length === 0) return 0;
     return generatedScenes.filter(s => !s.generatedImage).length;
@@ -616,6 +630,10 @@ export function ScriptPreviewTimeline({
     if (generatedScenes.length === 0) return [];
     return generatedScenes.filter(s => !s.generatedImage).map(s => s.number);
   }, [generatedScenes]);
+
+  if (!script.trim() || previewScenes.length === 0) {
+    return null;
+  }
 
   return (
     <Card className={`p-4 border-dashed border-primary/30 bg-primary/5 ${className}`}>
