@@ -4279,6 +4279,11 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                       initialLockedDuration={lockedDurationSeconds}
                       onSyncAudio={generating ? undefined : (newWpm) => {
                         setNarrationSpeed(newWpm.toString());
+                        
+                        // Sincronizar com VoiceGenerator: converter WPM para speed (1x = 150 WPM)
+                        const voiceSpeed = Math.max(0.5, Math.min(4, newWpm / 150));
+                        localStorage.setItem("voice_speed", JSON.stringify([voiceSpeed]));
+                        
                         if (generatedScenes.length > 0) {
                           const recalculatedScenes = computeScenesWithWpm(generatedScenes, newWpm);
                           updateScenes(recalculatedScenes);
