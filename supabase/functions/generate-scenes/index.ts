@@ -339,34 +339,35 @@ function getDefaultVisualMap(): ScriptVisualMap {
 }
 
 // Função para analisar imagens de referência e extrair descrições de personagens
+// ATUALIZADO: Usa Laozhang API (gpt-4o-mini com visão) para consumir créditos
 async function analyzeReferenceImages(
   referenceCharacters: ReferenceCharacterInput[],
-  lovableApiKey?: string | null
+  laozhangApiKey?: string | null
 ): Promise<CharacterDescription[]> {
   if (!referenceCharacters || referenceCharacters.length === 0) {
     return [];
   }
 
-  console.log(`[Analyze Reference Images] Processing ${referenceCharacters.length} reference images...`);
+  console.log(`[Analyze Reference Images] Processing ${referenceCharacters.length} reference images via Laozhang...`);
   
   const characters: CharacterDescription[] = [];
   
   for (const ref of referenceCharacters) {
     try {
-      if (!lovableApiKey) {
-        console.warn("[Analyze Reference] LOVABLE_API_KEY missing; skipping reference analysis");
+      if (!laozhangApiKey) {
+        console.warn("[Analyze Reference] LAOZHANG_API_KEY missing; skipping reference analysis");
         continue;
       }
 
-      // Usar o gateway multimodal do Lovable (Gemini) para extrair descrição do personagem
-      const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      // Usar Laozhang API com gpt-4o-mini (visão) - consome créditos
+      const resp = await fetch("https://api.laozhang.ai/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${lovableApiKey}`,
+          Authorization: `Bearer ${laozhangApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "gpt-4o-mini", // Modelo com visão mais econômico
           messages: [
             {
               role: "system",
@@ -388,7 +389,7 @@ async function analyzeReferenceImages(
 
       if (!resp.ok) {
         const errText = await resp.text().catch(() => "");
-        console.warn(`[Analyze Reference] Vision request failed for ${ref.name}:`, resp.status, errText?.slice(0, 300));
+        console.warn(`[Analyze Reference] Laozhang vision request failed for ${ref.name}:`, resp.status, errText?.slice(0, 300));
         continue;
       }
 
@@ -409,7 +410,7 @@ async function analyzeReferenceImages(
     }
   }
 
-  console.log(`[Analyze Reference Images] Successfully analyzed ${characters.length}/${referenceCharacters.length} characters`);
+  console.log(`[Analyze Reference Images] Successfully analyzed ${characters.length}/${referenceCharacters.length} characters via Laozhang`);
   return characters;
 }
 
@@ -1262,7 +1263,7 @@ serve(async (req) => {
         console.log(`[Generate Scenes] Deducted ${REFERENCE_IMAGE_CREDITS} credits for character analysis`);
       }
       
-      referenceChars = await analyzeReferenceImages(referenceCharacters, LOVABLE_API_KEY);
+      referenceChars = await analyzeReferenceImages(referenceCharacters, LAOZHANG_API_KEY);
     }
 
     // Mesclar personagens com prioridade:
