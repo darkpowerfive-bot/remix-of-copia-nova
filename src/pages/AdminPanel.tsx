@@ -80,6 +80,8 @@ import { AdminBlogTab } from "@/components/admin/AdminBlogTab";
 import { AdminUserPermissionsTab } from "@/components/admin/AdminUserPermissionsTab";
 import { AdminWhatsAppTemplatesTab } from "@/components/admin/AdminWhatsAppTemplatesTab";
 import { AdminExportDataTab } from "@/components/admin/AdminExportDataTab";
+import { AdminGlobalDashboardTab } from "@/components/admin/AdminGlobalDashboardTab";
+import { PieChart } from "lucide-react";
 import { MessageCircle, Database } from "lucide-react";
 interface AdminStats {
   totalUsers: number;
@@ -602,8 +604,12 @@ const AdminPanel = () => {
           </div>
 
           {/* Tabs */}
-          <Tabs defaultValue="users" className="space-y-6">
+          <Tabs defaultValue="global-dashboard" className="space-y-6">
             <TabsList className="bg-secondary/50 p-1 h-auto flex-wrap">
+              <TabsTrigger value="global-dashboard" className="flex items-center gap-2">
+                <PieChart className="w-4 h-4" />
+                Dashboard Global
+              </TabsTrigger>
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 Utilizadores
@@ -677,6 +683,11 @@ const AdminPanel = () => {
                 Exportar Dados
               </TabsTrigger>
             </TabsList>
+
+            {/* Global Dashboard Tab */}
+            <TabsContent value="global-dashboard">
+              <AdminGlobalDashboardTab />
+            </TabsContent>
 
             {/* Users Tab */}
             <TabsContent value="users" className="space-y-6">
