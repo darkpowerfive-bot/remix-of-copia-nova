@@ -330,6 +330,13 @@ export const CREDIT_TOOLS_MAP: Record<string, { name: string; icon: string; desc
     icon: '⭐', 
     description: 'Créditos mensais do plano' 
   },
+  
+  // Verificação de Sincronia
+  'sync_verification': { 
+    name: 'Verificar Sincronia', 
+    icon: '🔄', 
+    description: 'Verificação de sincronia entre narração e imagens' 
+  },
 };
 
 // Mapeamento de modelos de IA para nomes amigáveis
@@ -469,6 +476,9 @@ export const CREDIT_COSTS: Record<string, number> = {
   'youtube_analytics': 2,
   'channel_analytics': 2,
   'analytics_reload': 2,
+  
+  // 🔄 VERIFICAÇÃO DE SINCRONIA - 5 créditos
+  'sync_verification': 5,
 };
 
 // Multiplicadores por modelo (conforme documentação backend)
