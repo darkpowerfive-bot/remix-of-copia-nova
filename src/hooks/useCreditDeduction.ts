@@ -42,7 +42,8 @@ export type OperationType =
   | 'viral_analysis'
   | 'analyze_multiple_channels'
   | 'agent_chat'
-  | 'analyze_thumbnails';
+  | 'analyze_thumbnails'
+  | 'sync_verification';
 
 interface DeductionOptions {
   /** Tipo da operação */
