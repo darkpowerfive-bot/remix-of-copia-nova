@@ -886,6 +886,9 @@ const SceneGenerator = () => {
                             <p className="text-xs text-muted-foreground/70 mt-1">
                               Máximo 5 imagens • A IA usará essas referências nos prompts
                             </p>
+                            <p className="text-xs text-primary/80 mt-1 font-medium">
+                              +5 créditos para análise de personagens
+                            </p>
                           </div>
                         )}
                       </div>
@@ -899,7 +902,7 @@ const SceneGenerator = () => {
                             <span className="font-bold text-primary">{estimatedScenes}</span> cenas
                             {referenceImages.filter(i => i.characterName.trim()).length > 0 && (
                               <span className="ml-2 text-primary">
-                                • {referenceImages.filter(i => i.characterName.trim()).length} personagem(s)
+                                • {referenceImages.filter(i => i.characterName.trim()).length} personagem(s) (+5 créditos)
                               </span>
                             )}
                           </p>
