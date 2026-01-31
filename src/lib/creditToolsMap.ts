@@ -486,6 +486,18 @@ export const MODEL_MULTIPLIERS: Record<string, number> = {
 // Função para calcular custo com multiplicador de modelo
 export function calculateCostWithModel(operationType: string, model?: string): number {
   const baseCost = CREDIT_COSTS[operationType] || 5;
+
+  // Scripts/roteiros: 1 crédito por minuto, independente do modelo.
+  // (O multiplicador por modelo aqui gerava preços como 2.8 créditos/min para GPT/Claude)
+  if (
+    operationType === 'script_generation' ||
+    operationType === 'generate_script' ||
+    operationType === 'generate_script_with_formula' ||
+    operationType === 'viral_script' ||
+    operationType === 'roteiro_viral'
+  ) {
+    return baseCost;
+  }
   
   if (!model) return baseCost;
   
@@ -575,19 +587,9 @@ export function calculateFormulaAnalysisCost(): number {
 
 // Custos para geração de script baseado na duração
 export function calculateScriptCost(durationMinutes: number, model?: string): number {
-  const costPerMinute = CREDIT_COSTS['script_generation'] || 2;
-  const baseCost = Math.ceil(durationMinutes * costPerMinute);
-  
-  if (!model) return baseCost;
-  
-  const modelLower = model.toLowerCase();
-  if (modelLower.includes('claude') || modelLower.includes('gpt')) {
-    return Math.ceil(baseCost * 1.4); // 2.8 por minuto
-  } else if (modelLower.includes('gemini')) {
-    return Math.ceil(baseCost * 1.2); // 2.4 por minuto
-  }
-  
-  return baseCost;
+  // 1 crédito por minuto, independente do modelo
+  const costPerMinute = CREDIT_COSTS['script_generation'] ?? 1;
+  return Math.ceil(durationMinutes * costPerMinute);
 }
 
 export function getToolInfo(operationType: string): { name: string; icon: string; description: string } {
