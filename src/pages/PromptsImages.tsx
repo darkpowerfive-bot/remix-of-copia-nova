@@ -347,7 +347,7 @@ const [generating, setGenerating] = useState(false);
   const [editingCharacterIndex, setEditingCharacterIndex] = useState<number | null>(null);
   const [timecodesUpdated, setTimecodesUpdated] = useState(false);
   const [recoveringFromCache, setRecoveringFromCache] = useState(false);
-  const [lockedDurationSeconds, setLockedDurationSeconds] = useState<number | null>(null);
+  const [lockedDurationSeconds, setLockedDurationSeconds] = usePersistedState<number | null>("prompts_locked_duration", null);
   
   // SRT Preview Modal
   const [showSrtPreview, setShowSrtPreview] = useState(false);
@@ -4276,6 +4276,7 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                       script={script}
                       wordsPerScene={parseInt(wordsPerScene) || 80}
                       wpm={currentWpm}
+                      initialLockedDuration={lockedDurationSeconds}
                       onSyncAudio={generating ? undefined : (newWpm) => {
                         setNarrationSpeed(newWpm.toString());
                         if (generatedScenes.length > 0) {
