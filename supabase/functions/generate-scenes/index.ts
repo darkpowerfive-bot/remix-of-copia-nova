@@ -516,124 +516,73 @@ ${characters.map(c => `- ${c.name}: ${c.description}`).join('\n')}`
 🚨 DEFAULT RULE: When in doubt, DO NOT INCLUDE PEOPLE. Focus on OBJECTS and LOCATIONS.`
     : '';
 
-  // PROMPT COM MAPA VISUAL COMPLETO + VALIDAÇÃO AUTOMÁTICA para garantir fidelidade TOTAL ao roteiro
-  const systemPrompt = `You are a visual art director creating prompts for a documentary about: "${visualMap.mainTheme}"
+  // PROMPT ULTRA-FOCADO EM FIDELIDADE AO TEXTO DA NARRAÇÃO
+  // A imagem DEVE ilustrar EXATAMENTE o que o narrador está dizendo naquele momento
+  const systemPrompt = `You are a visual art director creating images that PERFECTLY ILLUSTRATE what the narrator is saying.
 
-🎬 SCRIPT VISUAL MAP (THIS IS YOUR ONLY REFERENCE - DO NOT INVENT):
-- MAIN THEME: ${visualMap.mainTheme}
-- KEY LOCATIONS (use ONLY these): ${visualMap.keyLocations.slice(0, 15).join(', ') || 'generic documentary setting'}
-- KEY OBJECTS (use ONLY these): ${visualMap.keyObjects.slice(0, 15).join(', ') || 'relevant objects'}
-- KEY EVENTS (visualize these): ${visualMap.keyEvents.slice(0, 10).join(', ') || 'narrative moments'}
-- VISUAL TONE: ${visualMap.visualTone}
+🎯 CRITICAL MISSION: Each image MUST VISUALLY REPRESENT the EXACT content of the scene's text.
+The viewer should look at the image and IMMEDIATELY understand what the narrator is saying.
 
-📍 GLOBAL CONTEXT:
+📖 MANDATORY PROCESS FOR EACH SCENE:
+1. READ the "text" field - this is what the narrator is SAYING at this exact moment
+2. IDENTIFY the key visual elements MENTIONED in that specific text:
+   - What OBJECTS are mentioned? (artifacts, documents, structures, tools)
+   - What LOCATIONS are described? (rooms, buildings, landscapes)
+   - What ACTIONS are happening? (discovering, building, moving, revealing)
+   - What CONCEPTS need visual representation? (mystery, power, time passing)
+3. CREATE a prompt that shows EXACTLY those elements - not generic theme images
+
+⛔ DO NOT:
+- Create generic "theme" images that don't match the specific narration
+- Show pyramids when the narrator is talking about papyrus scrolls
+- Show temples when the narrator is discussing mathematical calculations
+- Show landscapes when the narrator is describing a specific artifact
+- Use the same visual for different narration content
+
+✅ CORRECT APPROACH - EXAMPLES:
+- If narrator says "ancient scrolls reveal secrets" → show SCROLLS with mysterious symbols, close-up
+- If narrator says "workers moved massive stones" → show the ACTION of moving stones
+- If narrator says "inside the chamber, gold treasures" → show the INTERIOR with treasures
+- If narrator says "scientists discovered evidence" → show the EVIDENCE/ARTIFACT, not scientists
+- If narrator mentions a specific NUMBER or DATE → represent that concept visually
+
+🎬 GLOBAL CONTEXT (for consistency, but TEXT CONTENT takes PRIORITY):
+- Theme: ${visualMap.mainTheme}
 - Era: ${scriptContext.period}
 - Setting: ${scriptContext.setting}
 - Atmosphere: ${scriptContext.atmosphere}
-- Style: ${stylePrefix || style}${prohibitedList}${characterContext}${clothingRules}
+- Style: ${stylePrefix || style}
+- Key Locations: ${visualMap.keyLocations.slice(0, 10).join(', ') || 'documentary setting'}
+- Key Objects: ${visualMap.keyObjects.slice(0, 10).join(', ') || 'relevant objects'}${prohibitedList}${characterContext}${clothingRules}
 
-⛔ CRITICAL VALIDATION (APPLY TO EVERY PROMPT):
+📸 VISUAL STYLE:
+- ALWAYS apply: "${stylePrefix || style}"
+- Match lighting and color grading to this style
 
-STEP 1 - READ: Read the scene "text" field completely
-STEP 2 - EXTRACT: Find visual elements (objects, locations, artifacts) mentioned in the text
-STEP 3 - VALIDATE: Check each element against the VISUAL MAP above
-  - If element IS in visual map → USE IT
-  - If element is NOT in visual map AND NOT in scene text → DO NOT USE IT
-STEP 4 - HUMAN CHECK: For historical content, AVOID showing modern humans. Focus on ARTIFACTS, STRUCTURES, LANDSCAPES
-STEP 5 - SUBSTITUTE: For abstract text (theories, explanations, narration), use elements FROM THE VISUAL MAP that relate to the theme
-STEP 6 - FINAL CHECK: Ask "Would this image fit in a professional ${visualMap.mainTheme} documentary?" If NO → remove anachronistic elements
+🎨 VISUAL DIVERSITY (MANDATORY):
+- CAMERA ANGLES (rotate): wide shot, close-up, low angle, high angle, macro, panoramic
+- LIGHTING (vary): golden hour, blue hour, dramatic shadows, soft dawn, backlit, candlelight
+- Each consecutive scene MUST have DIFFERENT angle and lighting
+- NEVER 3+ scenes with same subject (e.g., 3 pyramid exteriors)
 
-🚫 ABSOLUTELY FORBIDDEN (AUTOMATIC REJECTION):
-- Modern business suits, blazers, ties, dress shirts in ancient settings
-- Construction helmets, safety vests, modern uniforms in historical scenes
-- Police uniforms, security guards in ancient locations
-- Tablet computers, phones, modern cameras held by people
-- Modern vehicles, electronics, contemporary objects
-- Random people with masks, goggles, or modern accessories
-- Generic "researchers" or "scientists" in modern attire observing ancient artifacts
-- Any clothing or accessory that would look OUT OF PLACE in the ${scriptContext.period}
+🎬 MOVEMENT RECOMMENDATIONS (suggestMovement):
+Set TRUE for: action scenes, natural phenomena, camera movements, emotional peaks, first 5 scenes
+TARGET: 40-50% of scenes should have movement=true
 
-✅ CORRECT APPROACH:
-- Historical discoveries → show ONLY the artifacts, structures, hieroglyphics (no modern observers)
-- Archaeological sites → show the LOCATION itself: tombs, chambers, pyramids, temples
-- Abstract narration → show relevant LOCATION or OBJECT without human presence
-- If people ARE needed → use SILHOUETTES, SHADOWS, or hands only
-- Workers/builders → show ancient workers in period tunics/robes if the script mentions construction
+⏱️ RETENTION MULTIPLIERS:
+- 0.7-0.85: opening hooks, action, tension (faster)
+- 0.9-1.1: standard narration (normal)
+- 1.15-1.4: revelations, climaxes, endings (slower)
 
-📸 VISUAL STYLE ENFORCEMENT:
-- ALWAYS apply the selected style: "${stylePrefix || style}"
-- This style takes PRIORITY over default assumptions
-- Match the lighting, color grading, and atmosphere to this specific style
+FORMAT (MANDATORY - 50-70 words):
+"16:9 horizontal landscape, edge-to-edge full bleed composition, [CAMERA ANGLE], ${stylePrefix || style}, [SPECIFIC LIGHTING], [DESCRIPTION THAT DIRECTLY ILLUSTRATES THE NARRATOR'S TEXT - what they are SAYING must be VISIBLE], ${scriptContext.atmosphere} atmosphere, fill entire frame, no text, no watermarks"
 
-🎬 VEO3 MOVEMENT RECOMMENDATIONS (CRITICAL FOR VIEWER RETENTION):
-IMPORTANT: Be GENEROUS with suggestMovement=true recommendations! Video movement captures attention and reduces viewer drop-off.
-
-MANDATORY suggestMovement=true for:
-- ALL scenes in the FIRST 20% of the video (early scenes are CRITICAL for retention - hook the viewer!)
-- Opening/hook scenes (first 3-5 scenes should ALWAYS have movement)
-- Action sequences: explosions, battles, chases, fights, running, flying
-- Natural phenomena: storms, waves, fire, waterfalls, wind, rain, lightning
-- Camera movements: sweeping panoramas, zooming reveals, tracking shots
-- Dynamic subjects: animals in motion, crowds, vehicles, machinery
-- Emotional peaks: dramatic reveals, transformations, confrontations
-- Transitions: scene changes, time lapses, day-to-night, seasonal changes
-- Any scene with verbs of motion in the text: walk, run, fly, fall, rise, crash, explode, flow
-
-ALSO RECOMMEND suggestMovement=true for:
-- Atmospheric scenes: clouds moving, fog rolling, leaves falling, smoke rising
-- Water scenes: rivers flowing, ocean waves, rain falling
-- Epic establishing shots: cities, landscapes, monuments (with subtle movement)
-- Suspense/tension scenes: shadows moving, doors opening, lights flickering
-
-TARGET: Recommend movement for AT LEAST 40-50% of all scenes, with PRIORITY on early scenes.
-The FIRST 5 scenes should almost ALWAYS have suggestMovement=true unless they are purely static informational frames.
-
-⏱️ RETENTION-BASED DURATION ANALYSIS (CRITICAL FOR ENGAGEMENT):
-Analyze EACH scene and assign a retentionMultiplier (0.7 to 1.4) based on:
-
-FASTER SCENES (0.7-0.85 multiplier) - Keep audience engaged:
-- Opening hook (first 3-5 scenes): 0.75-0.8 - grab attention FAST
-- Action sequences: 0.7-0.8 - fast cuts maintain energy
-- Tension/suspense buildup: 0.8-0.85 - keep viewers on edge
-- Transitions between topics: 0.8 - don't linger
-- Pattern breaks: 0.75 - surprise the viewer quickly
-
-NORMAL PACE (0.9-1.1 multiplier):
-- Standard narration: 1.0
-- Explanations: 0.95-1.05
-- Continuity scenes: 1.0
-
-SLOWER SCENES (1.15-1.4 multiplier) - Let moments breathe:
-- Major revelations: 1.2-1.3 - let the impact sink in
-- Emotional climaxes: 1.25-1.35 - give weight to key moments
-- Beautiful establishing shots: 1.15-1.25 - showcase visuals
-- Mystery reveals: 1.2-1.3 - build anticipation payoff
-- Conclusion/ending: 1.3-1.4 - satisfying close
-
-RULES:
-- First 5 scenes: ALWAYS use 0.75-0.85 (fast hook)
-- Revelation after buildup: 1.25-1.35 (payoff moment)
-- Never use same multiplier 3+ times in a row (vary pacing)
-- Alternate between faster and slower for rhythm
-
-🎨 VISUAL DIVERSITY REQUIREMENT (CRITICAL - MANDATORY):
-Each scene MUST have a DISTINCT visual composition. Use these techniques to ensure NO TWO CONSECUTIVE SCENES look similar:
-
-CAMERA ANGLES (rotate through these): wide establishing shot, close-up detail, low angle dramatic, high angle overview, panoramic vista, extreme macro close-up, dutch angle, side profile
-LIGHTING (vary between scenes): golden hour sunset, blue hour twilight, harsh midday, soft dawn, backlit silhouette, candlelight, moonlit night, overcast diffused
-COMPOSITION (alternate): symmetrical, rule of thirds, leading lines, negative space, layered depth, reflection, diagonal dynamic
-
-DIVERSITY RULES:
-- Scene N and Scene N+1 MUST have DIFFERENT camera angles
-- Scene N and Scene N+2 MUST show DIFFERENT key locations from the visualMap
-- NEVER generate 3+ consecutive scenes with the same dominant subject (e.g., 3 pyramid exteriors in a row)
-- ALTERNATE between: wide/close shots, exterior/interior, objects/architecture, day/night
-
-FORMAT (EVERY PROMPT - INCLUDE CAMERA ANGLE AND LIGHTING):
-"16:9 horizontal landscape, edge-to-edge full bleed composition, [CAMERA ANGLE], ${stylePrefix || style}, [LIGHTING], [VISUAL DESCRIPTION focusing on LOCATIONS and OBJECTS, minimal human presence], ${scriptContext.atmosphere} atmosphere, fill entire frame without any black bars or letterboxing, no text, no watermarks"
+🔍 SELF-CHECK BEFORE SUBMITTING EACH PROMPT:
+Ask yourself: "If someone sees this image while hearing the narration text, will they IMMEDIATELY see the connection?"
+If NO → rewrite the prompt to match the narration more closely.
 
 RETURN ONLY JSON:
-{"scenes":[{"number":N,"imagePrompt":"[50-70 words including camera angle and specific lighting, diverse from adjacent scenes]","emotion":"[one word: tensão/surpresa/medo/admiração/choque/curiosidade/neutral]","suggestMovement":true/false,"retentionMultiplier":0.7-1.4,"retentionReason":"[brief reason for duration adjustment]"}]}`;
+{"scenes":[{"number":N,"imagePrompt":"[50-70 words - MUST illustrate the specific narration text, not generic theme]","emotion":"[tensão/surpresa/medo/admiração/choque/curiosidade/neutral]","suggestMovement":true/false,"retentionMultiplier":0.7-1.4,"retentionReason":"[reason]"}]}`;
 
   let lastError = null;
   const maxRetries = 2;
