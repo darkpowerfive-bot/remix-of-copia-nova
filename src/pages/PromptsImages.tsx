@@ -353,6 +353,23 @@ const [generating, setGenerating] = useState(false);
   const [showSrtPreview, setShowSrtPreview] = useState(false);
   const [srtPreviewData, setSrtPreviewData] = useState<{ content: string; blocks: Array<{ index: number; start: string; end: string; text: string; charCount: number }> } | null>(null);
   
+  // Sync Verification Modal
+  const [showSyncVerificationModal, setShowSyncVerificationModal] = useState(false);
+  const [syncVerificationResult, setSyncVerificationResult] = useState<{
+    analyzing: boolean;
+    mismatchedScenes: Array<{
+      sceneNumber: number;
+      narration: string;
+      currentPrompt: string;
+      issue: string;
+      suggestedPrompt: string;
+      severity: 'low' | 'medium' | 'high';
+    }>;
+    syncedScenes: number[];
+    totalScenes: number;
+  } | null>(null);
+  const [fixingScenes, setFixingScenes] = useState(false);
+  
   // EDL Validation Modal & Cinematic Settings (persistido)
   const [showEdlValidationModal, setShowEdlValidationModal] = useState(false);
   const [edlValidationData, setEdlValidationData] = useState<{ missingScenes: number[]; percentage: number; totalScenes: number; withImages: number } | null>(null);
@@ -4076,6 +4093,233 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
     }
   };
 
+  // Função para verificar sincronia entre cena visual e narração com correção automática
+  const handleVerifySyncAndFix = async () => {
+    if (generatedScenes.length === 0) {
+      toast({
+        title: "Sem cenas",
+        description: "Gere as cenas primeiro antes de verificar sincronia",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setShowSyncVerificationModal(true);
+    setSyncVerificationResult({
+      analyzing: true,
+      mismatchedScenes: [],
+      syncedScenes: [],
+      totalScenes: generatedScenes.length
+    });
+
+    try {
+      // Preparar dados das cenas para análise
+      const scenesData = generatedScenes.map(scene => ({
+        number: scene.number,
+        narration: scene.text,
+        imagePrompt: scene.imagePrompt,
+        hasImage: !!scene.generatedImage
+      }));
+
+      // Chamar IA para analisar sincronia
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: {
+          messages: [
+            {
+              role: 'system',
+              content: `Você é um especialista em direção de vídeos e análise de sincronia visual-narração.
+
+TAREFA: Analisar se os prompts de imagem ilustram LITERALMENTE o que está sendo narrado em cada cena.
+
+CRITÉRIOS DE AVALIAÇÃO:
+1. OBJETOS MENCIONADOS: Se a narração menciona "livros antigos", o prompt deve incluir livros antigos
+2. AÇÕES DESCRITAS: Se a narração descreve "caminhando pela floresta", o prompt deve mostrar alguém caminhando em floresta
+3. LOCAIS: Se a narração fala de "castelo medieval", o prompt deve ter castelo medieval
+4. EMOÇÕES: O tom emocional do prompt deve combinar com a narração (suspense, alegria, medo, etc.)
+5. PERSONAGENS: Se há personagens mencionados, devem estar representados visualmente
+
+REGRAS PARA IDENTIFICAR INCONGRUÊNCIAS:
+- Se o prompt é muito genérico para a narração específica = INCONGRUÊNCIA
+- Se o prompt mostra algo diferente do que é narrado = INCONGRUÊNCIA
+- Se elementos-chave da narração não estão no prompt = INCONGRUÊNCIA
+- Se o prompt é adequado à narração = SINCRONIZADO
+
+Para cada cena com incongruência, forneça um prompt corrigido em INGLÊS que ilustre LITERALMENTE a narração.
+
+RESPONDA EM JSON:
+{
+  "analysis": [
+    {
+      "sceneNumber": 1,
+      "status": "mismatched" | "synced",
+      "issue": "descrição do problema (se houver)",
+      "severity": "low" | "medium" | "high",
+      "suggestedPrompt": "prompt corrigido em inglês (apenas se mismatched)"
+    }
+  ]
+}`
+            },
+            {
+              role: 'user',
+              content: `Analise a sincronia entre narração e prompts de imagem destas ${scenesData.length} cenas:
+
+${scenesData.map(s => `
+---
+CENA ${s.number}:
+NARRAÇÃO: "${s.narration}"
+PROMPT ATUAL: "${s.imagePrompt}"
+---`).join('\n')}
+
+Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Responda em JSON.`
+            }
+          ],
+          model: 'gemini-2.5-pro'
+        }
+      });
+
+      if (error) throw error;
+
+      // Parsear resposta
+      let analysisResult: { analysis: Array<{ sceneNumber: number; status: string; issue?: string; severity?: string; suggestedPrompt?: string }> };
+      try {
+        const content = data.result || data.content || '';
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          analysisResult = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('Resposta não contém JSON válido');
+        }
+      } catch (parseErr) {
+        console.error('Erro ao parsear resposta:', parseErr);
+        toast({
+          title: "Erro na análise",
+          description: "Não foi possível interpretar a resposta da IA",
+          variant: "destructive"
+        });
+        setShowSyncVerificationModal(false);
+        return;
+      }
+
+      // Separar cenas sincronizadas e com problemas
+      const mismatched = analysisResult.analysis
+        .filter(a => a.status === 'mismatched')
+        .map(a => {
+          const scene = generatedScenes.find(s => s.number === a.sceneNumber);
+          return {
+            sceneNumber: a.sceneNumber,
+            narration: scene?.text || '',
+            currentPrompt: scene?.imagePrompt || '',
+            issue: a.issue || 'Prompt não corresponde à narração',
+            suggestedPrompt: a.suggestedPrompt || '',
+            severity: (a.severity as 'low' | 'medium' | 'high') || 'medium'
+          };
+        });
+
+      const synced = analysisResult.analysis
+        .filter(a => a.status === 'synced')
+        .map(a => a.sceneNumber);
+
+      setSyncVerificationResult({
+        analyzing: false,
+        mismatchedScenes: mismatched,
+        syncedScenes: synced,
+        totalScenes: generatedScenes.length
+      });
+
+      if (mismatched.length === 0) {
+        toast({
+          title: "✅ Todas as cenas sincronizadas!",
+          description: "Não foram encontradas incongruências entre as cenas visuais e a narração",
+        });
+      } else {
+        toast({
+          title: `⚠️ ${mismatched.length} incongruência(s) detectada(s)`,
+          description: "Clique em 'Corrigir Automaticamente' para ajustar os prompts",
+        });
+      }
+
+    } catch (error) {
+      console.error('Erro na verificação de sincronia:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível analisar a sincronia das cenas",
+        variant: "destructive"
+      });
+      setShowSyncVerificationModal(false);
+    }
+  };
+
+  // Função para corrigir automaticamente as cenas com problemas
+  const handleAutoFixMismatchedScenes = async () => {
+    if (!syncVerificationResult || syncVerificationResult.mismatchedScenes.length === 0) return;
+
+    setFixingScenes(true);
+
+    try {
+      const updatedScenes = [...generatedScenes];
+      const scenesToRegenerate: number[] = [];
+
+      // Atualizar prompts das cenas com problemas
+      for (const mismatch of syncVerificationResult.mismatchedScenes) {
+        const index = mismatch.sceneNumber - 1;
+        if (index >= 0 && index < updatedScenes.length && mismatch.suggestedPrompt) {
+          // Garantir formato correto do prompt
+          let newPrompt = mismatch.suggestedPrompt;
+          if (!newPrompt.includes('1280x720')) {
+            newPrompt = `${newPrompt}, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
+          }
+
+          updatedScenes[index] = {
+            ...updatedScenes[index],
+            imagePrompt: newPrompt,
+            generatedImage: undefined, // Limpar imagem para regenerar
+            generatingImage: true
+          };
+          scenesToRegenerate.push(index);
+        }
+      }
+
+      // Atualizar estado
+      setGeneratedScenes(updatedScenes);
+      setPersistedScenes(updatedScenes.map(({ generatedImage, generatingImage, ...rest }) => rest));
+
+      // Sincronizar e iniciar geração em background
+      syncScenes(updatedScenes);
+
+      if (scenesToRegenerate.length > 0) {
+        setTimeout(() => {
+          const cookieCount = getImageFXCookieCount() || 1;
+          startBgGeneration(updatedScenes, style, scenesToRegenerate, detectedCharacters, cookieCount);
+        }, 100);
+      }
+
+      toast({
+        title: "🔄 Correção iniciada!",
+        description: `${scenesToRegenerate.length} cena(s) sendo corrigida(s) e regenerada(s)`,
+      });
+
+      // Fechar modal e limpar estado
+      setShowSyncVerificationModal(false);
+      setSyncVerificationResult(null);
+
+      // Log activity
+      await logActivity({
+        action: 'scenes_improved',
+        description: `${scenesToRegenerate.length} cenas corrigidas por verificação de sincronia`,
+      });
+
+    } catch (error) {
+      console.error('Erro ao corrigir cenas:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível corrigir as cenas",
+        variant: "destructive"
+      });
+    } finally {
+      setFixingScenes(false);
+    }
+  };
+
   return (
     <MainLayout>
       <SEOHead
@@ -4650,6 +4894,17 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
                           >
                             <Video className="w-4 h-4 mr-2" />
                             CapCut
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            size="sm" 
+                            onClick={handleVerifySyncAndFix}
+                            disabled={generatedScenes.length === 0 || bgState.isGenerating}
+                            className="border-amber-500/50 text-amber-500 hover:bg-amber-500/10"
+                            title="Verificar sincronia entre cenas visuais e narração, corrigindo automaticamente as incongruências"
+                          >
+                            <AlertCircle className="w-4 h-4 mr-2" />
+                            Verificar Sincronia
                           </Button>
                           <Button 
                             size="sm" 
@@ -7250,6 +7505,166 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Modal de Verificação de Sincronia */}
+      <Dialog open={showSyncVerificationModal} onOpenChange={setShowSyncVerificationModal}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-500" />
+              Verificação de Sincronia Cena↔Narração
+            </DialogTitle>
+            <DialogDescription>
+              Análise minuciosa para garantir que cada cena visual corresponde ao que está sendo narrado
+            </DialogDescription>
+          </DialogHeader>
+
+          {syncVerificationResult?.analyzing ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <Loader2 className="w-10 h-10 animate-spin text-primary" />
+              <p className="text-muted-foreground text-center">
+                Analisando {syncVerificationResult.totalScenes} cenas...
+                <br />
+                <span className="text-xs">Verificando correspondência entre imagens e narração</span>
+              </p>
+            </div>
+          ) : syncVerificationResult ? (
+            <div className="space-y-4">
+              {/* Resumo */}
+              <div className="flex gap-4 p-4 bg-secondary rounded-lg">
+                <div className="flex-1 text-center">
+                  <div className="text-2xl font-bold text-green-500">{syncVerificationResult.syncedScenes.length}</div>
+                  <div className="text-xs text-muted-foreground">Sincronizadas</div>
+                </div>
+                <div className="flex-1 text-center">
+                  <div className="text-2xl font-bold text-amber-500">{syncVerificationResult.mismatchedScenes.length}</div>
+                  <div className="text-xs text-muted-foreground">Incongruências</div>
+                </div>
+                <div className="flex-1 text-center">
+                  <div className="text-2xl font-bold text-foreground">{syncVerificationResult.totalScenes}</div>
+                  <div className="text-xs text-muted-foreground">Total</div>
+                </div>
+              </div>
+
+              {/* Lista de incongruências */}
+              {syncVerificationResult.mismatchedScenes.length > 0 ? (
+                <div className="space-y-3">
+                  <h4 className="font-medium text-sm text-foreground">Incongruências Detectadas:</h4>
+                  <ScrollArea className="h-[300px] pr-4">
+                    <div className="space-y-3">
+                      {syncVerificationResult.mismatchedScenes.map((mismatch, idx) => (
+                        <div 
+                          key={idx} 
+                          className={cn(
+                            "p-3 rounded-lg border",
+                            mismatch.severity === 'high' ? 'border-destructive/50 bg-destructive/5' :
+                            mismatch.severity === 'medium' ? 'border-amber-500/50 bg-amber-500/5' :
+                            'border-muted bg-muted/30'
+                          )}
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge 
+                              variant="outline" 
+                              className={cn(
+                                "text-xs",
+                                mismatch.severity === 'high' ? 'border-destructive text-destructive' :
+                                mismatch.severity === 'medium' ? 'border-amber-500 text-amber-500' :
+                                'border-muted-foreground text-muted-foreground'
+                              )}
+                            >
+                              Cena {mismatch.sceneNumber}
+                            </Badge>
+                            <Badge 
+                              variant="outline"
+                              className={cn(
+                                "text-[10px]",
+                                mismatch.severity === 'high' ? 'bg-destructive/20 text-destructive' :
+                                mismatch.severity === 'medium' ? 'bg-amber-500/20 text-amber-500' :
+                                'bg-muted text-muted-foreground'
+                              )}
+                            >
+                              {mismatch.severity === 'high' ? 'Alta' : mismatch.severity === 'medium' ? 'Média' : 'Baixa'}
+                            </Badge>
+                          </div>
+                          
+                          <p className="text-xs text-destructive mb-2">
+                            <strong>Problema:</strong> {mismatch.issue}
+                          </p>
+                          
+                          <div className="grid grid-cols-1 gap-2 text-xs">
+                            <div className="bg-secondary/50 p-2 rounded">
+                              <span className="text-muted-foreground font-medium">Narração:</span>
+                              <p className="text-foreground mt-1">"{mismatch.narration}"</p>
+                            </div>
+                            <div className="bg-secondary/50 p-2 rounded">
+                              <span className="text-muted-foreground font-medium">Prompt Atual:</span>
+                              <p className="text-foreground mt-1 line-clamp-2">{mismatch.currentPrompt}</p>
+                            </div>
+                            <div className="bg-green-500/10 p-2 rounded border border-green-500/30">
+                              <span className="text-green-500 font-medium">Correção Sugerida:</span>
+                              <p className="text-foreground mt-1">{mismatch.suggestedPrompt}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  
+                  {/* Botões de ação */}
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowSyncVerificationModal(false);
+                        setSyncVerificationResult(null);
+                      }}
+                      className="flex-1"
+                    >
+                      Fechar
+                    </Button>
+                    <Button
+                      onClick={handleAutoFixMismatchedScenes}
+                      disabled={fixingScenes}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {fixingScenes ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Corrigindo...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Corrigir Automaticamente ({syncVerificationResult.mismatchedScenes.length})
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 gap-3">
+                  <Check className="w-12 h-12 text-green-500" />
+                  <p className="text-center text-foreground font-medium">
+                    Todas as cenas estão sincronizadas!
+                  </p>
+                  <p className="text-center text-muted-foreground text-sm">
+                    Não foram encontradas incongruências entre as cenas visuais e a narração.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowSyncVerificationModal(false);
+                      setSyncVerificationResult(null);
+                    }}
+                  >
+                    Fechar
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
       
