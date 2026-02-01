@@ -1686,7 +1686,9 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
 
     if (apiProvider === 'gemini' && userApiKeyToUse) {
       // Gemini API has a different request format
-      const shouldUseProvidedMessages = type === 'sync_verification' && Array.isArray(messages) && messages.length > 0;
+      // Use messages directly when provided (e.g., regenerate lost scenes, sync_verification)
+      const shouldUseProvidedMessages = Array.isArray(messages) && messages.length > 0 && 
+        messages.some((m: any) => m?.role && m?.content);
       const combinedText = shouldUseProvidedMessages
         ? (messages as any[])
             .map((m) => {
@@ -1719,15 +1721,19 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       // Sync verification can include hundreds of scenes: avoid truncation.
       const maxOut = (longOutput || isSyncVerification) ? 8192 : (isAnalyzeTitles ? 4096 : 2048);
 
+      // Use messages directly when provided (e.g., regenerate lost scenes, sync_verification)
+      // Otherwise, construct from systemPrompt + userPrompt
+      const useDirectMessages = Array.isArray(messages) && messages.length > 0 && 
+        messages.some((m: any) => m?.role && m?.content);
+      
       const payload: Record<string, unknown> = {
         model: selectedModel,
-        messages:
-          type === 'sync_verification' && Array.isArray(messages) && messages.length > 0
-            ? messages
-            : [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
+        messages: useDirectMessages
+          ? messages
+          : [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
       };
 
       // Token limit differences
