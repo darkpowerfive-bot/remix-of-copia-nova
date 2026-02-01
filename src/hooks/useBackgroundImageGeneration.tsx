@@ -565,12 +565,21 @@ Reescreva o prompt de forma segura.`
     const totalMinutes = totalTimeMs / 60000;
     const imagesPerMinute = totalMinutes > 0 ? (processed / totalMinutes).toFixed(1) : '0';
 
+    // IMPORTANTE: Limpar generatingImage de todas as cenas ao finalizar
+    // Isso evita que cenas fiquem presas em estado de loading
+    const cleanedScenes = scenesRef.current.map((scene, idx) => ({
+      ...scene,
+      generatingImage: false, // Sempre limpar - se gerou, tem imagem; se falhou, não gerando
+    }));
+    scenesRef.current = cleanedScenes;
+
     setState(prev => ({
       ...prev,
       isGenerating: false,
       currentSceneIndex: null,
       currentPrompt: null,
       startTime: null,
+      scenes: cleanedScenes, // Atualizar com cenas limpas
       failedIndexes: failedIdxs,
       rateLimitHit: rateLimitEncountered,
       rewriteProgress: initialRewriteProgress,
