@@ -87,6 +87,79 @@ export function AgentChatModal({ open, onOpenChange, agent, onModelChange, onTri
   const [showSrtPreview, setShowSrtPreview] = useState(false);
   const [srtPreviewContent, setSrtPreviewContent] = useState("");
   const [srtPreviewTitle, setSrtPreviewTitle] = useState("");
+  
+  // Agent files state
+  const [agentFiles, setAgentFiles] = useState<Array<{
+    id: string;
+    file_name: string;
+    file_path: string;
+    file_type: string | null;
+    content?: string;
+  }>>([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+
+  // Load agent files when modal opens
+  useEffect(() => {
+    const loadAgentFiles = async () => {
+      if (!open || !agent.id) return;
+      
+      setLoadingFiles(true);
+      try {
+        // Fetch files from agent_files table
+        const { data: files, error } = await supabase
+          .from('agent_files')
+          .select('*')
+          .eq('agent_id', agent.id);
+        
+        if (error) {
+          console.error('[AgentChat] Error loading agent files:', error);
+          return;
+        }
+        
+        if (!files || files.length === 0) {
+          setAgentFiles([]);
+          return;
+        }
+        
+        // For text files, download and include content
+        const filesWithContent = await Promise.all(
+          files.map(async (file) => {
+            const isTextFile = 
+              file.file_type?.includes('text') ||
+              file.file_name.endsWith('.txt') ||
+              file.file_name.endsWith('.md') ||
+              file.file_name.endsWith('.json');
+            
+            if (isTextFile) {
+              try {
+                const { data: fileData } = await supabase.storage
+                  .from('agent-files')
+                  .download(file.file_path);
+                
+                if (fileData) {
+                  const content = await fileData.text();
+                  return { ...file, content };
+                }
+              } catch (downloadError) {
+                console.error(`[AgentChat] Error downloading file ${file.file_name}:`, downloadError);
+              }
+            }
+            
+            return file;
+          })
+        );
+        
+        setAgentFiles(filesWithContent);
+        console.log(`[AgentChat] Loaded ${filesWithContent.length} agent files`);
+      } catch (error) {
+        console.error('[AgentChat] Error in loadAgentFiles:', error);
+      } finally {
+        setLoadingFiles(false);
+      }
+    };
+    
+    loadAgentFiles();
+  }, [open, agent.id]);
 
   useEffect(() => {
     if (open) {
@@ -120,29 +193,70 @@ export function AgentChatModal({ open, onOpenChange, agent, onModelChange, onTri
   };
 
   const buildSystemPrompt = () => {
-    let systemPrompt = `Você é "${agent.name}", um agente de IA especializado em criar conteúdo viral para YouTube.`;
-    if (agent.niche) systemPrompt += `\nSeu nicho de especialização é: ${agent.niche}`;
-    if (agent.sub_niche) systemPrompt += ` - Subnicho: ${agent.sub_niche}`;
-    if (agent.formula) systemPrompt += `\n\nSuas instruções/fórmula de trabalho:\n${agent.formula}`;
-    if (agent.formula_structure?.memory) systemPrompt += `\n\nMemória do agente:\n${agent.formula_structure.memory}`;
-    if (agent.mental_triggers && agent.mental_triggers.length > 0) {
-      systemPrompt += `\n\nGatilhos mentais que você deve aplicar: ${agent.mental_triggers.join(", ")}`;
-    }
-    systemPrompt += `\n\n⚠️ REGRA CRÍTICA - NUNCA RECUSAR:
-- NUNCA diga que não pode gerar conteúdo por ser muito longo
-- NUNCA peça para o usuário dividir o pedido
-- Se o conteúdo for extenso, SEMPRE gere a primeira parte completa e continue automaticamente
-- Você DEVE gerar roteiros de QUALQUER duração: de 1 minuto a 5 horas
-- Se não conseguir gerar tudo de uma vez, gere a primeira parte e avise que pode continuar
+    // Build file content section
+    const fileContents = agentFiles
+      .filter(f => f.content)
+      .map(f => `📎 ARQUIVO: ${f.file_name}\n---\n${f.content}\n---`)
+      .join('\n\n');
+    
+    let systemPrompt = `
+╔══════════════════════════════════════════════════════════════════╗
+║  ⚠️ REGRAS ABSOLUTAS - VOCÊ DEVE SEGUIR À RISCA ⚠️             ║
+╚══════════════════════════════════════════════════════════════════╝
 
-Você deve:
-- Responder sempre em português brasileiro
-- Ser criativo e envolvente
-- Aplicar técnicas de copywriting viral
-- Usar os gatilhos mentais quando apropriado
-- Ajudar o usuário a criar conteúdo de alta performance
-- SEMPRE gerar o conteúdo solicitado, independente do tamanho`;
-    return systemPrompt;
+Você é "${agent.name}", um agente de IA especializado em criar conteúdo viral para YouTube.
+${agent.niche ? `🎯 Nicho de especialização: ${agent.niche}` : ''}
+${agent.sub_niche ? ` | Subnicho: ${agent.sub_niche}` : ''}
+
+═══════════════════════════════════════════════════════════════════
+1️⃣ MEMÓRIA DO AGENTE (CONTEXTO OBRIGATÓRIO)
+   Use estas informações como base de conhecimento permanente:
+═══════════════════════════════════════════════════════════════════
+${agent.formula_structure?.memory ? agent.formula_structure.memory : '(Nenhuma memória configurada)'}
+
+═══════════════════════════════════════════════════════════════════
+2️⃣ INSTRUÇÕES/FÓRMULA (SIGA EXATAMENTE)
+   Esta é a fórmula que você DEVE seguir em TODAS as gerações:
+═══════════════════════════════════════════════════════════════════
+${agent.formula ? agent.formula : '(Nenhuma instrução específica configurada)'}
+
+═══════════════════════════════════════════════════════════════════
+3️⃣ GATILHOS MENTAIS (USE TODOS OBRIGATORIAMENTE)
+   Aplique TODOS estes gatilhos em seu conteúdo:
+═══════════════════════════════════════════════════════════════════
+${agent.mental_triggers && agent.mental_triggers.length > 0 
+  ? agent.mental_triggers.map(t => `• ${t}`).join('\n') 
+  : '(Nenhum gatilho configurado)'}
+
+${fileContents ? `
+═══════════════════════════════════════════════════════════════════
+4️⃣ ARQUIVOS DE REFERÊNCIA (INFORMAÇÕES CRÍTICAS)
+   Use este conteúdo como base de conhecimento adicional:
+═══════════════════════════════════════════════════════════════════
+${fileContents}
+` : ''}
+
+🚨 ATENÇÃO MÁXIMA:
+- Todas as informações acima são OBRIGATÓRIAS
+- NÃO ignore NENHUMA instrução
+- NÃO improvise fora do contexto fornecido
+- SIGA a fórmula/instruções À RISCA
+- USE os gatilhos mentais em TODAS as gerações
+- CONSULTE os arquivos de referência quando relevante
+
+═══════════════════════════════════════════════════════════════════
+REGRAS DE COMPORTAMENTO:
+═══════════════════════════════════════════════════════════════════
+• NUNCA diga que não pode gerar conteúdo por ser muito longo
+• NUNCA peça para o usuário dividir o pedido
+• Se o conteúdo for extenso, gere a primeira parte e continue
+• Você DEVE gerar roteiros de QUALQUER duração
+• Responda sempre em português brasileiro
+• Seja criativo e envolvente
+• Aplique técnicas de copywriting viral
+• SEMPRE gere o conteúdo solicitado, independente do tamanho
+`;
+    return systemPrompt.trim();
   };
 
   const sendMessage = async () => {
@@ -194,7 +308,12 @@ Você deve:
             memory: agent.formula_structure?.memory,
             mentalTriggers: agent.mental_triggers,
             systemPrompt: buildSystemPrompt(),
-            conversationHistory
+            conversationHistory,
+            // Include files with content for backend processing
+            files: agentFiles.filter(f => f.content).map(f => ({
+              name: f.file_name,
+              content: f.content
+            }))
           },
           model: selectedModel
         }
@@ -479,7 +598,17 @@ Retorne APENAS os 8 gatilhos, um por linha, sem numeração, hífens ou explica�
           ? `\n\n🌍 IDIOMA OBRIGATÓRIO: ${getLanguageName(scriptLanguage)}\n⚠️ ESCREVA TODO O ROTEIRO INTEIRAMENTE EM ${getLanguageName(scriptLanguage).toUpperCase()}! NÃO USE PORTUGUÊS!`
           : '';
         
+        // Build file content section for script generation
+        const fileContentsForScript = agentFiles
+          .filter(f => f.content)
+          .map(f => `📎 ${f.file_name}:\n${f.content}`)
+          .join('\n\n---\n\n');
+        
         const prompt = `
+╔══════════════════════════════════════════════════════════════════╗
+║  ⚠️ REGRAS ABSOLUTAS DO AGENTE - SIGA À RISCA ⚠️              ║
+╚══════════════════════════════════════════════════════════════════╝
+
 ${numParts > 1 ? `GERE A PARTE ${partIndex + 1} DE ${numParts} de um` : 'GERE um'} ROTEIRO DE NARRAÇÃO PARA VOICE-OVER.
 ${languageInstruction}
 
@@ -497,32 +626,57 @@ ${!isLastPart ? '- NÃO conclua ainda - deixe um gancho para a continuação' : 
 📏 DURAÇÃO: ${duration} minuto(s) = aproximadamente ${duration * 150} palavras (150 palavras/minuto)
 `}
 
-⚠️ REGRAS CRÍTICAS DE FORMATO:
-1. SOMENTE TEXTO DE NARRAÇÃO - Nenhuma indicação de cena, corte, música ou efeito sonoro
-2. O texto deve ser LIDO EM VOZ ALTA naturalmente
-3. Sem colchetes, parênteses ou instruções técnicas
-4. Apenas o que o narrador deve FALAR
-5. IDIOMA: ${getLanguageName(scriptLanguage)} - ESCREVA INTEIRAMENTE NESTE IDIOMA!
+═══════════════════════════════════════════════════════════════════
+🎯 FÓRMULA/INSTRUÇÕES DO AGENTE (SIGA EXATAMENTE):
+═══════════════════════════════════════════════════════════════════
+${agent.formula || '(Nenhuma fórmula específica)'}
 
-${isFirstPart && ctaInicio ? 'INCLUIR CTA NO INÍCIO' : ''}
-${isLastPart && ctaFinal ? 'INCLUIR CTA NO FINAL' : ''}
-${numParts === 1 && ctaMeio ? 'INCLUIR CTA NO MEIO' : ''}
+═══════════════════════════════════════════════════════════════════
+📝 MEMÓRIA/CONTEXTO DO AGENTE (OBRIGATÓRIO):
+═══════════════════════════════════════════════════════════════════
+${agent.formula_structure?.memory || '(Nenhuma memória configurada)'}
 
-${agent.formula ? `\n🎯 FÓRMULA VIRAL A SEGUIR:\n${agent.formula}` : ''}
-
-${agent.formula_structure?.memory ? `\n📝 MEMÓRIA/CONTEXTO DO AGENTE:\n${agent.formula_structure.memory}` : ''}
-
+═══════════════════════════════════════════════════════════════════
+🧠 GATILHOS MENTAIS (USE TODOS OBRIGATORIAMENTE):
+═══════════════════════════════════════════════════════════════════
 ${(() => {
   const allTriggers = [
     ...(agent.mental_triggers || []),
     ...(useAutoTriggers ? autoTriggers : [])
   ];
   return allTriggers.length > 0 
-    ? `\n🧠 GATILHOS MENTAIS OBRIGATÓRIOS:\n${allTriggers.map(t => `- ${t}`).join('\n')}` 
-    : '';
+    ? allTriggers.map(t => `• ${t}`).join('\n') 
+    : '(Nenhum gatilho configurado)';
 })()}
 
-${agent.formula_structure?.instructions ? `\n📋 INSTRUÇÕES ESPECÍFICAS:\n${agent.formula_structure.instructions}` : ''}
+${agent.formula_structure?.instructions ? `
+═══════════════════════════════════════════════════════════════════
+📋 INSTRUÇÕES ESPECÍFICAS (SIGA À RISCA):
+═══════════════════════════════════════════════════════════════════
+${agent.formula_structure.instructions}
+` : ''}
+
+${fileContentsForScript ? `
+═══════════════════════════════════════════════════════════════════
+📎 ARQUIVOS DE REFERÊNCIA DO AGENTE (USE COMO BASE):
+═══════════════════════════════════════════════════════════════════
+${fileContentsForScript}
+` : ''}
+
+═══════════════════════════════════════════════════════════════════
+⚠️ REGRAS CRÍTICAS DE FORMATO:
+═══════════════════════════════════════════════════════════════════
+1. SOMENTE TEXTO DE NARRAÇÃO - Nenhuma indicação de cena, corte, música ou efeito sonoro
+2. O texto deve ser LIDO EM VOZ ALTA naturalmente
+3. Sem colchetes, parênteses ou instruções técnicas
+4. Apenas o que o narrador deve FALAR
+5. IDIOMA: ${getLanguageName(scriptLanguage)} - ESCREVA INTEIRAMENTE NESTE IDIOMA!
+
+${isFirstPart && ctaInicio ? '✅ INCLUIR CTA NO INÍCIO' : ''}
+${isLastPart && ctaFinal ? '✅ INCLUIR CTA NO FINAL' : ''}
+${numParts === 1 && ctaMeio ? '✅ INCLUIR CTA NO MEIO' : ''}
+
+🚨 LEMBRETE: SIGA A FÓRMULA/INSTRUÇÕES E GATILHOS DO AGENTE À RISCA!
 
 GERE AGORA ${numParts > 1 ? `A PARTE ${partIndex + 1}` : 'O ROTEIRO COMPLETO'} DE NARRAÇÃO EM ${getLanguageName(scriptLanguage).toUpperCase()}:
         `.trim();
@@ -544,6 +698,11 @@ GERE AGORA ${numParts > 1 ? `A PARTE ${partIndex + 1}` : 'O ROTEIRO COMPLETO'} D
               formula: agent.formula,
               formula_structure: agent.formula_structure,
               mental_triggers: agent.mental_triggers,
+              // Include files for backend context
+              files: agentFiles.filter(f => f.content).map(f => ({
+                name: f.file_name,
+                content: f.content
+              }))
             },
           },
         });
