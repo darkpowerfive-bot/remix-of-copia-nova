@@ -1533,11 +1533,20 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
 
     // Use external provider when we have a key (user or admin), otherwise use Lovable AI Gateway
     if (userApiKeyToUse && apiProvider !== 'lovable') {
+      // CRITICAL: For script generation with agent formula, ALWAYS use stronger models
+      const requiresStrongModel = type === 'generate_script_with_formula' || type === 'agent_chat' || type === 'viral-script';
+      
       if (apiProvider === 'laozhang') {
         // Laozhang AI Gateway - OpenAI compatible
         apiUrl = "https://api.laozhang.ai/v1/chat/completions";
         apiKey = userApiKeyToUse;
-        selectedModel = laozhangModel || "gpt-4o-mini";
+        // For script generation, FORCE stronger model (claude-sonnet-4)
+        if (requiresStrongModel) {
+          selectedModel = "claude-sonnet-4-20250514";
+          console.log(`[AI Assistant] Forcing Claude Sonnet 4 for complex agent instructions`);
+        } else {
+          selectedModel = laozhangModel || "gpt-4.1";
+        }
         requestHeaders = {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
@@ -1546,9 +1555,15 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       } else if (apiProvider === 'openai') {
         apiUrl = "https://api.openai.com/v1/chat/completions";
         apiKey = userApiKeyToUse;
-        selectedModel = "gpt-4o-mini"; // default cost-effective
-        if (model === "gpt-4o" || model === "gpt-5" || model?.includes("gpt")) {
+        // For script generation, FORCE gpt-4o (NOT mini)
+        if (requiresStrongModel) {
           selectedModel = "gpt-4o";
+          console.log(`[AI Assistant] Forcing GPT-4o for complex agent instructions`);
+        } else {
+          selectedModel = "gpt-4o-mini"; // default cost-effective for simple tasks
+          if (model === "gpt-4o" || model === "gpt-5" || model?.includes("gpt")) {
+            selectedModel = "gpt-4o";
+          }
         }
         requestHeaders = {
           "Authorization": `Bearer ${apiKey}`,
@@ -1557,12 +1572,19 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         console.log(`[AI Assistant] Using OpenAI API directly with model: ${selectedModel}`);
       } else if (apiProvider === 'gemini') {
         apiKey = userApiKeyToUse;
-        // Use Gemini 2.5 models (latest stable versions)
-        selectedModel = "gemini-2.5-flash";
-        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-        if (model === "gemini-pro" || model?.includes("pro")) {
+        // For script generation, FORCE Gemini Pro (NOT Flash)
+        if (requiresStrongModel) {
           selectedModel = "gemini-2.5-pro";
           apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
+          console.log(`[AI Assistant] Forcing Gemini Pro for complex agent instructions`);
+        } else {
+          // Use Gemini 2.5 models (latest stable versions)
+          selectedModel = "gemini-2.5-flash";
+          apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+          if (model === "gemini-pro" || model?.includes("pro")) {
+            selectedModel = "gemini-2.5-pro";
+            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
+          }
         }
         requestHeaders = {
           "Content-Type": "application/json",
@@ -1575,13 +1597,21 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       // Use Lovable AI Gateway
       apiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
       apiKey = LOVABLE_API_KEY!;
-      selectedModel = "google/gemini-2.5-flash";
-      if (model === "gpt-5" || model === "gpt-4o") {
-        selectedModel = "openai/gpt-5";
-      } else if (model === "claude" || model?.includes("claude")) {
+      // CRITICAL: For script generation with agent formula, ALWAYS use stronger models
+      const lovableRequiresStrongModel = type === 'generate_script_with_formula' || type === 'agent_chat' || type === 'viral-script';
+      // For script generation, FORCE Gemini Pro (strongest available)
+      if (lovableRequiresStrongModel) {
         selectedModel = "google/gemini-2.5-pro";
-      } else if (model === "gemini-pro" || model?.includes("pro")) {
-        selectedModel = "google/gemini-2.5-pro";
+        console.log(`[AI Assistant] Forcing Gemini Pro via Lovable for complex agent instructions`);
+      } else {
+        selectedModel = "google/gemini-2.5-flash";
+        if (model === "gpt-5" || model === "gpt-4o") {
+          selectedModel = "openai/gpt-5";
+        } else if (model === "claude" || model?.includes("claude")) {
+          selectedModel = "google/gemini-2.5-pro";
+        } else if (model === "gemini-pro" || model?.includes("pro")) {
+          selectedModel = "google/gemini-2.5-pro";
+        }
       }
       requestHeaders = {
         "Authorization": `Bearer ${apiKey}`,
