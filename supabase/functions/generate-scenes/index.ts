@@ -742,36 +742,56 @@ RETURN ONLY JSON:
           const lighting = timeOfDay[sceneIdx % timeOfDay.length];
           const composition = visualFocus[sceneIdx % visualFocus.length];
           
-          // CORREÇÃO AUTOMÁTICA (SEM QUEBRAR SINCRONIA/CONTEXTO):
-          // - Em conteúdo histórico: remover humanos/roupas modernas quando detectado
-          // - Fora disso: apenas acrescentar diversidade (ângulo/luz/composição) sem reescrever o significado
+          // CORREÇÃO AUTOMÁTICA PRESERVANDO FIDELIDADE À NARRAÇÃO:
+          // - NUNCA reescrever completamente o prompt - isso perde a sincronização com o texto
+          // - Apenas REMOVER termos problemáticos e ADICIONAR diversidade visual
+          // - O prompt original da IA já foi criado com base no texto da cena
           const hasHuman = /\b(person|people|man|woman|official|observer|figure)\b/i.test(finalPrompt);
 
-          if (isHistorical) {
-            // Em contexto histórico, só corrigir quando houver risco claro (humanos/roupa moderna)
-            if (hasModernClothing || hasHuman) {
-              console.log(`[Batch ${batchNumber}] Scene ${originalScene.number} detected modern/human elements in historical context, FORCE correcting with visual diversity...`);
-
-              // Usar índice da cena para DISTRIBUIR elementos - cada cena usa localização/objeto diferente
-              const locationIdx = sceneIdx % numLocations;
-              const objectIdx = (sceneIdx + 1) % numObjects; // +1 para não coincidir com location
-
-              const relevantLocation = visualMap.keyLocations[locationIdx] || scriptContext.setting;
-              const relevantObject = visualMap.keyObjects.length > 0 ? visualMap.keyObjects[objectIdx] : '';
-
-              // Prompt focado em LOCAIS/OBJETOS, com diversidade visual, sem pessoas
-              finalPrompt = `16:9 horizontal landscape, edge-to-edge full bleed composition, ${cameraAngle}, ${composition}, ${stylePrefix || style}, ${lighting}, ancient ${relevantLocation}${relevantObject ? ', ancient ' + relevantObject + ' artifact' : ''}, ${scriptContext.period}, ${scriptContext.atmosphere} atmosphere, documentary about ${visualMap.mainTheme}, empty scene without any people, focus on architecture and artifacts only, no humans, no modern elements, fill entire frame without any black bars, no text, no watermarks`;
-            } else {
-              // Mesmo quando não corrige, adicionar diversidade leve sem mexer no conteúdo
-              const diversity = `, ${cameraAngle}, ${composition}, ${lighting}`;
-              const lp = finalPrompt.toLowerCase();
-              if (!lp.includes(cameraAngle.toLowerCase()) && !lp.includes(lighting.toLowerCase())) {
-                finalPrompt = `${finalPrompt}${diversity}`;
-              }
+          if (isHistorical && (hasModernClothing || hasHuman)) {
+            console.log(`[Batch ${batchNumber}] Scene ${originalScene.number} detected modern/human elements in historical context, CLEANING prompt while preserving narration context...`);
+            
+            // NOVA ABORDAGEM: Limpar o prompt original em vez de substituí-lo completamente
+            // Isso preserva a conexão com a narração original
+            
+            // Lista de termos a REMOVER (não reescrever tudo)
+            const termsToRemove = [
+              /\b(suit|suits|blazer|blazers|tie|ties|formal attire|formal wear|formal clothing)\b/gi,
+              /\b(business attire|business suit|dress shirt|button.?up shirt|collar shirt)\b/gi,
+              /\b(office wear|professional attire|corporate|executive)\b/gi,
+              /\b(official|researcher|scientist|archaeologist|explorer|investigator|expert|curator|archivist)\s+(in|wearing|with)\s+[^,]+/gi,
+              /\b(person|people|man|woman|figure)\s+(in|wearing|examining|studying|observing|looking at)\s+[^,]+/gi,
+              /\b(uniform|police|security|guard|officer|military)\b/gi,
+              /\b(modern|contemporary|present.?day)\s+(person|people|man|woman|observer|attire|clothing)\b/gi,
+              /\b(jeans|denim|t-?shirt|hoodie|jacket|sweater|cardigan|polo|blouse)\b/gi,
+              /\b(glasses|sunglasses|watch|wristwatch|goggles|backpack|briefcase)\b/gi,
+              /\b(laptop|computer|smartphone|phone|tablet|camera|flashlight)\b/gi,
+            ];
+            
+            let cleanedPrompt = finalPrompt;
+            for (const pattern of termsToRemove) {
+              cleanedPrompt = cleanedPrompt.replace(pattern, '');
             }
+            
+            // Limpar vírgulas duplas e espaços extras resultantes da remoção
+            cleanedPrompt = cleanedPrompt
+              .replace(/,\s*,/g, ',')
+              .replace(/,\s*$/g, '')
+              .replace(/^\s*,/g, '')
+              .replace(/\s+/g, ' ')
+              .trim();
+            
+            // Adicionar sufixos de limpeza e diversidade, preservando o conteúdo original
+            const sceneTextKeywords = originalScene.text
+              .split(/\s+/)
+              .filter(w => w.length > 4)
+              .slice(0, 5)
+              .join(', ');
+            
+            // Reconstruir com contexto da cena preservado
+            finalPrompt = `${cleanedPrompt}, ${cameraAngle}, ${composition}, ${lighting}, focus on ${sceneTextKeywords || 'artifacts and location'}, empty scene without visible people, no humans, no modern elements`;
           } else {
-            // Fora do histórico: NÃO reescrever o prompt (isso pode desalinhar a imagem da narração).
-            // Só adiciona diversidade para evitar imagens muito parecidas.
+            // Adicionar diversidade visual sem mexer no conteúdo
             const diversity = `, ${cameraAngle}, ${composition}, ${lighting}`;
             const lp = finalPrompt.toLowerCase();
             if (!lp.includes(cameraAngle.toLowerCase()) && !lp.includes(lighting.toLowerCase())) {
