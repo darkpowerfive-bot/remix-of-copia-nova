@@ -313,7 +313,9 @@ REGRAS DE COMPORTAMENTO:
             files: agentFiles.filter(f => f.content).map(f => ({
               name: f.file_name,
               content: f.content
-            }))
+            })),
+            // CRITICAL: Include preferred model so backend respects it
+            preferredModel: selectedModel
           },
           model: selectedModel
         }
@@ -702,7 +704,9 @@ GERE AGORA ${numParts > 1 ? `A PARTE ${partIndex + 1}` : 'O ROTEIRO COMPLETO'} D
               files: agentFiles.filter(f => f.content).map(f => ({
                 name: f.file_name,
                 content: f.content
-              }))
+              })),
+              // CRITICAL: Include preferred model so backend respects it
+              preferredModel: selectedModel
             },
           },
         });

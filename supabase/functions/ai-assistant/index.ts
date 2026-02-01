@@ -1533,17 +1533,49 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
 
     // Use external provider when we have a key (user or admin), otherwise use Lovable AI Gateway
     if (userApiKeyToUse && apiProvider !== 'lovable') {
-      // CRITICAL: For script generation with agent formula, ALWAYS use stronger models
+      // CRITICAL: For script generation with agent formula, check if agent has a preferred model
       const requiresStrongModel = type === 'generate_script_with_formula' || type === 'agent_chat' || type === 'viral-script';
+      // Get agent's preferred model if available
+      const agentPreferredModel = agentData?.preferredModel || agentData?.preferred_model || null;
+      
+      // Strong models list for validation
+      const strongModels = [
+        'gpt-4o', 'gpt-4.1', 'gpt-5', 'openai/gpt-5',
+        'claude-sonnet-4-20250514', 'claude-4-sonnet', 'claude-3-5-sonnet',
+        'gemini-2.5-pro', 'gemini-pro', 'google/gemini-2.5-pro',
+        'deepseek-r1'
+      ];
+      
+      // Check if agent's preferred model is strong enough
+      const isAgentModelStrong = agentPreferredModel && strongModels.some(sm => 
+        agentPreferredModel.includes(sm.replace('google/', '').replace('openai/', ''))
+      );
       
       if (apiProvider === 'laozhang') {
         // Laozhang AI Gateway - OpenAI compatible
         apiUrl = "https://api.laozhang.ai/v1/chat/completions";
         apiKey = userApiKeyToUse;
-        // For script generation, FORCE stronger model (claude-sonnet-4)
+        
+        // Use agent's preferred model if strong enough, otherwise force strong model
         if (requiresStrongModel) {
-          selectedModel = "claude-sonnet-4-20250514";
-          console.log(`[AI Assistant] Forcing Claude Sonnet 4 for complex agent instructions`);
+          if (isAgentModelStrong) {
+            // Map agent's preferred model to Laozhang equivalent
+            const laozhangAgentModelMap: Record<string, string> = {
+              "gpt-4o": "gpt-4.1",
+              "gpt-4.1": "gpt-4.1",
+              "gpt-5": "gpt-4.1",
+              "claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
+              "claude-4-sonnet": "claude-sonnet-4-20250514",
+              "gemini-2.5-pro": "gemini-2.5-pro",
+              "gemini-pro": "gemini-2.5-pro",
+              "deepseek-r1": "deepseek-r1",
+            };
+            selectedModel = laozhangAgentModelMap[agentPreferredModel] || "claude-sonnet-4-20250514";
+            console.log(`[AI Assistant] Using agent's preferred model via Laozhang: ${agentPreferredModel} -> ${selectedModel}`);
+          } else {
+            selectedModel = "claude-sonnet-4-20250514";
+            console.log(`[AI Assistant] Forcing Claude Sonnet 4 for complex agent instructions (agent model not strong enough)`);
+          }
         } else {
           selectedModel = laozhangModel || "gpt-4.1";
         }
@@ -1555,12 +1587,17 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       } else if (apiProvider === 'openai') {
         apiUrl = "https://api.openai.com/v1/chat/completions";
         apiKey = userApiKeyToUse;
-        // For script generation, FORCE gpt-4o (NOT mini)
+        
         if (requiresStrongModel) {
-          selectedModel = "gpt-4o";
-          console.log(`[AI Assistant] Forcing GPT-4o for complex agent instructions`);
+          if (isAgentModelStrong && agentPreferredModel?.includes('gpt')) {
+            selectedModel = "gpt-4o";
+            console.log(`[AI Assistant] Using agent's preferred GPT model: gpt-4o`);
+          } else {
+            selectedModel = "gpt-4o";
+            console.log(`[AI Assistant] Forcing GPT-4o for complex agent instructions`);
+          }
         } else {
-          selectedModel = "gpt-4o-mini"; // default cost-effective for simple tasks
+          selectedModel = "gpt-4o-mini";
           if (model === "gpt-4o" || model === "gpt-5" || model?.includes("gpt")) {
             selectedModel = "gpt-4o";
           }
@@ -1572,13 +1609,18 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         console.log(`[AI Assistant] Using OpenAI API directly with model: ${selectedModel}`);
       } else if (apiProvider === 'gemini') {
         apiKey = userApiKeyToUse;
-        // For script generation, FORCE Gemini Pro (NOT Flash)
+        
         if (requiresStrongModel) {
-          selectedModel = "gemini-2.5-pro";
-          apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
-          console.log(`[AI Assistant] Forcing Gemini Pro for complex agent instructions`);
+          if (isAgentModelStrong && agentPreferredModel?.includes('gemini')) {
+            selectedModel = "gemini-2.5-pro";
+            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
+            console.log(`[AI Assistant] Using agent's preferred Gemini model: gemini-2.5-pro`);
+          } else {
+            selectedModel = "gemini-2.5-pro";
+            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
+            console.log(`[AI Assistant] Forcing Gemini Pro for complex agent instructions`);
+          }
         } else {
-          // Use Gemini 2.5 models (latest stable versions)
           selectedModel = "gemini-2.5-flash";
           apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
           if (model === "gemini-pro" || model?.includes("pro")) {
@@ -1597,12 +1639,32 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       // Use Lovable AI Gateway
       apiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
       apiKey = LOVABLE_API_KEY!;
-      // CRITICAL: For script generation with agent formula, ALWAYS use stronger models
+      
+      // CRITICAL: For script generation with agent formula, respect agent's preferred model
       const lovableRequiresStrongModel = type === 'generate_script_with_formula' || type === 'agent_chat' || type === 'viral-script';
-      // For script generation, FORCE Gemini Pro (strongest available)
+      const agentPreferredModel = agentData?.preferredModel || agentData?.preferred_model || null;
+      
+      // Map agent's preferred model to Lovable gateway format
+      const lovableModelMap: Record<string, string> = {
+        "gpt-4o": "openai/gpt-5",
+        "gpt-4.1": "openai/gpt-5",
+        "gpt-5": "openai/gpt-5",
+        "claude-sonnet-4-20250514": "google/gemini-2.5-pro", // Best alternative on Lovable
+        "claude-4-sonnet": "google/gemini-2.5-pro",
+        "gemini-2.5-pro": "google/gemini-2.5-pro",
+        "gemini-pro": "google/gemini-2.5-pro",
+        "gemini-2.5-flash": "google/gemini-2.5-flash",
+        "deepseek-r1": "google/gemini-2.5-pro", // Use Gemini as alternative
+      };
+      
       if (lovableRequiresStrongModel) {
-        selectedModel = "google/gemini-2.5-pro";
-        console.log(`[AI Assistant] Forcing Gemini Pro via Lovable for complex agent instructions`);
+        if (agentPreferredModel && lovableModelMap[agentPreferredModel]) {
+          selectedModel = lovableModelMap[agentPreferredModel];
+          console.log(`[AI Assistant] Using agent's preferred model via Lovable: ${agentPreferredModel} -> ${selectedModel}`);
+        } else {
+          selectedModel = "google/gemini-2.5-pro";
+          console.log(`[AI Assistant] Forcing Gemini Pro via Lovable for complex agent instructions`);
+        }
       } else {
         selectedModel = "google/gemini-2.5-flash";
         if (model === "gpt-5" || model === "gpt-4o") {
