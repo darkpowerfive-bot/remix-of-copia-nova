@@ -1342,32 +1342,76 @@ Forneça uma dica personalizada baseada nessas estatísticas.`;
         break;
 
       case "agent_chat":
-        // Chat with a custom agent
+        // Chat with a custom agent - STRICT enforcement of agent configuration
         if (agentData?.systemPrompt) {
+          // Use the enhanced system prompt from frontend (already includes files)
           systemPrompt = agentData.systemPrompt;
+          
+          // If files are provided separately, append them to the system prompt
+          if (agentData?.files?.length > 0) {
+            const filesSection = agentData.files
+              .map((f: { name: string; content: string }) => 
+                `\n📎 ARQUIVO: ${f.name}\n---\n${f.content}\n---`
+              )
+              .join('\n');
+            
+            // Only append if not already in systemPrompt
+            if (!systemPrompt.includes('ARQUIVOS DE REFERÊNCIA')) {
+              systemPrompt += `\n\n═══════════════════════════════════════════════════════════════════
+4️⃣ ARQUIVOS DE REFERÊNCIA (INFORMAÇÕES CRÍTICAS)
+   Use este conteúdo como base de conhecimento adicional:
+═══════════════════════════════════════════════════════════════════
+${filesSection}`;
+            }
+          }
         } else {
-          systemPrompt = `Você é "${agentData?.name || 'um assistente'}", um agente de IA especializado em criar conteúdo viral para YouTube.`;
-          if (agentData?.niche) {
-            systemPrompt += ` Seu nicho é: ${agentData.niche}`;
-          }
-          if (agentData?.formula) {
-            systemPrompt += ` Instruções: ${agentData.formula}`;
-          }
-          if (agentData?.memory) {
-            systemPrompt += ` Memória: ${agentData.memory}`;
-          }
-          if (agentData?.mentalTriggers?.length) {
-            systemPrompt += ` Gatilhos mentais: ${agentData.mentalTriggers.join(", ")}`;
-          }
+          // Fallback: Build strict system prompt manually
+          const filesSection = (agentData?.files || [])
+            .map((f: { name: string; content: string }) => 
+              `📎 ARQUIVO: ${f.name}\n---\n${f.content}\n---`
+            )
+            .join('\n\n');
+          
+          systemPrompt = `
+╔══════════════════════════════════════════════════════════════════╗
+║  ⚠️ REGRAS ABSOLUTAS - VOCÊ DEVE SEGUIR À RISCA ⚠️             ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Você é "${agentData?.name || 'um assistente'}", um agente de IA especializado em criar conteúdo viral para YouTube.
+${agentData?.niche ? `🎯 Nicho: ${agentData.niche}` : ''}
+${agentData?.subNiche ? ` | Subnicho: ${agentData.subNiche}` : ''}
+
+═══════════════════════════════════════════════════════════════════
+1️⃣ MEMÓRIA DO AGENTE (CONTEXTO OBRIGATÓRIO)
+═══════════════════════════════════════════════════════════════════
+${agentData?.memory || '(Nenhuma memória configurada)'}
+
+═══════════════════════════════════════════════════════════════════
+2️⃣ INSTRUÇÕES/FÓRMULA (SIGA EXATAMENTE)
+═══════════════════════════════════════════════════════════════════
+${agentData?.formula || '(Nenhuma instrução específica)'}
+
+═══════════════════════════════════════════════════════════════════
+3️⃣ GATILHOS MENTAIS (USE TODOS OBRIGATORIAMENTE)
+═══════════════════════════════════════════════════════════════════
+${agentData?.mentalTriggers?.length 
+  ? agentData.mentalTriggers.map((t: string) => `• ${t}`).join('\n') 
+  : '(Nenhum gatilho configurado)'}
+
+${filesSection ? `
+═══════════════════════════════════════════════════════════════════
+4️⃣ ARQUIVOS DE REFERÊNCIA (INFORMAÇÕES CRÍTICAS)
+═══════════════════════════════════════════════════════════════════
+${filesSection}
+` : ''}
+
+🚨 ATENÇÃO: Todas as informações acima são OBRIGATÓRIAS.
+NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RISCA.
+`;
         }
         
         // Build the conversation context
-        if (agentData?.conversationHistory?.length) {
-          // The messages will be appended in the API call
-          userPrompt = prompt;
-        } else {
-          userPrompt = prompt;
-        }
+        userPrompt = prompt;
         break;
 
       case "analyze_thumbnails":
