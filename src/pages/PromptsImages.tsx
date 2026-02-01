@@ -1427,11 +1427,19 @@ const [generating, setGenerating] = useState(false);
 
   // Regenerar cenas perdidas com novos prompts gerados pela IA baseados no roteiro
   const handleRegenerateLostWithAI = async () => {
-    const lostScenes = generatedScenes.filter(s => !s.generatedImage);
+    // Considerar perdidas: sem imagem OU com generatingImage preso em true
+    const lostScenes = generatedScenes.filter(s => !s.generatedImage || s.generatingImage);
     if (lostScenes.length === 0) {
       toast({ title: "Nenhuma cena perdida para regenerar" });
       return;
     }
+
+    // IMPORTANTE: Limpar estado generatingImage preso antes de começar
+    const cleanedScenes = generatedScenes.map(scene => ({
+      ...scene,
+      generatingImage: false
+    }));
+    updateScenes(cleanedScenes);
 
     setRegeneratingLost(true);
 
@@ -1453,15 +1461,16 @@ const [generating, setGenerating] = useState(false);
         .join('\n');
 
       // Para cada cena perdida, gerar prompt baseado no roteiro
-      const updatedScenes = [...generatedScenes];
+      // Usar cleanedScenes que já tem generatingImage limpo
+      const updatedScenes = [...cleanedScenes];
       let regeneratedCount = 0;
       
       for (const lostScene of lostScenes) {
         try {
           // Contexto das cenas vizinhas para continuidade visual
-          const sceneIndex = generatedScenes.findIndex(s => s.number === lostScene.number);
-          const prevScene = sceneIndex > 0 ? generatedScenes[sceneIndex - 1] : null;
-          const nextScene = sceneIndex < generatedScenes.length - 1 ? generatedScenes[sceneIndex + 1] : null;
+          const sceneIndex = cleanedScenes.findIndex(s => s.number === lostScene.number);
+          const prevScene = sceneIndex > 0 ? cleanedScenes[sceneIndex - 1] : null;
+          const nextScene = sceneIndex < cleanedScenes.length - 1 ? cleanedScenes[sceneIndex + 1] : null;
           
           const contextScenes = [
             prevScene ? `Cena anterior (${prevScene.number}): "${prevScene.text}"` : '',
@@ -5138,8 +5147,8 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
                               {filterPending ? "Ver Geradas" : "Só Pendentes"}
                             </Button>
                             
-                            {/* Botão para recuperar imagens do cache */}
-                            {generatedScenes.some(s => !s.generatedImage) && (
+                            {/* Botão para recuperar imagens do cache - considerar presas em loading também */}
+                            {generatedScenes.some(s => !s.generatedImage || s.generatingImage) && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -5158,8 +5167,9 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
                             )}
                             
                             {/* Botão para regenerar apenas mídias perdidas com números das cenas */}
-                            {generatedScenes.some(s => !s.generatedImage) && (() => {
-                              const lostScenes = generatedScenes.filter(s => !s.generatedImage);
+                            {generatedScenes.some(s => !s.generatedImage || s.generatingImage) && (() => {
+                              // Considerar perdidas: sem imagem OU presas em loading
+                              const lostScenes = generatedScenes.filter(s => !s.generatedImage || s.generatingImage);
                               const lostNumbers = lostScenes.map(s => s.number);
                               const displayNumbers = lostNumbers.length <= 5 
                                 ? lostNumbers.join(', ') 
