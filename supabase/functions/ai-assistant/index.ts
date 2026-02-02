@@ -780,27 +780,68 @@ Forneça uma dica personalizada baseada nessas estatísticas.`;
         break;
 
       case "analyze_script_formula":
-        systemPrompt = `Você é um especialista em análise de roteiros virais do YouTube.
-        Analise a transcrição/roteiro fornecido e identifique a fórmula de sucesso.
-        
-        Responda SEMPRE em formato JSON válido com esta estrutura:
-        {
-          "motivoSucesso": "Explicação detalhada de por que este roteiro funciona e viraliza",
-          "formula": "Fórmula identificada (ex: Hook emocional + Promessa de revelação + Desenvolvimento com tensão + Clímax + CTA)",
-          "estrutura": {
-            "hook": "Descrição do gancho usado nos primeiros segundos",
-            "desenvolvimento": "Como o conteúdo é desenvolvido",
-            "climax": "Onde está o momento de maior impacto",
-            "cta": "Como a chamada para ação é feita"
-          },
-          "tempoTotal": "Tempo estimado ideal para este tipo de roteiro",
-          "gatilhosMentais": ["lista", "de", "gatilhos", "mentais", "usados"]
-        }
-        
-        IMPORTANTE:
-        - Identifique TODOS os gatilhos mentais usados (Curiosidade, Urgência, Escassez, Prova Social, etc)
-        - Explique em detalhes a estrutura do roteiro
-        - Seja específico sobre o que faz este roteiro funcionar`;
+        systemPrompt = `# VOCÊ É O MELHOR ESPECIALISTA MUNDIAL EM ENGENHARIA REVERSA DE ROTEIROS VIRAIS
+
+Sua missão: Analisar profundamente a transcrição fornecida e EXTRAIR UMA FÓRMULA REPLICÁVEL que possa ser usada para criar novos roteiros virais sobre QUALQUER tema, mantendo o mesmo padrão de sucesso.
+
+## COMO ANALISAR:
+
+### 1. ANATOMIA DO HOOK (Primeiros 3-10 segundos)
+- Qual a EXATA técnica de abertura usada? (Promessa, Choque, Curiosidade, Declaração controversa, Pergunta provocativa?)
+- Como captura atenção INSTANTANEAMENTE?
+- Qual emoção é ativada primeiro?
+
+### 2. ESTRUTURA NARRATIVA COMPLETA
+- Mapeie CADA transição do roteiro
+- Identifique o RITMO de informações (rápido, crescente, alternado?)
+- Localize os "loops abertos" (informações prometidas mas reveladas depois)
+- Onde estão os CLIFFS (momentos de tensão que prendem o espectador)?
+
+### 3. GATILHOS PSICOLÓGICOS PROFUNDOS
+Para CADA gatilho identificado, explique:
+- Onde aparece no texto
+- Como está aplicado
+- Por que funciona neste contexto
+
+### 4. PADRÃO DE LINGUAGEM
+- Tom de voz (autoritário, amigável, conspiratório, urgente?)
+- Estrutura das frases (curtas e impactantes? Longas e envolventes?)
+- Palavras-chave recorrentes
+- Técnicas de persuasão linguística
+
+### 5. FÓRMULA REPLICÁVEL
+Crie uma fórmula que funcione assim:
+"[TIPO DE HOOK: ex. Declaração chocante sobre X] + [ESTRUTURA: ex. 3 revelações progressivas] + [CLÍMAX: ex. A maior revelação] + [CTA: ex. Engajamento por medo de perder]"
+
+## RESPONDA SEMPRE EM JSON VÁLIDO:
+
+{
+  "motivoSucesso": "Análise DETALHADA de 200-400 palavras explicando EXATAMENTE por que este roteiro viraliza, incluindo aspectos psicológicos, estruturais e emocionais",
+  "formula": "Fórmula escrita de forma REPLICÁVEL: [Tipo de Hook com descrição] + [Estrutura com passos] + [Técnica de Clímax] + [Tipo de CTA]",
+  "formulaReplicavel": "Instruções passo-a-passo de como replicar este roteiro para QUALQUER tema: 1) Comece com... 2) Desenvolva usando... 3) No meio... 4) Finalize com...",
+  "estrutura": {
+    "hook": "EXATAMENTE como fazer o gancho: técnica usada, palavras-chave, emoção ativada, tempo ideal (ex: 'Abrir com declaração controversa que contradiz o senso comum sobre [tema], usando tom de autoridade')",
+    "desenvolvimento": "COMO desenvolver o conteúdo: ritmo, estrutura de revelações, técnicas de manter atenção (ex: 'Apresentar 3-5 pontos em ordem crescente de impacto, cada um com mini-clímax')",
+    "climax": "COMO construir o momento de maior impacto: posicionamento, preparação, entrega (ex: 'No minuto X, revelar a informação mais chocante após criar tensão máxima')",
+    "cta": "COMO fazer o call-to-action: técnica, posicionamento, gatilho usado (ex: 'Usar escassez temporal + curiosidade sobre próximo conteúdo')",
+    "transicoes": "Como conectar cada parte: técnicas de bridge usadas para manter fluxo"
+  },
+  "tempoTotal": "Tempo ideal estimado para este tipo de conteúdo",
+  "gatilhosMentais": ["Gatilho 1: COMO aplicar - descrição detalhada", "Gatilho 2: COMO aplicar - descrição detalhada", "etc"],
+  "exemplosDeAplicacao": {
+    "fraserChave": ["Frases do roteiro que podem ser adaptadas como templates"],
+    "estruturaDeFrases": "Padrão das frases que funcionam (curtas e impactantes, perguntas retóricas, etc)",
+    "transicoesUsadas": ["Lista de transições usadas entre ideias"]
+  },
+  "instrucoesParaAgente": "Instruções ESPECÍFICAS de como um agente de IA deve usar esta fórmula para gerar novos roteiros: tom, estrutura obrigatória, técnicas que DEVEM ser usadas, erros a evitar"
+}
+
+## REGRAS CRÍTICAS:
+1. A fórmula deve ser ESPECÍFICA o suficiente para replicar o sucesso
+2. A fórmula deve ser GENÉRICA o suficiente para funcionar com outros temas
+3. Foque em COMO fazer, não apenas O QUE fazer
+4. Cada campo deve ter instruções ACIONÁVEIS
+5. O agente criado com esta análise deve conseguir gerar roteiros virais sobre QUALQUER título`;
         userPrompt = text || prompt;
         break;
 
@@ -815,7 +856,29 @@ Forneça uma dica personalizada baseada nessas estatísticas.`;
         const agentMemory = agentData?.formula_structure?.memory || agentData?.memory || "";
         
         // INSTRUCTIONS: Instruções adicionais (se existirem na estrutura)
-        const agentInstructions = agentData?.formula_structure?.instructions || "";
+        const agentInstructions = agentData?.formula_structure?.instructions || 
+                                   agentData?.formula_structure?.instrucoesParaAgente || "";
+        
+        // FORMULA REPLICÁVEL: Instruções passo-a-passo para replicar
+        const formulaReplicavel = agentData?.formula_structure?.formulaReplicavel || "";
+        
+        // MOTIVO DO SUCESSO: Por que a fórmula original funciona
+        const motivoSucesso = agentData?.formula_structure?.motivoSucesso || "";
+        
+        // ESTRUTURA DETALHADA: Hook, Desenvolvimento, Clímax, CTA, Transições
+        const estruturaDetalhada = agentData?.formula_structure?.hook 
+          ? `HOOK: ${agentData.formula_structure.hook}\n` +
+            `DESENVOLVIMENTO: ${agentData.formula_structure.desenvolvimento || ''}\n` +
+            `CLÍMAX: ${agentData.formula_structure.climax || ''}\n` +
+            `CTA: ${agentData.formula_structure.cta || ''}\n` +
+            `TRANSIÇÕES: ${agentData.formula_structure.transicoes || ''}`
+          : "";
+        
+        // EXEMPLOS DE APLICAÇÃO: Frases-chave e estruturas
+        const exemplosDeAplicacao = agentData?.formula_structure?.exemplosDeAplicacao;
+        const frasesChave = exemplosDeAplicacao?.fraserChave?.length > 0
+          ? `FRASES-CHAVE PARA ADAPTAR:\n${exemplosDeAplicacao.fraserChave.map((f: string) => `• "${f}"`).join('\n')}`
+          : "";
         
         // TRIGGERS: Manter a estrutura COMPLETA dos gatilhos (podem ter descrições longas)
         // Usar bullet points para cada trigger com seu texto completo
@@ -896,6 +959,26 @@ ${agentMemory || '(Nenhuma memória configurada)'}
 
 ${agentFormula || '(Nenhuma fórmula configurada)'}
 ${agentInstructions ? `\n--- INSTRUÇÕES ADICIONAIS ---\n${agentInstructions}` : ''}
+
+${formulaReplicavel ? `
+--- FÓRMULA REPLICÁVEL (PASSO-A-PASSO) ---
+${formulaReplicavel}
+` : ''}
+
+${motivoSucesso ? `
+--- POR QUE ESTA FÓRMULA FUNCIONA ---
+${motivoSucesso}
+` : ''}
+
+${estruturaDetalhada ? `
+--- ESTRUTURA OBRIGATÓRIA ---
+${estruturaDetalhada}
+` : ''}
+
+${frasesChave ? `
+--- TEMPLATES DE FRASES ---
+${frasesChave}
+` : ''}
 
 ═══════════════════════════════════════════════════════════════════════════════════════════
 █ 3. GATILHOS MENTAIS (APLIQUE TODOS - SEM EXCEÇÃO) █
