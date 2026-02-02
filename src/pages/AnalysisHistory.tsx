@@ -424,6 +424,15 @@ export default function AnalysisHistory() {
 
   // Load all related titles from the same analysis
   const loadRelatedTitles = async (videoAnalysisId: string) => {
+    if (!videoAnalysisId) {
+      toast({
+        title: "Erro",
+        description: "ID da análise não encontrado",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (expandedAnalysisId === videoAnalysisId) {
       // Collapse if already expanded
       setExpandedAnalysisId(null);
@@ -435,19 +444,31 @@ export default function AnalysisHistory() {
     setExpandedAnalysisId(videoAnalysisId);
 
     try {
+      // Force fresh data by invalidating the cache first
+      await queryClient.invalidateQueries({ queryKey: ["generated-titles"] });
+      
       const { data, error } = await supabase
         .from("generated_titles")
         .select("*")
         .eq("video_analysis_id", videoAnalysisId)
-        .order("pontuacao", { ascending: false });
+        .order("pontuacao", { ascending: false, nullsFirst: false });
 
       if (error) throw error;
 
-      setRelatedTitles(data as unknown as GeneratedTitle[]);
-      toast({
-        title: "Títulos carregados!",
-        description: `${data?.length || 0} títulos encontrados desta análise`,
-      });
+      const titles = data as unknown as GeneratedTitle[];
+      setRelatedTitles(titles);
+      
+      if (titles.length === 0) {
+        toast({
+          title: "Nenhum título encontrado",
+          description: "Esta análise não possui títulos relacionados salvos",
+        });
+      } else {
+        toast({
+          title: "Títulos carregados!",
+          description: `${titles.length} título${titles.length > 1 ? 's' : ''} encontrado${titles.length > 1 ? 's' : ''} desta análise`,
+        });
+      }
     } catch (error) {
       console.error("Error loading related titles:", error);
       toast({
@@ -455,6 +476,7 @@ export default function AnalysisHistory() {
         description: "Não foi possível carregar os títulos relacionados",
         variant: "destructive",
       });
+      setExpandedAnalysisId(null);
     } finally {
       setLoadingRelatedTitles(false);
     }
@@ -960,71 +982,84 @@ export default function AnalysisHistory() {
                       </div>
 
                       {/* Expanded related titles section */}
-                      {expandedAnalysisId === title.video_analysis_id && relatedTitles.length > 0 && (
+                      {expandedAnalysisId === title.video_analysis_id && (
                         <div className="mt-4 pt-4 border-t border-border/50">
-                          <p className="text-sm font-medium text-muted-foreground mb-3">
-                            Todos os {relatedTitles.length} títulos desta análise:
-                          </p>
-                          <div className="space-y-2">
-                            {relatedTitles.map((relatedTitle) => (
-                              <div
-                                key={relatedTitle.id}
-                                className={`p-3 rounded-lg bg-secondary/30 flex items-center justify-between gap-2 ${
-                                  relatedTitle.is_favorite ? "border border-primary/30" : ""
-                                }`}
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    {relatedTitle.is_favorite && (
-                                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
-                                    )}
-                                    <p className="text-sm text-foreground truncate">{relatedTitle.title_text}</p>
-                                    {relatedTitle.pontuacao && (
-                                      <Badge variant="secondary" className="text-xs shrink-0">
-                                        {relatedTitle.pontuacao}%
-                                      </Badge>
-                                    )}
+                          {loadingRelatedTitles ? (
+                            <div className="flex items-center justify-center py-4">
+                              <Loader2 className="w-5 h-5 animate-spin text-primary mr-2" />
+                              <span className="text-sm text-muted-foreground">Carregando títulos...</span>
+                            </div>
+                          ) : relatedTitles.length > 0 ? (
+                            <>
+                              <p className="text-sm font-medium text-muted-foreground mb-3">
+                                Todos os {relatedTitles.length} títulos desta análise:
+                              </p>
+                              <div className="space-y-2">
+                                {relatedTitles.map((relatedTitle) => (
+                                  <div
+                                    key={relatedTitle.id}
+                                    className={`p-3 rounded-lg bg-secondary/30 flex items-center justify-between gap-2 ${
+                                      relatedTitle.is_favorite ? "border border-primary/30" : ""
+                                    }`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2">
+                                        {relatedTitle.is_favorite && (
+                                          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 shrink-0" />
+                                        )}
+                                        <p className="text-sm text-foreground truncate">{relatedTitle.title_text}</p>
+                                        {relatedTitle.pontuacao && (
+                                          <Badge variant="secondary" className="text-xs shrink-0">
+                                            {relatedTitle.pontuacao}%
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      {relatedTitle.model_used && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {relatedTitle.model_used}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() =>
+                                          toggleFavoriteMutation.mutate({
+                                            id: relatedTitle.id,
+                                            isFavorite: relatedTitle.is_favorite || false,
+                                          })
+                                        }
+                                      >
+                                        <Star
+                                          className={`w-4 h-4 ${
+                                            relatedTitle.is_favorite ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"
+                                          }`}
+                                        />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => copyToClipboard(relatedTitle.id, relatedTitle.title_text)}
+                                      >
+                                        {copiedId === relatedTitle.id ? (
+                                          <Check className="w-4 h-4 text-green-500" />
+                                        ) : (
+                                          <Copy className="w-4 h-4" />
+                                        )}
+                                      </Button>
+                                    </div>
                                   </div>
-                                  {relatedTitle.model_used && (
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      {relatedTitle.model_used}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() =>
-                                      toggleFavoriteMutation.mutate({
-                                        id: relatedTitle.id,
-                                        isFavorite: relatedTitle.is_favorite || false,
-                                      })
-                                    }
-                                  >
-                                    <Star
-                                      className={`w-4 h-4 ${
-                                        relatedTitle.is_favorite ? "text-yellow-500 fill-yellow-500" : "text-muted-foreground"
-                                      }`}
-                                    />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => copyToClipboard(relatedTitle.id, relatedTitle.title_text)}
-                                  >
-                                    {copiedId === relatedTitle.id ? (
-                                      <Check className="w-4 h-4 text-green-500" />
-                                    ) : (
-                                      <Copy className="w-4 h-4" />
-                                    )}
-                                  </Button>
-                                </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
+                            </>
+                          ) : (
+                            <p className="text-sm text-muted-foreground text-center py-2">
+                              Nenhum título adicional encontrado para esta análise
+                            </p>
+                          )}
                         </div>
                       )}
                     </Card>
