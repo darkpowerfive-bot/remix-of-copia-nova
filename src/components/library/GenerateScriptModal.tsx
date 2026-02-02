@@ -447,10 +447,6 @@ Gere o roteiro seguindo a estrutura e fórmula do agente, otimizado para engajam
               </p>
             </div>
 
-            {/* Quality guarantee message */}
-            <p className="text-xs text-muted-foreground/70 text-center mt-4 max-w-xs">
-              ✨ Garantindo notas 8+ em escrita, clareza, prova prática, retenção e autoridade
-            </p>
           </div>
         )}
 
