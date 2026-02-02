@@ -1804,12 +1804,28 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       // Get agent's preferred model if available
       const agentPreferredModel = agentData?.preferredModel || agentData?.preferred_model || null;
       
+      // ====================================================================
+      // FORÇAR MODELO: deepseek-v3.2-exp para roteiros e prompts de imagem
+      // Ignora qualquer seleção do frontend - SEMPRE usa DeepSeek v3.2 exp
+      // ====================================================================
+      const FORCED_MODEL = "deepseek-v3.2-exp";
+      const FORCE_DEEPSEEK_TYPES = [
+        'generate_script_with_formula',
+        'generate_script',
+        'viral-script',
+        'agent_chat',
+        'batch_images',
+        'video_script',
+        'optimize_script'
+      ];
+      const shouldForceDeepSeek = FORCE_DEEPSEEK_TYPES.includes(type);
+      
       // Strong models list for validation
       const strongModels = [
         'gpt-4o', 'gpt-4.1', 'gpt-5', 'openai/gpt-5',
         'claude-sonnet-4-20250514', 'claude-4-sonnet', 'claude-3-5-sonnet',
         'gemini-2.5-pro', 'gemini-pro', 'google/gemini-2.5-pro',
-        'deepseek-r1'
+        'deepseek-r1', 'deepseek-v3.2-exp'
       ];
       
       // Check if agent's preferred model is strong enough
@@ -1822,30 +1838,36 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         apiUrl = "https://api.laozhang.ai/v1/chat/completions";
         apiKey = userApiKeyToUse;
         
-        // Map agent's preferred model to Laozhang API models (docs.laozhang.ai)
-        const laozhangAgentModelMap: Record<string, string> = {
-          "gpt-4o": "gpt-4o",
-          "gpt-4.1": "gpt-4o",
-          "gpt-5": "gpt-4o",
-          "claude-sonnet-4-20250514": "claude-3-5-sonnet-20241022",
-          "claude-4-sonnet": "claude-3-5-sonnet-20241022",
-          "gemini-2.5-pro": "gemini-1.5-pro",
-          "gemini-pro": "gemini-1.5-pro",
-          "deepseek-r1": "deepseek-v3.2-exp",
-          "deepseek-v3": "deepseek-v3.2-exp",
-          "deepseek-chat": "deepseek-v3.2-exp",
-        };
-        
-        // Priority: Agent preferred model > laozhangModel (from initial mapping) > default
-        if (agentPreferredModel && laozhangAgentModelMap[agentPreferredModel]) {
-          selectedModel = laozhangAgentModelMap[agentPreferredModel];
-          console.log(`[AI Assistant] Laozhang: Using agent's PREFERRED model: ${agentPreferredModel} -> ${selectedModel}`);
-        } else if (laozhangModel) {
-          selectedModel = laozhangModel;
-          console.log(`[AI Assistant] Laozhang: Using pre-mapped model: ${selectedModel}`);
+        // FORÇAR DeepSeek para roteiros e prompts de imagem
+        if (shouldForceDeepSeek) {
+          selectedModel = FORCED_MODEL;
+          console.log(`[AI Assistant] ⚡ FORCED DeepSeek v3.2 exp para ${type}`);
         } else {
-          selectedModel = "gpt-4o";
-          console.log(`[AI Assistant] Laozhang: Using default model: ${selectedModel}`);
+          // Map agent's preferred model to Laozhang API models (docs.laozhang.ai)
+          const laozhangAgentModelMap: Record<string, string> = {
+            "gpt-4o": "gpt-4o",
+            "gpt-4.1": "gpt-4o",
+            "gpt-5": "gpt-4o",
+            "claude-sonnet-4-20250514": "claude-3-5-sonnet-20241022",
+            "claude-4-sonnet": "claude-3-5-sonnet-20241022",
+            "gemini-2.5-pro": "gemini-1.5-pro",
+            "gemini-pro": "gemini-1.5-pro",
+            "deepseek-r1": "deepseek-v3.2-exp",
+            "deepseek-v3": "deepseek-v3.2-exp",
+            "deepseek-chat": "deepseek-v3.2-exp",
+          };
+          
+          // Priority: Agent preferred model > laozhangModel (from initial mapping) > default
+          if (agentPreferredModel && laozhangAgentModelMap[agentPreferredModel]) {
+            selectedModel = laozhangAgentModelMap[agentPreferredModel];
+            console.log(`[AI Assistant] Laozhang: Using agent's PREFERRED model: ${agentPreferredModel} -> ${selectedModel}`);
+          } else if (laozhangModel) {
+            selectedModel = laozhangModel;
+            console.log(`[AI Assistant] Laozhang: Using pre-mapped model: ${selectedModel}`);
+          } else {
+            selectedModel = "gpt-4o";
+            console.log(`[AI Assistant] Laozhang: Using default model: ${selectedModel}`);
+          }
         }
         
         requestHeaders = {
