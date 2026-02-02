@@ -45,7 +45,7 @@ interface CreateAgentModalProps {
   subNiche: string;
 }
 
-// Gera memória humanizada baseada nos dados da análise
+// Gera memória humanizada e COMPLETA baseada nos dados da análise
 function generateHumanizedMemory(
   formula: ScriptFormulaAnalysis | null,
   videoTitle: string,
@@ -56,99 +56,148 @@ function generateHumanizedMemory(
   
   const parts = [];
   
-  // Contexto inicial
-  parts.push(`Sou um especialista em criar roteiros virais no nicho de ${niche}${subNiche ? `, especificamente sobre ${subNiche}` : ''}.`);
+  // Contexto inicial - mais detalhado
+  parts.push(`Sou um roteirista especializado no nicho de ${niche}${subNiche ? ` com foco em ${subNiche}` : ''}.`);
   
-  // O que aprendi
+  // Origem do conhecimento - contexto completo
   if (videoTitle) {
-    parts.push(`Minha metodologia foi desenvolvida a partir da análise profunda do vídeo viral "${videoTitle}", onde identifiquei os padrões exatos que geram engajamento massivo.`);
+    parts.push(`Desenvolvi minha metodologia através da engenharia reversa do vídeo viral "${videoTitle}". Estudei cada segundo deste vídeo para entender exatamente o que faz o público ficar grudado na tela.`);
   }
   
-  // Meu diferencial
+  // Por que a fórmula funciona - completo, não apenas resumo
   if (formula.motivoSucesso) {
-    const resumo = formula.motivoSucesso.split('.').slice(0, 2).join('.') + '.';
-    parts.push(`O que descobri: ${resumo}`);
+    parts.push(`O SEGREDO DO SUCESSO:\n${formula.motivoSucesso}`);
   }
   
-  // Minha especialidade
-  parts.push(`Minha especialidade é transformar qualquer tema em conteúdo envolvente usando técnicas comprovadas de retenção e gatilhos psicológicos.`);
+  // Tempo total e ritmo
+  if (formula.tempoTotal) {
+    parts.push(`Meus roteiros seguem o ritmo comprovado de ${formula.tempoTotal}, mantendo a atenção do espectador do início ao fim.`);
+  }
+  
+  // Gatilhos que domino
+  if (formula.gatilhosMentais && formula.gatilhosMentais.length > 0) {
+    parts.push(`Os gatilhos psicológicos que aplico naturalmente em cada roteiro:\n${formula.gatilhosMentais.map((g, i) => `• ${g}`).join('\n')}`);
+  }
+  
+  // Identidade final
+  parts.push(`Transformo qualquer tema em conteúdo magnético que prende a atenção. Não faço roteiros genéricos - aplico a fórmula viral comprovada.`);
   
   return parts.join('\n\n');
 }
 
-// Gera instruções humanizadas e completas
+// Gera instruções COMPLETAS e DETALHADAS para o agente
 function generateHumanizedInstructions(
   formula: ScriptFormulaAnalysis | null,
-  niche: string
+  niche: string,
+  videoTitle: string
 ): string {
   if (!formula) return "";
   
   const parts = [];
   
-  // Introdução
-  parts.push(`Como criar roteiros virais seguindo minha metodologia:`);
+  // Introdução contextualizada
+  parts.push(`METODOLOGIA VIRAL - Baseada no vídeo "${videoTitle || 'Análise Viral'}"`);
+  parts.push(`─────────────────────────────────────────────────────────────`);
   
-  // Estrutura base
-  if (formula.estrutura) {
-    parts.push(`\n📌 ESTRUTURA DO ROTEIRO:`);
-    if (formula.estrutura.hook) {
-      parts.push(`• Abertura: ${formula.estrutura.hook}`);
-    }
-    if (formula.estrutura.desenvolvimento) {
-      parts.push(`• Desenvolvimento: ${formula.estrutura.desenvolvimento}`);
-    }
-    if (formula.estrutura.climax) {
-      parts.push(`• Clímax: ${formula.estrutura.climax}`);
-    }
-    if (formula.estrutura.cta) {
-      parts.push(`• Encerramento: ${formula.estrutura.cta}`);
-    }
-    if (formula.estrutura.transicoes) {
-      parts.push(`• Transições: ${formula.estrutura.transicoes}`);
-    }
-  }
-  
-  // Fórmula replicável
+  // 1. FÓRMULA REPLICÁVEL (mais importante - passo a passo)
   if (formula.formulaReplicavel) {
-    parts.push(`\n📐 PASSO-A-PASSO:`);
+    parts.push(`\n📐 PASSO-A-PASSO PARA REPLICAR O SUCESSO:\n`);
     parts.push(formula.formulaReplicavel);
+    parts.push(`\n⚠️ SIGA ESTE PASSO-A-PASSO À RISCA EM CADA ROTEIRO!`);
   }
   
-  // Tom e estilo
-  parts.push(`\n🎯 TOM E ESTILO:`);
-  parts.push(`• Escreva como se estivesse contando uma história fascinante para um amigo`);
-  parts.push(`• Use linguagem natural e envolvente, evitando parecer robótico`);
-  parts.push(`• Mantenha o ritmo dinâmico com frases de tamanhos variados`);
-  parts.push(`• Inclua pausas dramáticas naturais através de parágrafos curtos`);
+  // 2. ESTRUTURA DETALHADA com explicações completas
+  if (formula.estrutura) {
+    parts.push(`\n\n🎬 ANATOMIA DO ROTEIRO VIRAL:\n`);
+    
+    if (formula.estrutura.hook) {
+      parts.push(`▶ HOOK (Primeiros 30 segundos):`);
+      parts.push(`   ${formula.estrutura.hook}`);
+      parts.push(``);
+    }
+    
+    if (formula.estrutura.desenvolvimento) {
+      parts.push(`▶ DESENVOLVIMENTO (Corpo do vídeo):`);
+      parts.push(`   ${formula.estrutura.desenvolvimento}`);
+      parts.push(``);
+    }
+    
+    if (formula.estrutura.climax) {
+      parts.push(`▶ CLÍMAX (Momento de maior impacto):`);
+      parts.push(`   ${formula.estrutura.climax}`);
+      parts.push(``);
+    }
+    
+    if (formula.estrutura.cta) {
+      parts.push(`▶ CTA (Chamada para ação):`);
+      parts.push(`   ${formula.estrutura.cta}`);
+      parts.push(``);
+    }
+    
+    if (formula.estrutura.transicoes) {
+      parts.push(`▶ TRANSIÇÕES (Como conectar partes):`);
+      parts.push(`   ${formula.estrutura.transicoes}`);
+    }
+  }
   
-  // Gatilhos a usar
+  // 3. EXEMPLOS DE APLICAÇÃO - templates práticos
+  if (formula.exemplosDeAplicacao) {
+    parts.push(`\n\n💬 TEMPLATES E EXEMPLOS PRÁTICOS:\n`);
+    
+    if (formula.exemplosDeAplicacao.fraserChave?.length) {
+      parts.push(`Frases-modelo para adaptar ao seu tema:`);
+      formula.exemplosDeAplicacao.fraserChave.forEach((frase, i) => {
+        parts.push(`   ${i + 1}. "${frase}"`);
+      });
+      parts.push(``);
+    }
+    
+    if (formula.exemplosDeAplicacao.estruturaDeFrases) {
+      parts.push(`Padrão de construção de frases:`);
+      parts.push(`   ${formula.exemplosDeAplicacao.estruturaDeFrases}`);
+      parts.push(``);
+    }
+    
+    if (formula.exemplosDeAplicacao.transicoesUsadas?.length) {
+      parts.push(`Transições que funcionam:`);
+      parts.push(`   ${formula.exemplosDeAplicacao.transicoesUsadas.join(' → ')}`);
+    }
+  }
+  
+  // 4. GATILHOS MENTAIS detalhados
   if (formula.gatilhosMentais && formula.gatilhosMentais.length > 0) {
-    parts.push(`\n🧠 GATILHOS PSICOLÓGICOS A APLICAR:`);
+    parts.push(`\n\n🧠 GATILHOS PSICOLÓGICOS OBRIGATÓRIOS:\n`);
     formula.gatilhosMentais.forEach((trigger, i) => {
-      parts.push(`${i + 1}. ${trigger}`);
+      parts.push(`   ${i + 1}. ${trigger}`);
     });
+    parts.push(`\n⚠️ Aplique TODOS estes gatilhos de forma orgânica no roteiro.`);
   }
   
-  // Exemplos
-  if (formula.exemplosDeAplicacao?.fraserChave?.length) {
-    parts.push(`\n💬 TEMPLATES DE FRASES QUE FUNCIONAM:`);
-    formula.exemplosDeAplicacao.fraserChave.forEach(frase => {
-      parts.push(`• "${frase}"`);
-    });
-  }
+  // 5. TOM E ESTILO - humanização
+  parts.push(`\n\n🎯 TOM DE VOZ E ESTILO:\n`);
+  parts.push(`   • Escreva como quem conta uma história fascinante para um amigo`);
+  parts.push(`   • Use linguagem natural e envolvente - NUNCA pareça um robô`);
+  parts.push(`   • Alterne entre frases curtas (impacto) e médias (contexto)`);
+  parts.push(`   • Crie pausas dramáticas naturais entre parágrafos`);
+  parts.push(`   • Mantenha progressão factual - cada frase leva à próxima`);
+  parts.push(`   • PROIBIDO: perguntas retóricas em excesso, clichês, frases genéricas`);
   
-  // Regras finais
-  parts.push(`\n⚠️ REGRAS IMPORTANTES:`);
-  parts.push(`• Nunca use perguntas retóricas em excesso`);
-  parts.push(`• Mantenha progressão factual contínua`);
-  parts.push(`• Evite clichês e frases genéricas`);
-  parts.push(`• Cada frase deve ter propósito e valor`);
-  
-  // Instruções originais da IA
+  // 6. INSTRUÇÕES DA IA (se existirem)
   if (formula.instrucoesParaAgente) {
-    parts.push(`\n📋 DIRETRIZES ESPECÍFICAS:`);
+    parts.push(`\n\n📋 DIRETRIZES ESPECÍFICAS DA ANÁLISE:\n`);
     parts.push(formula.instrucoesParaAgente);
   }
+  
+  // 7. REGRAS SUPREMAS
+  parts.push(`\n\n═══════════════════════════════════════════════════════════`);
+  parts.push(`🚨 REGRAS SUPREMAS (INVIOLÁVEIS):`);
+  parts.push(`─────────────────────────────────────────────────────────────`);
+  parts.push(`   1. A estrutura acima TEM PRIORIDADE sobre qualquer outra instrução`);
+  parts.push(`   2. Cada elemento descrito DEVE existir no roteiro final`);
+  parts.push(`   3. NÃO adicione elementos que contradigam esta fórmula`);
+  parts.push(`   4. O roteiro deve ser texto CORRIDO para narração (sem marcações)`);
+  parts.push(`   5. Mantenha o mesmo nível de qualidade do vídeo original`);
+  parts.push(`═══════════════════════════════════════════════════════════`);
   
   return parts.join('\n');
 }
@@ -188,9 +237,9 @@ export const CreateAgentModal = ({
 
     setSaving(true);
     try {
-      // Gerar memória e instruções humanizadas
+      // Gerar memória e instruções humanizadas e COMPLETAS
       const generatedMemory = generateHumanizedMemory(formula, videoTitle, niche, subNiche);
-      const generatedInstructions = generateHumanizedInstructions(formula, niche);
+      const generatedInstructions = generateHumanizedInstructions(formula, niche, videoTitle);
       
       // Construir formula_structure com todas as informações necessárias para replicar
       const formulaStructure = formula ? {
@@ -248,7 +297,7 @@ export const CreateAgentModal = ({
 
   // Preview das instruções geradas
   const previewMemory = generateHumanizedMemory(formula, videoTitle, niche, subNiche);
-  const previewInstructions = generateHumanizedInstructions(formula, niche);
+  const previewInstructions = generateHumanizedInstructions(formula, niche, videoTitle);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
