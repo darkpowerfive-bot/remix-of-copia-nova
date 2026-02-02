@@ -473,10 +473,11 @@ serve(async (req) => {
           "claude-sonnet": "claude-3-5-sonnet-20241022",
           "claude-sonnet-4-20250514": "claude-3-5-sonnet-20241022",
 
-          // DeepSeek -> deepseek-chat (recommended for general use)
+          // DeepSeek Models - correct API identifiers
           "deepseek-chat": "deepseek-chat",
-          "deepseek-v3": "deepseek-chat",
-          "deepseek-r1": "deepseek-chat",
+          "deepseek-v3": "deepseek-chat",        // V3 uses deepseek-chat endpoint
+          "deepseek-r1": "deepseek-reasoner",    // R1 uses deepseek-reasoner for reasoning
+          "deepseek-reasoner": "deepseek-reasoner",
           "deepseek-coder": "deepseek-coder",
 
           // Gemini Models -> gemini-1.5-pro
@@ -500,6 +501,8 @@ serve(async (req) => {
           laozhangModel = "gpt-4o";
         } else if (modelToMap?.includes("claude")) {
           laozhangModel = "claude-3-5-sonnet-20241022";
+        } else if (modelToMap?.includes("deepseek") && modelToMap?.includes("r1")) {
+          laozhangModel = "deepseek-reasoner";
         } else if (modelToMap?.includes("deepseek")) {
           laozhangModel = "deepseek-chat";
         } else if (modelToMap?.includes("gemini")) {
@@ -1830,7 +1833,9 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
           "claude-4-sonnet": "claude-3-5-sonnet-20241022",
           "gemini-2.5-pro": "gemini-1.5-pro",
           "gemini-pro": "gemini-1.5-pro",
-          "deepseek-r1": "deepseek-chat",
+          "deepseek-r1": "deepseek-reasoner",    // R1 uses deepseek-reasoner
+          "deepseek-v3": "deepseek-chat",        // V3 uses deepseek-chat
+          "deepseek-chat": "deepseek-chat",
         };
         
         // Priority: Agent preferred model > laozhangModel (from initial mapping) > default
