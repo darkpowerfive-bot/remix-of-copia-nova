@@ -1055,21 +1055,44 @@ CERTO: "Testa por 3 dias. Se não funcionar, me cobra nos comentários."
 CERTO: "O link tá na descrição. Usa e me conta o resultado."
 
 ═══════════════════════════════════════════════════════════════════════════════════════════
-CONTEXTO DO AGENTE (Use como base, mas siga A.C.T.I.O.N.)
+🔴🔴🔴 REGRA SUPREMA DE ORIGINALIDADE 🔴🔴🔴
 ═══════════════════════════════════════════════════════════════════════════════════════════
 
-${agentMemory || ''}
-${basedOnTitle ? `Referência viral: "${basedOnTitle}"` : ''}
+VOCÊ DEVE CRIAR CONTEÚDO 100% ORIGINAL. A fórmula abaixo é apenas ESTRUTURA, não conteúdo.
+
+🚫 O QUE VOCÊ NUNCA PODE FAZER:
+- COPIAR frases, exemplos ou parágrafos do roteiro original
+- ADAPTAR superficialmente trocando palavras (mesmo significado = cópia)
+- USAR os mesmos exemplos, nomes ou cenários do original
+- MANTER a mesma narrativa só mudando detalhes
+- PARAFRASEAR o original (isso também é cópia)
+
+✅ O QUE VOCÊ DEVE FAZER:
+- ESTUDAR a TÉCNICA: Como o original constrói tensão? Onde coloca revelações?
+- APLICAR a ESTRUTURA: Mesma arquitetura, conteúdo totalmente novo
+- CRIAR seus PRÓPRIOS exemplos, analogias e histórias
+- INVENTAR novos cenários que ilustrem o NOVO TEMA
+- DESENVOLVER perspectivas únicas sobre o assunto do título
+
+ANALOGIA: A fórmula é a PLANTA de uma casa, não a casa.
+Você constrói uma casa NOVA seguindo a mesma planta, com materiais e decoração 100% diferentes.
+
+═══════════════════════════════════════════════════════════════════════════════════════════
+ESTRUTURA DO AGENTE (COPIE A TÉCNICA, NÃO O TEXTO)
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+${agentMemory ? `PERSONA DO ESPECIALISTA:\n${agentMemory}\n` : ''}
+${basedOnTitle ? `Vídeo de referência (APENAS para entender a técnica): "${basedOnTitle}"` : ''}
 Nicho: ${agentData?.niche || 'Geral'} / ${agentData?.sub_niche || ''}
 
-${agentFormula ? `Fórmula específica: ${agentFormula}` : ''}
-${agentInstructions ? `Instruções do agente: ${agentInstructions}` : ''}
-${formulaReplicavel ? `Passo-a-passo: ${formulaReplicavel}` : ''}
-${motivoSucesso ? `Por que funciona: ${motivoSucesso}` : ''}
-${estruturaDetalhada ? `Estrutura: ${estruturaDetalhada}` : ''}
-${frasesChave ? `Padrões: ${frasesChave}` : ''}
+${agentFormula ? `TÉCNICA A REPLICAR (estrutura, não texto):\n${agentFormula}` : ''}
+${agentInstructions ? `DIRETRIZES DE ESTILO:\n${agentInstructions}` : ''}
+${formulaReplicavel ? `MÉTODO:\n${formulaReplicavel}` : ''}
+${motivoSucesso ? `POR QUE FUNCIONA (aplique ao novo tema):\n${motivoSucesso}` : ''}
+${estruturaDetalhada ? `ARQUITETURA:\n${estruturaDetalhada}` : ''}
+${frasesChave ? `PADRÕES DE CONSTRUÇÃO (use como modelo, não copie):\n${frasesChave}` : ''}
 
-Gatilhos a aplicar: ${agentTriggers}
+Gatilhos psicológicos a aplicar: ${agentTriggers}
 
 ${agentFileContents ? `Material de referência: ${agentFileContents}` : ''}
 
@@ -1122,10 +1145,19 @@ Quer testar? Link na descrição. Me cobra nos comentários se não funcionar."
 🚨 CHECKLIST FINAL - ANTES DE ENTREGAR, VERIFIQUE:
 ═══════════════════════════════════════════════════════════════════════════════════════════
 
+ORIGINALIDADE (se falhar aqui, REESCREVA DO ZERO):
+[ ] O conteúdo é 100% ORIGINAL? (não copiou/adaptou frases do original)
+[ ] Criou SEUS PRÓPRIOS exemplos e analogias?
+[ ] A narrativa é ÚNICA para este novo tema?
+[ ] Usou apenas a ESTRUTURA da fórmula, não o texto?
+
+ESTRUTURA A.C.T.I.O.N.:
 [ ] A primeira frase é uma ANOMALIA (não pergunta, não apresentação)?
 [ ] Tem um TESTE REAL com "eu fiz" + tempo/número?
 [ ] Os PASSOS são claros o suficiente pra alguém copiar?
 [ ] Você mostrou um LIMITE/OBSTÁCULO honesto?
+
+QUALIDADE:
 [ ] NÃO usou NENHUMA palavra da lista proibida?
 [ ] O tom é de CONVERSA, não de palestra?
 [ ] Tem NÚMEROS ESPECÍFICOS (não "muitos", "alguns")?
@@ -1138,11 +1170,12 @@ REGRA SUPREMA
 ═══════════════════════════════════════════════════════════════════════════════════════════
 
 Você NÃO PODE entregar um roteiro mediano. Seu padrão é 10/10.
+Se COPIAR conteúdo do original, você FALHOU.
 Se tiver QUALQUER palavra proibida, você FALHOU.
 Se não seguir A.C.T.I.O.N., você FALHOU.
 Se soar como IA, você FALHOU.
 
-Escreva como HUMANO. Seja DIRETO. Use PROVAS. Mostre LIMITES. Entregue VALOR.`;
+Escreva como HUMANO. Seja ORIGINAL. Use PROVAS. Mostre LIMITES. Entregue VALOR.`;
         break;
 
       case "generate_script":
