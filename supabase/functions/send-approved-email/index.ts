@@ -81,11 +81,11 @@ serve(async (req) => {
 
     logStep("Plan determined", { userPlanName });
 
-    // Fetch access_approved template
+    // Fetch approved template
     const { data: template, error: templateError } = await supabaseAdmin
       .from("email_templates")
       .select("*")
-      .eq("template_type", "access_approved")
+      .eq("template_type", "approved")
       .eq("is_active", true)
       .maybeSingle();
 

@@ -44,11 +44,11 @@ serve(async (req) => {
       auth: { persistSession: false }
     });
 
-    // Fetch pending_approval template
+    // Fetch pending template
     const { data: template, error: templateError } = await supabaseAdmin
       .from("email_templates")
       .select("*")
-      .eq("template_type", "pending_approval")
+      .eq("template_type", "pending")
       .eq("is_active", true)
       .maybeSingle();
 
