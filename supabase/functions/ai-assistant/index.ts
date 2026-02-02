@@ -2051,6 +2051,16 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       const errorText = await response.text();
       console.error("[AI Assistant] AI API error:", response.status, errorText);
       
+      // Check for quota exhausted (insufficient_quota) - this is different from rate limit
+      const isQuotaExhausted = errorText.includes('insufficient_quota') || errorText.includes('exceeded your current quota');
+      
+      if (response.status === 429 && isQuotaExhausted) {
+        return new Response(
+          JSON.stringify({ error: "Créditos da API esgotados. Configure suas chaves de API pessoais em Configurações ou aguarde a renovação da cota." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns minutos." }),
