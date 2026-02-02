@@ -992,11 +992,11 @@ GERE AGORA ${numParts > 1 ? `A PARTE ${partIndex + 1}` : 'O ROTEIRO COMPLETO'} D
 
             {/* Part indicator */}
             {totalParts > 1 && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-center gap-1.5 max-w-[280px]">
                 {Array.from({ length: totalParts }, (_, i) => (
                   <div
                     key={i}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300 ${
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium transition-all duration-300 ${
                       i < currentPart
                         ? "bg-primary text-primary-foreground"
                         : i === currentPart - 1
