@@ -73,10 +73,20 @@ serve(async (req) => {
     let amount: number | null = null;
     let currency: string | null = null;
     let subscriptionEnd: string | null = null;
+    let userId: string | null = null; // Primary identifier from metadata
 
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
       customerEmail = session.customer_email;
+      
+      // CRITICAL: Get user_id from metadata (set during checkout creation)
+      userId = session.metadata?.user_id || session.client_reference_id || null;
+      logStep("Checkout session metadata", { 
+        userId, 
+        client_reference_id: session.client_reference_id, 
+        metadata: session.metadata,
+        customer_email: customerEmail 
+      });
       
       if (session.customer && !customerEmail) {
         const customer = await stripe.customers.retrieve(session.customer as string);
@@ -105,6 +115,9 @@ serve(async (req) => {
       }
     } else if (event.type === "customer.subscription.created") {
       const subscription = event.data.object as Stripe.Subscription;
+      
+      // Try to get user_id from subscription metadata
+      userId = subscription.metadata?.user_id || null;
       
       if (subscription.customer) {
         const customer = await stripe.customers.retrieve(subscription.customer as string);
@@ -158,6 +171,9 @@ serve(async (req) => {
         const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
         subscriptionEnd = new Date(subscription.current_period_end * 1000).toLocaleDateString("pt-BR");
         
+        // Try to get user_id from subscription metadata
+        userId = subscription.metadata?.user_id || null;
+        
         const priceId = subscription.items.data[0]?.price.id;
         const { data: planData } = await supabaseAdmin
           .from("plan_permissions")
@@ -169,6 +185,9 @@ serve(async (req) => {
       }
     } else if (event.type === "customer.subscription.deleted") {
       const subscription = event.data.object as Stripe.Subscription;
+      
+      // Try to get user_id from subscription metadata
+      userId = subscription.metadata?.user_id || null;
       
       if (subscription.customer) {
         const customer = await stripe.customers.retrieve(subscription.customer as string);
@@ -190,15 +209,111 @@ serve(async (req) => {
       planName = planData?.plan_name || "Plano Premium";
     }
 
+    // If we don't have userId but have email, try to find user by email
+    if (!userId && customerEmail) {
+      const { data: profileByEmail } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("email", customerEmail)
+        .single();
+      
+      if (profileByEmail) {
+        userId = profileByEmail.id;
+        logStep("Found user by email lookup", { userId, email: customerEmail });
+      }
+    }
+
     if (!customerEmail) {
       logStep("No customer email found, skipping email", { eventType: event.type });
-      return new Response(JSON.stringify({ received: true, skipped: true, reason: "no_email" }), {
+      // Continue processing role update if we have userId
+    }
+
+    logStep("Customer data extracted", { email: customerEmail, name: customerName, plan: planName, userId });
+
+    // Update user role FIRST (most important part)
+    if (event.type === "customer.subscription.created" || event.type === "checkout.session.completed") {
+      if (userId) {
+        // Update user role to 'pro' using userId directly
+        const { error: roleError } = await supabaseAdmin
+          .from("user_roles")
+          .upsert(
+            { user_id: userId, role: "pro" },
+            { onConflict: "user_id" }
+          );
+        
+        if (roleError) {
+          logStep("Error updating user role", { error: roleError.message, userId });
+        } else {
+          logStep("User role updated to pro", { userId });
+        }
+        
+        // Also add credits based on plan
+        const { data: planPerms } = await supabaseAdmin
+          .from("plan_permissions")
+          .select("monthly_credits")
+          .eq("plan_name", planName)
+          .single();
+        
+        if (planPerms?.monthly_credits) {
+          const { data: currentProfile } = await supabaseAdmin
+            .from("profiles")
+            .select("credits")
+            .eq("id", userId)
+            .single();
+          
+          const newCredits = (currentProfile?.credits || 0) + planPerms.monthly_credits;
+          
+          await supabaseAdmin
+            .from("profiles")
+            .update({ credits: newCredits })
+            .eq("id", userId);
+          
+          logStep("Credits added", { userId, addedCredits: planPerms.monthly_credits, newTotal: newCredits });
+        }
+      } else {
+        logStep("No userId found, cannot update role", { email: customerEmail });
+      }
+    }
+
+    // If subscription is cancelled, downgrade user role
+    if (event.type === "customer.subscription.deleted") {
+      if (userId) {
+        await supabaseAdmin
+          .from("user_roles")
+          .upsert(
+            { user_id: userId, role: "free" },
+            { onConflict: "user_id" }
+          );
+        
+        logStep("User role downgraded to free", { userId });
+      } else if (customerEmail) {
+        // Fallback to email lookup
+        const { data: profile } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("email", customerEmail)
+          .single();
+
+        if (profile) {
+          await supabaseAdmin
+            .from("user_roles")
+            .upsert(
+              { user_id: profile.id, role: "free" },
+              { onConflict: "user_id" }
+            );
+          
+          logStep("User role downgraded to free (by email)", { userId: profile.id });
+        }
+      }
+    }
+
+    // Skip email if no customer email
+    if (!customerEmail) {
+      return new Response(JSON.stringify({ received: true, processed: true, role_updated: !!userId }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
-
-    logStep("Customer data extracted", { email: customerEmail, name: customerName, plan: planName });
 
     // Fetch the email template from database
     const { data: template, error: templateError } = await supabaseAdmin
@@ -210,7 +325,7 @@ serve(async (req) => {
 
     if (templateError || !template) {
       logStep("Template not found or inactive", { templateType, error: templateError?.message });
-      return new Response(JSON.stringify({ received: true, skipped: true, reason: "no_template" }), {
+      return new Response(JSON.stringify({ received: true, processed: true, role_updated: !!userId }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
@@ -225,7 +340,7 @@ serve(async (req) => {
 
     if (!smtpData?.value) {
       logStep("SMTP settings not configured");
-      return new Response(JSON.stringify({ received: true, skipped: true, reason: "no_smtp" }), {
+      return new Response(JSON.stringify({ received: true, processed: true, role_updated: !!userId }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
@@ -266,18 +381,6 @@ serve(async (req) => {
     }
 
     // Send email using SMTP via fetch to avoid import issues
-    const emailPayload = {
-      host: smtpSettings.host,
-      port: smtpSettings.port,
-      user: smtpSettings.user,
-      pass: smtpSettings.pass,
-      from: `"${smtpSettings.from_name}" <${smtpSettings.from_email}>`,
-      to: customerEmail,
-      subject: emailSubject,
-      html: emailBody,
-    };
-
-    // Use the existing send-test-email function approach with direct SMTP
     const smtpResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-template-test`, {
       method: "POST",
       headers: {
@@ -294,54 +397,12 @@ serve(async (req) => {
     if (!smtpResponse.ok) {
       const errorData = await smtpResponse.json();
       logStep("Error sending email", { error: errorData });
-      throw new Error(`Failed to send email: ${JSON.stringify(errorData)}`);
-    }
-    
-    logStep("Email sent successfully", { to: customerEmail, template: templateType });
-
-    // Update user role if this is a new subscription
-    if (event.type === "customer.subscription.created" || event.type === "checkout.session.completed") {
-      // Find user by email
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("email", customerEmail)
-        .single();
-
-      if (profile) {
-        // Update user role to 'pro'
-        await supabaseAdmin
-          .from("user_roles")
-          .upsert(
-            { user_id: profile.id, role: "pro" },
-            { onConflict: "user_id" }
-          );
-        
-        logStep("User role updated to pro", { userId: profile.id });
-      }
+      // Don't throw - role was already updated successfully
+    } else {
+      logStep("Email sent successfully", { to: customerEmail, template: templateType });
     }
 
-    // If subscription is cancelled, downgrade user role
-    if (event.type === "customer.subscription.deleted") {
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("email", customerEmail)
-        .single();
-
-      if (profile) {
-        await supabaseAdmin
-          .from("user_roles")
-          .upsert(
-            { user_id: profile.id, role: "free" },
-            { onConflict: "user_id" }
-          );
-        
-        logStep("User role downgraded to free", { userId: profile.id });
-      }
-    }
-
-    return new Response(JSON.stringify({ received: true, processed: true }), {
+    return new Response(JSON.stringify({ received: true, processed: true, role_updated: !!userId }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
