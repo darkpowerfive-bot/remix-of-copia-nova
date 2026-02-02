@@ -1945,7 +1945,7 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       console.log(`[AI Assistant] Using Lovable AI Gateway with model: ${selectedModel}`);
     }
 
-    let response: Response;
+    let response!: Response; // Definite assignment assertion - will be assigned in loops
 
     if (apiProvider === 'gemini' && userApiKeyToUse) {
       // Gemini API has a different request format
@@ -1962,19 +1962,33 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
             .join('\n\n')
         : `${systemPrompt}\n\n${userPrompt}`;
 
-      response = await fetch(apiUrl, {
-        method: "POST",
-        headers: requestHeaders,
-        body: JSON.stringify({
-          contents: [
-            { role: "user", parts: [{ text: combinedText }] }
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 8192,
-          },
-        }),
-      });
+      // Retry logic for rate limits (429)
+      const maxRetries = 3;
+      let retryDelay = 15000; // Start with 15 seconds
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        response = await fetch(apiUrl, {
+          method: "POST",
+          headers: requestHeaders,
+          body: JSON.stringify({
+            contents: [
+              { role: "user", parts: [{ text: combinedText }] }
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 8192,
+            },
+          }),
+        });
+        
+        if (response.status === 429 && attempt < maxRetries) {
+          console.log(`[AI Assistant] Rate limit hit (Gemini), attempt ${attempt}/${maxRetries}. Waiting ${retryDelay/1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          retryDelay *= 2; // Exponential backoff
+          continue;
+        }
+        break;
+      }
     } else {
       // OpenAI-compatible format (OpenAI, Laozhang AI, and Lovable AI Gateway)
       const longOutput = type === "viral-script" || type === "generate_script_with_formula" || type === "agent_chat";
@@ -2012,11 +2026,25 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         (payload as any).max_tokens = maxOut;
       }
 
-      response = await fetch(apiUrl, {
-        method: "POST",
-        headers: requestHeaders,
-        body: JSON.stringify(payload),
-      });
+      // Retry logic for rate limits (429)
+      const maxRetriesOpenAI = 3;
+      let retryDelayOpenAI = 15000; // Start with 15 seconds
+      
+      for (let attemptOpenAI = 1; attemptOpenAI <= maxRetriesOpenAI; attemptOpenAI++) {
+        response = await fetch(apiUrl, {
+          method: "POST",
+          headers: requestHeaders,
+          body: JSON.stringify(payload),
+        });
+        
+        if (response.status === 429 && attemptOpenAI < maxRetriesOpenAI) {
+          console.log(`[AI Assistant] Rate limit hit (OpenAI), attempt ${attemptOpenAI}/${maxRetriesOpenAI}. Waiting ${retryDelayOpenAI/1000}s...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelayOpenAI));
+          retryDelayOpenAI *= 2; // Exponential backoff
+          continue;
+        }
+        break;
+      }
     }
 
     if (!response.ok) {
