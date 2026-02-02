@@ -17,14 +17,22 @@ import { useNavigate } from "react-router-dom";
 interface ScriptFormulaAnalysis {
   motivoSucesso: string;
   formula: string;
+  formulaReplicavel?: string;
   estrutura: {
     hook: string;
     desenvolvimento: string;
     climax: string;
     cta: string;
+    transicoes?: string;
   };
   tempoTotal: string;
   gatilhosMentais: string[];
+  exemplosDeAplicacao?: {
+    fraserChave?: string[];
+    estruturaDeFrases?: string;
+    transicoesUsadas?: string[];
+  };
+  instrucoesParaAgente?: string;
 }
 
 interface CreateAgentModalProps {
@@ -71,6 +79,16 @@ export const CreateAgentModal = ({
 
     setSaving(true);
     try {
+      // Construir formula_structure com todas as informações necessárias para replicar
+      const formulaStructure = formula ? {
+        ...formula.estrutura,
+        motivoSucesso: formula.motivoSucesso,
+        formulaReplicavel: formula.formulaReplicavel,
+        exemplosDeAplicacao: formula.exemplosDeAplicacao,
+        instrucoesParaAgente: formula.instrucoesParaAgente,
+        tempoTotal: formula.tempoTotal,
+      } : null;
+
       const { error } = await supabase.from("script_agents").insert({
         user_id: user.id,
         name: agentName.trim(),
@@ -78,7 +96,7 @@ export const CreateAgentModal = ({
         sub_niche: subNiche || null,
         based_on_title: videoTitle || null,
         formula: formula?.formula || null,
-        formula_structure: formula?.estrutura || null,
+        formula_structure: formulaStructure,
         mental_triggers: formula?.gatilhosMentais || null,
         times_used: 0,
       });

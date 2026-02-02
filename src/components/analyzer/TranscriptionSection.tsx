@@ -30,14 +30,22 @@ import { useCreditDeduction } from "@/hooks/useCreditDeduction";
 interface ScriptFormulaAnalysis {
   motivoSucesso: string;
   formula: string;
+  formulaReplicavel?: string;
   estrutura: {
     hook: string;
     desenvolvimento: string;
     climax: string;
     cta: string;
+    transicoes?: string;
   };
   tempoTotal: string;
   gatilhosMentais: string[];
+  exemplosDeAplicacao?: {
+    fraserChave?: string[];
+    estruturaDeFrases?: string;
+    transicoesUsadas?: string[];
+  };
+  instrucoesParaAgente?: string;
 }
 
 interface VideoDetails {
