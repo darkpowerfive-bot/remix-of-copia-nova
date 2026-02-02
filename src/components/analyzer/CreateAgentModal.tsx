@@ -153,7 +153,7 @@ export const CreateAgentModal = ({
           </div>
 
           {/* Detected Info - Read Only */}
-          <div className="bg-secondary/50 p-5 rounded-xl space-y-4">
+          <div className="bg-secondary/50 p-5 rounded-xl space-y-4 max-h-[400px] overflow-y-auto">
             <div className="flex items-center gap-3">
               <Check className="w-5 h-5 text-success" />
               <span className="font-semibold text-foreground text-base">Informações Detectadas</span>
@@ -179,10 +179,54 @@ export const CreateAgentModal = ({
 
             {formula?.formula && (
               <div>
-                <Label className="text-sm text-muted-foreground">Fórmula</Label>
+                <Label className="text-sm text-muted-foreground">Fórmula Principal</Label>
                 <code className="block mt-1 text-sm bg-primary/20 text-primary px-3 py-2 rounded-lg">
                   {formula.formula}
                 </code>
+              </div>
+            )}
+
+            {formula?.formulaReplicavel && (
+              <div>
+                <Label className="text-sm text-muted-foreground">Fórmula Replicável (Passo-a-Passo)</Label>
+                <p className="text-sm text-foreground/80 mt-1 whitespace-pre-wrap bg-card/50 p-2 rounded">
+                  {formula.formulaReplicavel}
+                </p>
+              </div>
+            )}
+
+            {formula?.estrutura && (
+              <div>
+                <Label className="text-sm text-muted-foreground">Estrutura Detalhada</Label>
+                <div className="text-sm text-foreground/80 mt-1 space-y-1 bg-card/50 p-2 rounded">
+                  {formula.estrutura.hook && <p><strong>Hook:</strong> {formula.estrutura.hook}</p>}
+                  {formula.estrutura.desenvolvimento && <p><strong>Desenvolvimento:</strong> {formula.estrutura.desenvolvimento}</p>}
+                  {formula.estrutura.climax && <p><strong>Clímax:</strong> {formula.estrutura.climax}</p>}
+                  {formula.estrutura.cta && <p><strong>CTA:</strong> {formula.estrutura.cta}</p>}
+                </div>
+              </div>
+            )}
+
+            {formula?.gatilhosMentais && formula.gatilhosMentais.length > 0 && (
+              <div>
+                <Label className="text-sm text-muted-foreground">Gatilhos Mentais ({formula.gatilhosMentais.length})</Label>
+                <ul className="text-sm text-foreground/80 mt-1 list-disc list-inside bg-card/50 p-2 rounded">
+                  {formula.gatilhosMentais.slice(0, 5).map((trigger, i) => (
+                    <li key={i} className="truncate">{trigger}</li>
+                  ))}
+                  {formula.gatilhosMentais.length > 5 && (
+                    <li className="text-muted-foreground">+{formula.gatilhosMentais.length - 5} mais...</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            {formula?.instrucoesParaAgente && (
+              <div>
+                <Label className="text-sm text-muted-foreground">Instruções para o Agente</Label>
+                <p className="text-sm text-foreground/80 mt-1 bg-card/50 p-2 rounded line-clamp-3">
+                  {formula.instrucoesParaAgente}
+                </p>
               </div>
             )}
           </div>

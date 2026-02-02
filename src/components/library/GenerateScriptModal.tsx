@@ -36,7 +36,22 @@ interface ScriptAgent {
   sub_niche: string | null;
   based_on_title: string | null;
   formula: string | null;
-  formula_structure: any;
+  formula_structure: {
+    hook?: string;
+    desenvolvimento?: string;
+    climax?: string;
+    cta?: string;
+    transicoes?: string;
+    motivoSucesso?: string;
+    formulaReplicavel?: string;
+    instrucoesParaAgente?: string;
+    exemplosDeAplicacao?: {
+      fraserChave?: string[];
+      estruturaDeFrases?: string;
+      transicoesUsadas?: string[];
+    };
+    tempoTotal?: string;
+  } | null;
   mental_triggers: string[] | null;
   times_used: number;
 }
@@ -211,9 +226,11 @@ Gere o roteiro seguindo a estrutura e fórmula do agente, otimizado para engajam
               name: agent.name,
               niche: agent.niche,
               sub_niche: agent.sub_niche,
+              based_on_title: agent.based_on_title,
               formula: agent.formula,
               formula_structure: agent.formula_structure,
               mental_triggers: agent.mental_triggers,
+              preferredModel: aiModel,
             },
           },
         });
