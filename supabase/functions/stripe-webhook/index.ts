@@ -270,6 +270,33 @@ serve(async (req) => {
           
           logStep("Credits added", { userId, addedCredits: planPerms.monthly_credits, newTotal: newCredits });
         }
+
+        // Send WhatsApp notification for plan purchase
+        try {
+          const { data: profileData } = await supabaseAdmin
+            .from("profiles")
+            .select("full_name, whatsapp")
+            .eq("id", userId)
+            .single();
+
+          if (profileData?.whatsapp) {
+            logStep("Sending WhatsApp purchase notification", { whatsapp: profileData.whatsapp });
+            
+            await supabaseAdmin.functions.invoke("send-whatsapp-welcome", {
+              body: {
+                whatsapp: profileData.whatsapp,
+                fullName: profileData.full_name || customerEmail,
+                email: customerEmail,
+                planName: planName,
+                messageType: "approved",
+              },
+            });
+            
+            logStep("WhatsApp purchase notification sent");
+          }
+        } catch (whatsappError) {
+          logStep("WhatsApp notification error (non-blocking)", { error: String(whatsappError) });
+        }
       } else {
         logStep("No userId found, cannot update role", { email: customerEmail });
       }
