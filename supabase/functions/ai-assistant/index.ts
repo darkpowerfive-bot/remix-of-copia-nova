@@ -449,39 +449,44 @@ serve(async (req) => {
         userApiKeyToUse = adminApiKeys.laozhang;
         apiProvider = 'laozhang';
         
-        // Laozhang supports: gpt-4.1, claude-sonnet-4-20250514, gemini-2.5-pro, deepseek-r1
+        // Laozhang API models (from docs.laozhang.ai/en/api-reference/models):
+        // OpenAI: gpt-4o, gpt-4o-mini, gpt-4-turbo, o1-preview, o1-mini, o3
+        // Claude: claude-3-5-sonnet-20241022, claude-3-5-haiku-20241022, claude-3-opus-20240229
+        // Gemini: gemini-1.5-pro, gemini-1.5-flash
+        // DeepSeek: deepseek-chat, deepseek-coder, deepseek-v2.5
         const laozhangModelMap: Record<string, string> = {
-          // GPT Models -> gpt-4.1 (GPT-4.1 Fast)
-          "gpt-4o": "gpt-4.1",
-          "gpt-4o-2025": "gpt-4.1",
-          "openai/gpt-5": "gpt-4.1",
-          "openai/gpt-5-mini": "gpt-4.1",
-          "gpt-5": "gpt-4.1",
-          "gpt-4o-mini": "gpt-4.1",
-          "gpt-4-turbo": "gpt-4.1",
-          "gpt-4.1": "gpt-4.1",
+          // GPT Models -> gpt-4o (best available)
+          "gpt-4o": "gpt-4o",
+          "gpt-4o-2025": "gpt-4o",
+          "openai/gpt-5": "gpt-4o",
+          "openai/gpt-5-mini": "gpt-4o-mini",
+          "gpt-5": "gpt-4o",
+          "gpt-4o-mini": "gpt-4o-mini",
+          "gpt-4-turbo": "gpt-4-turbo",
+          "gpt-4.1": "gpt-4o",
 
-          // Claude Models -> claude-sonnet-4-20250514
-          "claude-4-sonnet": "claude-sonnet-4-20250514",
-          "claude": "claude-sonnet-4-20250514",
-          "claude-3-5-sonnet": "claude-sonnet-4-20250514",
-          "claude-3-opus": "claude-sonnet-4-20250514",
-          "claude-sonnet": "claude-sonnet-4-20250514",
-          "claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
+          // Claude Models -> claude-3-5-sonnet-20241022 (latest sonnet)
+          "claude-4-sonnet": "claude-3-5-sonnet-20241022",
+          "claude": "claude-3-5-sonnet-20241022",
+          "claude-3-5-sonnet": "claude-3-5-sonnet-20241022",
+          "claude-3-opus": "claude-3-opus-20240229",
+          "claude-sonnet": "claude-3-5-sonnet-20241022",
+          "claude-sonnet-4-20250514": "claude-3-5-sonnet-20241022",
 
-          // DeepSeek -> deepseek-r1
-          "deepseek-chat": "deepseek-r1",
-          "deepseek-v3": "deepseek-r1",
-          "deepseek-r1": "deepseek-r1",
+          // DeepSeek -> deepseek-chat (recommended for general use)
+          "deepseek-chat": "deepseek-chat",
+          "deepseek-v3": "deepseek-chat",
+          "deepseek-r1": "deepseek-chat",
+          "deepseek-coder": "deepseek-coder",
 
-          // Gemini Models -> gemini-2.5-pro
-          "gemini": "gemini-2.5-pro",
-          "gemini-flash": "gemini-2.5-pro",
-          "gemini-pro": "gemini-2.5-pro",
-          "gemini-2.5-flash": "gemini-2.5-pro",
-          "gemini-2.5-pro": "gemini-2.5-pro",
-          "google/gemini-2.5-flash": "gemini-2.5-pro",
-          "google/gemini-2.5-pro": "gemini-2.5-pro",
+          // Gemini Models -> gemini-1.5-pro
+          "gemini": "gemini-1.5-pro",
+          "gemini-flash": "gemini-1.5-flash",
+          "gemini-pro": "gemini-1.5-pro",
+          "gemini-2.5-flash": "gemini-1.5-flash",
+          "gemini-2.5-pro": "gemini-1.5-pro",
+          "google/gemini-2.5-flash": "gemini-1.5-flash",
+          "google/gemini-2.5-pro": "gemini-1.5-pro",
         };
         
         // CRITICAL: Prioritize agent's preferred model over request model
@@ -492,15 +497,15 @@ serve(async (req) => {
         if (modelToMap && laozhangModelMap[modelToMap]) {
           laozhangModel = laozhangModelMap[modelToMap];
         } else if (modelToMap?.includes("gpt")) {
-          laozhangModel = "gpt-4.1";
+          laozhangModel = "gpt-4o";
         } else if (modelToMap?.includes("claude")) {
-          laozhangModel = "claude-sonnet-4-20250514";
+          laozhangModel = "claude-3-5-sonnet-20241022";
         } else if (modelToMap?.includes("deepseek")) {
-          laozhangModel = "deepseek-r1";
+          laozhangModel = "deepseek-chat";
         } else if (modelToMap?.includes("gemini")) {
-          laozhangModel = "gemini-2.5-pro";
+          laozhangModel = "gemini-1.5-pro";
         } else {
-          laozhangModel = "gpt-4.1"; // Default model
+          laozhangModel = "gpt-4o"; // Default model
         }
         console.log(`[AI Assistant] Using Laozhang AI (platform credits) - Agent Model: ${agentPreferredModel}, Request Model: ${model}, Final: ${laozhangModel}`);
       } else if (adminApiKeys?.openai && adminApiKeys.openai_validated) {
@@ -1560,16 +1565,16 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         apiUrl = "https://api.laozhang.ai/v1/chat/completions";
         apiKey = userApiKeyToUse;
         
-        // Map agent's preferred model to Laozhang equivalent - ALWAYS respect user's choice
+        // Map agent's preferred model to Laozhang API models (docs.laozhang.ai)
         const laozhangAgentModelMap: Record<string, string> = {
-          "gpt-4o": "gpt-4.1",
-          "gpt-4.1": "gpt-4.1",
-          "gpt-5": "gpt-4.1",
-          "claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
-          "claude-4-sonnet": "claude-sonnet-4-20250514",
-          "gemini-2.5-pro": "gemini-2.5-pro",
-          "gemini-pro": "gemini-2.5-pro",
-          "deepseek-r1": "deepseek-r1",
+          "gpt-4o": "gpt-4o",
+          "gpt-4.1": "gpt-4o",
+          "gpt-5": "gpt-4o",
+          "claude-sonnet-4-20250514": "claude-3-5-sonnet-20241022",
+          "claude-4-sonnet": "claude-3-5-sonnet-20241022",
+          "gemini-2.5-pro": "gemini-1.5-pro",
+          "gemini-pro": "gemini-1.5-pro",
+          "deepseek-r1": "deepseek-chat",
         };
         
         // Priority: Agent preferred model > laozhangModel (from initial mapping) > default
@@ -1580,7 +1585,7 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
           selectedModel = laozhangModel;
           console.log(`[AI Assistant] Laozhang: Using pre-mapped model: ${selectedModel}`);
         } else {
-          selectedModel = "gpt-4.1";
+          selectedModel = "gpt-4o";
           console.log(`[AI Assistant] Laozhang: Using default model: ${selectedModel}`);
         }
         
