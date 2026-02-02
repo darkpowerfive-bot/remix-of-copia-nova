@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useProfile } from "@/hooks/useProfile";
-import { useCredits } from "@/hooks/useCredits";
+import { useProfileData } from "@/hooks/useProfileData";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import logo from "@/assets/logo.gif";
@@ -49,7 +48,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CreditHistoryModal } from "@/components/credits/CreditHistoryModal";
 
-interface NavItem {
+interface SidebarNavItem {
   icon: React.ElementType;
   label: string;
   href: string;
@@ -58,7 +57,7 @@ interface NavItem {
 }
 
 // Ordem cronológica de produção de vídeo
-const defaultNavItems: NavItem[] = [
+const defaultNavItems: SidebarNavItem[] = [
   { id: "home", icon: Home, label: "Início", href: "/", category: "home" },
   { id: "explore", icon: Compass, label: "Explorar Nicho", href: "/explore", category: "pesquisa" },
   { id: "channel-analyzer", icon: BarChart3, label: "Análise de Canais", href: "/channel-analyzer", category: "pesquisa" },
@@ -81,14 +80,13 @@ const defaultNavItems: NavItem[] = [
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [navItems, setNavItems] = useState<NavItem[]>(defaultNavItems);
+  const [navItems, setNavItems] = useState<SidebarNavItem[]>(defaultNavItems);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const dragOverId = useRef<string | null>(null);
   
   const { signOut } = useAuth();
-  const { role } = useProfile();
-  const { balance: creditsBalance, loading: creditsLoading } = useCredits();
+  const { role, credits: creditsBalance, loading: creditsLoading } = useProfileData();
   const { sidebarOrder, saveSidebarOrder, isLoading: prefsLoading } = useUserPreferences();
   
   const navigate = useNavigate();
@@ -100,7 +98,7 @@ export function Sidebar() {
   const reorderItems = useCallback((orderIds: string[]) => {
     const reorderedItems = orderIds
       .map(id => defaultNavItems.find(item => item.id === id))
-      .filter((item): item is NavItem => item !== undefined);
+      .filter((item): item is SidebarNavItem => item !== undefined);
     
     // Add any new items that weren't in saved order
     defaultNavItems.forEach(item => {
@@ -156,7 +154,7 @@ export function Sidebar() {
     navigate("/auth");
   };
 
-  const userRole = role?.role ?? "free";
+  const userRole = role ?? "free";
 
   const roleLabels = {
     admin: "ADMIN",

@@ -1,18 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo, lazy, Suspense } from "react";
 import { Sidebar } from "./Sidebar";
 import { MobileSidebar } from "./MobileSidebar";
 import { NotificationsBell } from "./NotificationsBell";
 import { StorageIndicator } from "./StorageIndicator";
 import { CreditsDisplay } from "./CreditsDisplay";
-import { FloatingPomodoro } from "./FloatingPomodoro";
 import { UpdateNotification } from "./UpdateNotification";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/hooks/useAuth";
-import { useProfile } from "@/hooks/useProfile";
+import { useProfileData } from "@/hooks/useProfileData";
 import { useAdminPushNotifications } from "@/hooks/useAdminPushNotifications";
 import { RequireWhatsAppModal } from "@/components/auth/RequireWhatsAppModal";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+// Lazy load FloatingPomodoro - it's not critical for initial render
+const FloatingPomodoro = lazy(() => import("./FloatingPomodoro").then(m => ({ default: m.FloatingPomodoro })));
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -20,7 +22,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { user } = useAuth();
-  const { profile, loading: profileLoading, refetch } = useProfile();
+  const { profile, loading: profileLoading, refetch } = useProfileData();
   const [headerVisible, setHeaderVisible] = useState(true);
   const [headerHovered, setHeaderHovered] = useState(false);
   const [whatsAppCompleted, setWhatsAppCompleted] = useState(false);
@@ -112,8 +114,12 @@ export function MainLayout({ children }: MainLayoutProps) {
         </div>
       </main>
 
-      {/* Floating Pomodoro - visible on all pages */}
-      {user && <FloatingPomodoro />}
+      {/* Floating Pomodoro - visible on all pages, lazy loaded */}
+      {user && (
+        <Suspense fallback={null}>
+          <FloatingPomodoro />
+        </Suspense>
+      )}
 
       {/* WhatsApp Required Modal */}
       {showWhatsAppModal && (
