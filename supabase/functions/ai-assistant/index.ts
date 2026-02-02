@@ -853,10 +853,13 @@ Crie uma fórmula que funcione assim:
         const agentFormula = agentData?.formula || "";
         
         // MEMORY: Usar a memória do agente como contexto obrigatório
-        const agentMemory = agentData?.formula_structure?.memory || agentData?.memory || "";
+        // Prioridade: campo dedicado > formula_structure > vazio
+        const agentMemory = agentData?.memory || agentData?.formula_structure?.memory || "";
         
-        // INSTRUCTIONS: Instruções adicionais (se existirem na estrutura)
-        const agentInstructions = agentData?.formula_structure?.instructions || 
+        // INSTRUCTIONS: Instruções completas do agente
+        // Prioridade: campo dedicado > formula_structure > instrucoesParaAgente (legado)
+        const agentInstructions = agentData?.instructions || 
+                                   agentData?.formula_structure?.instructions || 
                                    agentData?.formula_structure?.instrucoesParaAgente || "";
         
         // FORMULA REPLICÁVEL: Instruções passo-a-passo para replicar
