@@ -1588,14 +1588,19 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         apiUrl = "https://api.openai.com/v1/chat/completions";
         apiKey = userApiKeyToUse;
         
-        if (requiresStrongModel) {
-          if (isAgentModelStrong && agentPreferredModel?.includes('gpt')) {
-            selectedModel = "gpt-4o";
-            console.log(`[AI Assistant] Using agent's preferred GPT model: gpt-4o`);
-          } else {
-            selectedModel = "gpt-4o";
-            console.log(`[AI Assistant] Forcing GPT-4o for complex agent instructions`);
-          }
+        // CRITICAL: Respect agent's selected model - user chose it intentionally
+        if (agentPreferredModel) {
+          // Map frontend model names to OpenAI API model names
+          const openaiModelMap: Record<string, string> = {
+            "gpt-4o": "gpt-4o",
+            "gpt-4.1": "gpt-4o", // gpt-4.1 maps to gpt-4o
+            "gpt-5": "gpt-4o",
+          };
+          selectedModel = openaiModelMap[agentPreferredModel] || "gpt-4o";
+          console.log(`[AI Assistant] Using agent's SELECTED model: ${agentPreferredModel} -> ${selectedModel}`);
+        } else if (requiresStrongModel) {
+          selectedModel = "gpt-4o";
+          console.log(`[AI Assistant] No model selected, defaulting to GPT-4o for complex tasks`);
         } else {
           selectedModel = "gpt-4o-mini";
           if (model === "gpt-4o" || model === "gpt-5" || model?.includes("gpt")) {
@@ -1610,16 +1615,15 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       } else if (apiProvider === 'gemini') {
         apiKey = userApiKeyToUse;
         
-        if (requiresStrongModel) {
-          if (isAgentModelStrong && agentPreferredModel?.includes('gemini')) {
-            selectedModel = "gemini-2.5-pro";
-            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
-            console.log(`[AI Assistant] Using agent's preferred Gemini model: gemini-2.5-pro`);
-          } else {
-            selectedModel = "gemini-2.5-pro";
-            apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
-            console.log(`[AI Assistant] Forcing Gemini Pro for complex agent instructions`);
-          }
+        // CRITICAL: Respect agent's selected model - user chose it intentionally
+        if (agentPreferredModel && agentPreferredModel.includes('gemini')) {
+          selectedModel = "gemini-2.5-pro"; // Both gemini options map to pro for quality
+          apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
+          console.log(`[AI Assistant] Using agent's SELECTED Gemini model: ${agentPreferredModel} -> ${selectedModel}`);
+        } else if (requiresStrongModel) {
+          selectedModel = "gemini-2.5-pro";
+          apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`;
+          console.log(`[AI Assistant] No Gemini model selected, defaulting to gemini-2.5-pro for complex tasks`);
         } else {
           selectedModel = "gemini-2.5-flash";
           apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
@@ -1640,40 +1644,33 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       apiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
       apiKey = LOVABLE_API_KEY!;
       
-      // CRITICAL: For script generation with agent formula, respect agent's preferred model
-      const lovableRequiresStrongModel = type === 'generate_script_with_formula' || type === 'agent_chat' || type === 'viral-script';
-      const agentPreferredModel = agentData?.preferredModel || agentData?.preferred_model || null;
+      // CRITICAL: Respect agent's selected model - user chose it intentionally
+      const agentPreferredModelLovable = agentData?.preferredModel || agentData?.preferred_model || null;
       
       // Map agent's preferred model to Lovable gateway format
       const lovableModelMap: Record<string, string> = {
         "gpt-4o": "openai/gpt-5",
         "gpt-4.1": "openai/gpt-5",
         "gpt-5": "openai/gpt-5",
-        "claude-sonnet-4-20250514": "google/gemini-2.5-pro", // Best alternative on Lovable
-        "claude-4-sonnet": "google/gemini-2.5-pro",
+        "claude-sonnet-4-20250514": "openai/gpt-5", // Claude -> GPT-5 on Lovable (similar quality)
+        "claude-4-sonnet": "openai/gpt-5",
         "gemini-2.5-pro": "google/gemini-2.5-pro",
         "gemini-pro": "google/gemini-2.5-pro",
         "gemini-2.5-flash": "google/gemini-2.5-flash",
-        "deepseek-r1": "google/gemini-2.5-pro", // Use Gemini as alternative
+        "deepseek-r1": "google/gemini-2.5-pro",
       };
       
-      if (lovableRequiresStrongModel) {
-        if (agentPreferredModel && lovableModelMap[agentPreferredModel]) {
-          selectedModel = lovableModelMap[agentPreferredModel];
-          console.log(`[AI Assistant] Using agent's preferred model via Lovable: ${agentPreferredModel} -> ${selectedModel}`);
-        } else {
-          selectedModel = "google/gemini-2.5-pro";
-          console.log(`[AI Assistant] Forcing Gemini Pro via Lovable for complex agent instructions`);
-        }
+      // ALWAYS respect user's model selection first
+      if (agentPreferredModelLovable && lovableModelMap[agentPreferredModelLovable]) {
+        selectedModel = lovableModelMap[agentPreferredModelLovable];
+        console.log(`[AI Assistant] Using agent's SELECTED model via Lovable: ${agentPreferredModelLovable} -> ${selectedModel}`);
+      } else if (model && lovableModelMap[model]) {
+        selectedModel = lovableModelMap[model];
+        console.log(`[AI Assistant] Using request model via Lovable: ${model} -> ${selectedModel}`);
       } else {
-        selectedModel = "google/gemini-2.5-flash";
-        if (model === "gpt-5" || model === "gpt-4o") {
-          selectedModel = "openai/gpt-5";
-        } else if (model === "claude" || model?.includes("claude")) {
-          selectedModel = "google/gemini-2.5-pro";
-        } else if (model === "gemini-pro" || model?.includes("pro")) {
-          selectedModel = "google/gemini-2.5-pro";
-        }
+        // Default to Gemini Pro for quality
+        selectedModel = "google/gemini-2.5-pro";
+        console.log(`[AI Assistant] No model preference, defaulting to: ${selectedModel}`);
       }
       requestHeaders = {
         "Authorization": `Bearer ${apiKey}`,
