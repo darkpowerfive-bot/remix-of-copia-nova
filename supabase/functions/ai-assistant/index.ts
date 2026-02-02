@@ -484,21 +484,25 @@ serve(async (req) => {
           "google/gemini-2.5-pro": "gemini-2.5-pro",
         };
         
-        // Try exact match first, then partial match, then default
-        if (model && laozhangModelMap[model]) {
-          laozhangModel = laozhangModelMap[model];
-        } else if (model?.includes("gpt")) {
+        // CRITICAL: Prioritize agent's preferred model over request model
+        const agentPreferredModel = agentData?.preferredModel || agentData?.preferred_model || null;
+        const modelToMap = agentPreferredModel || model;
+        
+        // Try exact match first with agent's preferred model, then request model
+        if (modelToMap && laozhangModelMap[modelToMap]) {
+          laozhangModel = laozhangModelMap[modelToMap];
+        } else if (modelToMap?.includes("gpt")) {
           laozhangModel = "gpt-4.1";
-        } else if (model?.includes("claude")) {
+        } else if (modelToMap?.includes("claude")) {
           laozhangModel = "claude-sonnet-4-20250514";
-        } else if (model?.includes("deepseek")) {
+        } else if (modelToMap?.includes("deepseek")) {
           laozhangModel = "deepseek-r1";
-        } else if (model?.includes("gemini")) {
+        } else if (modelToMap?.includes("gemini")) {
           laozhangModel = "gemini-2.5-pro";
         } else {
           laozhangModel = "gpt-4.1"; // Default model
         }
-        console.log(`[AI Assistant] Using Laozhang AI (platform credits) - Requested: ${model}, Using: ${laozhangModel}`);
+        console.log(`[AI Assistant] Using Laozhang AI (platform credits) - Agent Model: ${agentPreferredModel}, Request Model: ${model}, Final: ${laozhangModel}`);
       } else if (adminApiKeys?.openai && adminApiKeys.openai_validated) {
         userApiKeyToUse = adminApiKeys.openai ?? null;
         apiProvider = 'openai';
@@ -1556,34 +1560,35 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         apiUrl = "https://api.laozhang.ai/v1/chat/completions";
         apiKey = userApiKeyToUse;
         
-        // Use agent's preferred model if strong enough, otherwise force strong model
-        if (requiresStrongModel) {
-          if (isAgentModelStrong) {
-            // Map agent's preferred model to Laozhang equivalent
-            const laozhangAgentModelMap: Record<string, string> = {
-              "gpt-4o": "gpt-4.1",
-              "gpt-4.1": "gpt-4.1",
-              "gpt-5": "gpt-4.1",
-              "claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
-              "claude-4-sonnet": "claude-sonnet-4-20250514",
-              "gemini-2.5-pro": "gemini-2.5-pro",
-              "gemini-pro": "gemini-2.5-pro",
-              "deepseek-r1": "deepseek-r1",
-            };
-            selectedModel = laozhangAgentModelMap[agentPreferredModel] || "claude-sonnet-4-20250514";
-            console.log(`[AI Assistant] Using agent's preferred model via Laozhang: ${agentPreferredModel} -> ${selectedModel}`);
-          } else {
-            selectedModel = "claude-sonnet-4-20250514";
-            console.log(`[AI Assistant] Forcing Claude Sonnet 4 for complex agent instructions (agent model not strong enough)`);
-          }
+        // Map agent's preferred model to Laozhang equivalent - ALWAYS respect user's choice
+        const laozhangAgentModelMap: Record<string, string> = {
+          "gpt-4o": "gpt-4.1",
+          "gpt-4.1": "gpt-4.1",
+          "gpt-5": "gpt-4.1",
+          "claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
+          "claude-4-sonnet": "claude-sonnet-4-20250514",
+          "gemini-2.5-pro": "gemini-2.5-pro",
+          "gemini-pro": "gemini-2.5-pro",
+          "deepseek-r1": "deepseek-r1",
+        };
+        
+        // Priority: Agent preferred model > laozhangModel (from initial mapping) > default
+        if (agentPreferredModel && laozhangAgentModelMap[agentPreferredModel]) {
+          selectedModel = laozhangAgentModelMap[agentPreferredModel];
+          console.log(`[AI Assistant] Laozhang: Using agent's PREFERRED model: ${agentPreferredModel} -> ${selectedModel}`);
+        } else if (laozhangModel) {
+          selectedModel = laozhangModel;
+          console.log(`[AI Assistant] Laozhang: Using pre-mapped model: ${selectedModel}`);
         } else {
-          selectedModel = laozhangModel || "gpt-4.1";
+          selectedModel = "gpt-4.1";
+          console.log(`[AI Assistant] Laozhang: Using default model: ${selectedModel}`);
         }
+        
         requestHeaders = {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         };
-        console.log(`[AI Assistant] Using Laozhang AI API with model: ${selectedModel}`);
+        console.log(`[AI Assistant] Using Laozhang AI API with final model: ${selectedModel}`);
       } else if (apiProvider === 'openai') {
         apiUrl = "https://api.openai.com/v1/chat/completions";
         apiKey = userApiKeyToUse;
