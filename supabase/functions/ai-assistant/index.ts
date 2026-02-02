@@ -473,12 +473,12 @@ serve(async (req) => {
           "claude-sonnet": "claude-3-5-sonnet-20241022",
           "claude-sonnet-4-20250514": "claude-3-5-sonnet-20241022",
 
-          // DeepSeek Models - correct API identifiers
-          "deepseek-chat": "deepseek-chat",
-          "deepseek-v3": "deepseek-chat",        // V3 uses deepseek-chat endpoint
-          "deepseek-r1": "deepseek-reasoner",    // R1 uses deepseek-reasoner for reasoning
-          "deepseek-reasoner": "deepseek-reasoner",
-          "deepseek-coder": "deepseek-coder",
+          // DeepSeek Models - using deepseek-v3.2-exp (experimental)
+          "deepseek-chat": "deepseek-v3.2-exp",
+          "deepseek-v3": "deepseek-v3.2-exp",
+          "deepseek-r1": "deepseek-v3.2-exp",
+          "deepseek-reasoner": "deepseek-v3.2-exp",
+          "deepseek-coder": "deepseek-v3.2-exp",
 
           // Gemini Models -> gemini-1.5-pro
           "gemini": "gemini-1.5-pro",
@@ -501,10 +501,8 @@ serve(async (req) => {
           laozhangModel = "gpt-4o";
         } else if (modelToMap?.includes("claude")) {
           laozhangModel = "claude-3-5-sonnet-20241022";
-        } else if (modelToMap?.includes("deepseek") && modelToMap?.includes("r1")) {
-          laozhangModel = "deepseek-reasoner";
         } else if (modelToMap?.includes("deepseek")) {
-          laozhangModel = "deepseek-chat";
+          laozhangModel = "deepseek-v3.2-exp";
         } else if (modelToMap?.includes("gemini")) {
           laozhangModel = "gemini-1.5-pro";
         } else {
@@ -1833,9 +1831,9 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
           "claude-4-sonnet": "claude-3-5-sonnet-20241022",
           "gemini-2.5-pro": "gemini-1.5-pro",
           "gemini-pro": "gemini-1.5-pro",
-          "deepseek-r1": "deepseek-reasoner",    // R1 uses deepseek-reasoner
-          "deepseek-v3": "deepseek-chat",        // V3 uses deepseek-chat
-          "deepseek-chat": "deepseek-chat",
+          "deepseek-r1": "deepseek-v3.2-exp",
+          "deepseek-v3": "deepseek-v3.2-exp",
+          "deepseek-chat": "deepseek-v3.2-exp",
         };
         
         // Priority: Agent preferred model > laozhangModel (from initial mapping) > default
