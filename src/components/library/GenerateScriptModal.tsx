@@ -230,6 +230,8 @@ Gere o roteiro seguindo a estrutura e fórmula do agente, otimizado para engajam
               formula: agent.formula,
               formula_structure: agent.formula_structure,
               mental_triggers: agent.mental_triggers,
+              memory: (agent as any).memory,
+              instructions: (agent as any).instructions,
               preferredModel: aiModel,
             },
           },

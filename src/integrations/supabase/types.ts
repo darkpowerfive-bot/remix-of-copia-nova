@@ -1549,6 +1549,8 @@ export type Database = {
           formula: string | null
           formula_structure: Json | null
           id: string
+          instructions: string | null
+          memory: string | null
           mental_triggers: string[] | null
           name: string
           niche: string | null
@@ -1564,6 +1566,8 @@ export type Database = {
           formula?: string | null
           formula_structure?: Json | null
           id?: string
+          instructions?: string | null
+          memory?: string | null
           mental_triggers?: string[] | null
           name: string
           niche?: string | null
@@ -1579,6 +1583,8 @@ export type Database = {
           formula?: string | null
           formula_structure?: Json | null
           id?: string
+          instructions?: string | null
+          memory?: string | null
           mental_triggers?: string[] | null
           name?: string
           niche?: string | null
