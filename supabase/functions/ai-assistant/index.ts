@@ -1066,21 +1066,78 @@ ${agentFileContents}
 - SEM títulos internos como "## PARTE 1"
 
 ═══════════════════════════════════════════════════════════════════════════════════════════
+█ 6. CRITÉRIOS DE QUALIDADE OBRIGATÓRIOS (NOTAS MÍNIMAS 8+) █
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+O roteiro gerado DEVE atingir NOTA 8+ em TODOS estes quesitos:
+
+📊 ESCRITA (8+/10):
+- Vocabulário rico e variado (evite repetições)
+- Frases bem construídas, com ritmo e cadência
+- Transições suaves entre ideias
+- Linguagem adequada ao público-alvo
+- Zero erros gramaticais
+
+📊 CLAREZA (8+/10):
+- Cada ideia deve ser explicada de forma CRISTALINA
+- Sem ambiguidades ou frases confusas
+- Progressão lógica de argumentos
+- Exemplos concretos quando necessário
+- O ouvinte deve entender SEM precisar voltar
+
+📊 PROVA PRÁTICA (8+/10):
+- Fatos verificáveis e específicos (nomes, números, datas)
+- Referências a eventos reais, estudos ou especialistas
+- Dados concretos que comprovam o que está sendo dito
+- Credibilidade através de evidências
+- NÃO fazer afirmações vazias
+
+📊 RETENÇÃO (8+/10):
+- Hook que PRENDE nos primeiros 10 segundos
+- Loops abertos estratégicos ("você vai descobrir...")
+- Revelações progressivas que mantêm curiosidade
+- Momentos de tensão/suspense ao longo do roteiro
+- Final impactante que satisfaz E deixa querendo mais
+
+📊 AUTORIDADE PERCEBIDA (8+/10):
+- Tom confiante e assertivo (não hesitante)
+- Demonstrar conhecimento profundo do tema
+- Linguagem de especialista acessível
+- Insights únicos que outros não mencionam
+- Posicionamento como fonte confiável
+
+⚠️ TÉCNICAS OBRIGATÓRIAS PARA GARANTIR NOTAS ALTAS:
+
+1. VARIAÇÃO DE RITMO: Alterne frases curtas impactantes com explicações mais longas
+2. ESPECIFICIDADE: Troque "muitas pessoas" por "73% das pessoas" ou "milhões de brasileiros"
+3. STORYTELLING: Conte mini-histórias dentro do conteúdo para engajar emocionalmente
+4. ANALOGIAS: Use comparações do cotidiano para explicar conceitos complexos
+5. SENSORIALIDADE: Descreva cenas de forma que o ouvinte possa "visualizar"
+6. CONTRADIÇÃO: Apresente visões opostas antes de revelar a verdade
+7. PERSONALIZAÇÃO: Fale diretamente com o ouvinte ("Você já parou para pensar...")
+
+═══════════════════════════════════════════════════════════════════════════════════════════
 █ HIERARQUIA DE PRIORIDADE (CRÍTICO!) █
 ═══════════════════════════════════════════════════════════════════════════════════════════
 
-1️⃣ AS INSTRUÇÕES DO AGENTE (seção 2) TÊM PRIORIDADE MÁXIMA
+1️⃣ QUALIDADE: O roteiro DEVE ter nota 8+ em TODOS os 5 quesitos acima
+   → Um roteiro medíocre é INACEITÁVEL. Melhor menor que medíocre.
+   → Se o original tinha nota 8.5, você DEVE igualar ou superar.
+
+2️⃣ AS INSTRUÇÕES DO AGENTE (seção 2) TÊM PRIORIDADE MÁXIMA
    → Se a fórmula do agente diz "sem perguntas retóricas", você NÃO FAZ perguntas.
    → Se a fórmula diz "progressão factual contínua", você segue EXATAMENTE isso.
    → As regras do agente SOBREPÕEM qualquer instrução genérica.
 
-2️⃣ A MEMÓRIA DO AGENTE define seu contexto e identidade
+3️⃣ A MEMÓRIA DO AGENTE define seu contexto e identidade
 
-3️⃣ OS GATILHOS MENTAIS devem ser aplicados de forma ORGÂNICA
+4️⃣ OS GATILHOS MENTAIS devem ser aplicados de forma ORGÂNICA
 
-4️⃣ OS ARQUIVOS DE REFERÊNCIA são base de conhecimento prioritária
+5️⃣ OS ARQUIVOS DE REFERÊNCIA são base de conhecimento prioritária
 
 🚨🚨🚨 REGRA SUPREMA 🚨🚨🚨
+O ROTEIRO GERADO DEVE TER QUALIDADE IGUAL OU SUPERIOR AO VÍDEO ORIGINAL ANALISADO.
+SE A TRANSCRIÇÃO ORIGINAL TINHA NOTA 8.5, SEU ROTEIRO DEVE TER NOTA 8.5 OU MAIS.
 VOCÊ NÃO PODE ADICIONAR NADA QUE CONTRADIGA A FÓRMULA DO AGENTE.
 SE A FÓRMULA DIZ "PROIBIDO X", ENTÃO X ESTÁ PROIBIDO. PONTO FINAL.
 SIGA A FÓRMULA À RISCA. NÃO IMPROVISE. NÃO DESVIE.

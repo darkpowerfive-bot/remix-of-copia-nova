@@ -345,33 +345,35 @@ Gere o roteiro seguindo a estrutura e fórmula do agente, otimizado para engajam
   };
 
   // Loading messages for professional experience
-  const loadingMessages = [
-    "Analisando título e nicho",
-    "Aplicando fórmula viral do agente",
-    "Estruturando narrativa com gatilhos mentais",
-    "Desenvolvendo hook poderoso",
-    "Criando conteúdo otimizado para engajamento",
-    "Finalizando roteiro"
+  const loadingSteps = [
+    { step: 1, label: "Analisando título", detail: "Identificando tema e público-alvo" },
+    { step: 2, label: "Carregando fórmula viral", detail: "Aplicando estrutura do agente" },
+    { step: 3, label: "Desenvolvendo hook poderoso", detail: "Criando abertura impactante" },
+    { step: 4, label: "Estruturando narrativa", detail: "Aplicando gatilhos mentais e transições" },
+    { step: 5, label: "Otimizando para retenção", detail: "Garantindo notas 8+ em todos os quesitos" },
+    { step: 6, label: "Finalizando roteiro", detail: "Revisando qualidade e formatação" }
   ];
-  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const [loadingStepIndex, setLoadingStepIndex] = useState(0);
 
-  // Rotate loading messages
+  // Rotate loading steps
   useEffect(() => {
     if (generating) {
-      setLoadingMessageIndex(0);
+      setLoadingStepIndex(0);
       const interval = setInterval(() => {
-        setLoadingMessageIndex(prev => (prev + 1) % loadingMessages.length);
-      }, 3000);
+        setLoadingStepIndex(prev => (prev + 1) % loadingSteps.length);
+      }, 4000);
       return () => clearInterval(interval);
     }
   }, [generating]);
 
   if (!agent) return null;
 
+  const currentLoadingStep = loadingSteps[loadingStepIndex];
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-card border-primary/30">
-        {/* Loading Overlay - PADRONIZADO */}
+        {/* Loading Overlay - MELHORADO COM LEGIBILIDADE */}
         {generating && (
           <div className="absolute inset-0 bg-background/98 backdrop-blur-sm z-50 flex flex-col items-center justify-center rounded-lg p-8">
             {/* Logo com efeito de pulso - PADRONIZADO w-24 */}
@@ -387,15 +389,39 @@ Gere o roteiro seguindo a estrutura e fórmula do agente, otimizado para engajam
               </div>
             </div>
             
-            <h3 className="text-lg font-bold text-foreground mb-1">Gerando Roteiro</h3>
+            <h3 className="text-lg font-bold text-foreground mb-2">Gerando Roteiro</h3>
             
-            <p className="text-sm text-muted-foreground mb-4 text-center">
-              {loadingMessages[loadingMessageIndex]}...
-            </p>
+            {/* Current Step with better visibility */}
+            <div className="text-center mb-4 space-y-1">
+              <p className="text-base font-medium text-primary">
+                {currentLoadingStep.label}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {currentLoadingStep.detail}
+              </p>
+            </div>
 
-            {/* Indicador de partes */}
+            {/* Step indicators - horizontal dots showing progress */}
+            <div className="flex items-center gap-2 mb-4">
+              {loadingSteps.map((step, i) => (
+                <div
+                  key={i}
+                  className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                    i < loadingStepIndex
+                      ? "bg-primary"
+                      : i === loadingStepIndex
+                      ? "bg-primary animate-pulse scale-125"
+                      : "bg-muted-foreground/30"
+                  }`}
+                  title={step.label}
+                />
+              ))}
+            </div>
+
+            {/* Parts indicator for multi-part scripts */}
             {totalParts > 1 && (
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-4 px-4 py-2 bg-secondary/50 rounded-lg">
+                <span className="text-xs text-muted-foreground">Parte</span>
                 {Array.from({ length: totalParts }, (_, i) => (
                   <div
                     key={i}
@@ -415,11 +441,16 @@ Gere o roteiro seguindo a estrutura e fórmula do agente, otimizado para engajam
             
             {/* Barra de progresso */}
             <div className="w-full space-y-2">
-              <Progress value={progress} className="h-1.5 bg-secondary" />
-              <p className="text-xs text-center text-muted-foreground">
+              <Progress value={progress} className="h-2 bg-secondary" />
+              <p className="text-sm text-center text-muted-foreground font-medium">
                 {progress}%
               </p>
             </div>
+
+            {/* Quality guarantee message */}
+            <p className="text-xs text-muted-foreground/70 text-center mt-4 max-w-xs">
+              ✨ Garantindo notas 8+ em escrita, clareza, prova prática, retenção e autoridade
+            </p>
           </div>
         )}
 
