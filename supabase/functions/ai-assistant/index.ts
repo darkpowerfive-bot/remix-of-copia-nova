@@ -480,14 +480,14 @@ serve(async (req) => {
           "deepseek-reasoner": "deepseek-v3.2-exp",
           "deepseek-coder": "deepseek-v3.2-exp",
 
-          // Gemini Models -> gemini-1.5-pro
-          "gemini": "gemini-1.5-pro",
-          "gemini-flash": "gemini-1.5-flash",
-          "gemini-pro": "gemini-1.5-pro",
-          "gemini-2.5-flash": "gemini-1.5-flash",
-          "gemini-2.5-pro": "gemini-1.5-pro",
-          "google/gemini-2.5-flash": "gemini-1.5-flash",
-          "google/gemini-2.5-pro": "gemini-1.5-pro",
+          // Gemini Models -> usar deepseek-v3.2-exp (gemini-1.5-pro não disponível no Laozhang)
+          "gemini": "deepseek-v3.2-exp",
+          "gemini-flash": "deepseek-v3.2-exp",
+          "gemini-pro": "deepseek-v3.2-exp",
+          "gemini-2.5-flash": "deepseek-v3.2-exp",
+          "gemini-2.5-pro": "deepseek-v3.2-exp",
+          "google/gemini-2.5-flash": "deepseek-v3.2-exp",
+          "google/gemini-2.5-pro": "deepseek-v3.2-exp",
         };
         
         // CRITICAL: Prioritize agent's preferred model over request model
@@ -504,7 +504,7 @@ serve(async (req) => {
         } else if (modelToMap?.includes("deepseek")) {
           laozhangModel = "deepseek-v3.2-exp";
         } else if (modelToMap?.includes("gemini")) {
-          laozhangModel = "gemini-1.5-pro";
+          laozhangModel = "deepseek-v3.2-exp"; // gemini não disponível, usar deepseek
         } else {
           laozhangModel = "gpt-4o"; // Default model
         }
