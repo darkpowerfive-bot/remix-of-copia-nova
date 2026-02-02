@@ -101,10 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("Erro ao atualizar whatsapp:", e);
       }
       
-      // Enviar email de pendente de aprovação para o usuário
+      // Enviar email de pendente de aprovação para o usuário (e WhatsApp)
       try {
         await supabase.functions.invoke("send-pending-email", {
-          body: { email, fullName },
+          body: { email, fullName, whatsapp },
         });
       } catch (e) {
         console.error("Erro ao enviar email de pendente:", e);
