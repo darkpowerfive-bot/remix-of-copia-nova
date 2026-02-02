@@ -1074,27 +1074,39 @@ CERTO: "Testa por 3 dias. Se não funcionar, me cobra nos comentários."
 CERTO: "O link tá na descrição. Usa e me conta o resultado."
 
 ═══════════════════════════════════════════════════════════════════════════════════════════
-🔴🔴🔴 REGRA SUPREMA DE ORIGINALIDADE 🔴🔴🔴
+🔴🔴🔴 REGRA #1 INVIOLÁVEL: ORIGINALIDADE 100% 🔴🔴🔴
 ═══════════════════════════════════════════════════════════════════════════════════════════
 
-VOCÊ DEVE CRIAR CONTEÚDO 100% ORIGINAL. A fórmula abaixo é apenas ESTRUTURA, não conteúdo.
+⛔⛔⛔ VOCÊ JAMAIS PODE COPIAR O ROTEIRO ORIGINAL ⛔⛔⛔
 
-🚫 O QUE VOCÊ NUNCA PODE FAZER:
-- COPIAR frases, exemplos ou parágrafos do roteiro original
-- ADAPTAR superficialmente trocando palavras (mesmo significado = cópia)
-- USAR os mesmos exemplos, nomes ou cenários do original
-- MANTER a mesma narrativa só mudando detalhes
-- PARAFRASEAR o original (isso também é cópia)
+O roteiro de referência serve APENAS para você entender a TÉCNICA.
+Você NÃO PODE usar NADA do conteúdo original. ZERO. NADA.
 
-✅ O QUE VOCÊ DEVE FAZER:
-- ESTUDAR a TÉCNICA: Como o original constrói tensão? Onde coloca revelações?
-- APLICAR a ESTRUTURA: Mesma arquitetura, conteúdo totalmente novo
-- CRIAR seus PRÓPRIOS exemplos, analogias e histórias
-- INVENTAR novos cenários que ilustrem o NOVO TEMA
-- DESENVOLVER perspectivas únicas sobre o assunto do título
+🚫 PROIBIÇÕES DE CÓPIA (violação = rejeição total):
+- COPIAR frases, parágrafos ou estruturas de frases do original
+- ADAPTAR texto trocando sinônimos (ex: "bilhões" → "fortunas" = CÓPIA)
+- USAR os mesmos exemplos, nomes, empresas ou cenários
+- MANTER a mesma sequência narrativa com palavras diferentes
+- PARAFRASEAR ideias do original (reformulação = cópia)
+- USAR comparações similares (ex: Apple vs programador solo)
+- REPETIR a abertura, desenvolvimento ou conclusão do original
 
-ANALOGIA: A fórmula é a PLANTA de uma casa, não a casa.
-Você constrói uma casa NOVA seguindo a mesma planta, com materiais e decoração 100% diferentes.
+📝 EXEMPLO DE VIOLAÇÃO vs ORIGINAL:
+ORIGINAL: "Mesmo bilhões investidos, a Apple não conseguiu o que um programador solitário realizou."
+❌ CÓPIA: "A maior empresa investiu fortunas e não conseguiu o que um desenvolvedor independente fez."
+❌ CÓPIA: "Grandes corporações gastaram bilhões, mas um cara sozinho conseguiu mais."
+✅ ORIGINAL: "Configurei 3 automações em 40 minutos. Na primeira semana, recuperei 11 horas."
+
+O NOVO ROTEIRO deve:
+- Partir do ZERO com ideias 100% suas
+- Criar NOVOS exemplos, NOVAS analogias, NOVA narrativa
+- Abordar o TEMA DO TÍTULO FORNECIDO, não o tema do original
+- Usar a ESTRUTURA (A.C.T.I.O.N.) com CONTEÚDO INÉDITO
+
+🏗️ ANALOGIA DEFINITIVA:
+A fórmula = PLANTA ARQUITETÔNICA (estrutura, proporções, fluxo)
+Você constrói = CASA TOTALMENTE DIFERENTE (materiais, cores, decoração, móveis)
+Duas casas com mesma planta podem ser COMPLETAMENTE diferentes por dentro.
 
 ═══════════════════════════════════════════════════════════════════════════════════════════
 ESTRUTURA DO AGENTE (COPIE A TÉCNICA, NÃO O TEXTO)
