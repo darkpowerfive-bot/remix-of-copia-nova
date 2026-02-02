@@ -24,6 +24,7 @@ const AI_MODELS = [
   { id: "gpt-4o", name: "GPT-4o", provider: "OpenAI", description: "Rápido e inteligente" },
   { id: "claude-4-sonnet", name: "Claude 4 Sonnet", provider: "Anthropic", description: "Criativo e detalhado" },
   { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", provider: "Google", description: "Contexto extenso" },
+  { id: "deepseek-r1", name: "DeepSeek R1", provider: "DeepSeek", description: "Raciocínio avançado" },
 ];
 
 interface Message {
