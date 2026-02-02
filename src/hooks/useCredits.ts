@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { useProfileData } from "./useProfileData";
 
 interface CreditTransaction {
   id: string;
@@ -25,85 +26,57 @@ const CREDITS_GC_TIME = 10 * 60 * 1000;
 export const useCredits = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Use optimized combined query for balance
+  const { credits: balance, loading, refetch: refreshBalance } = useProfileData();
 
-  const { data: balance = 0, isLoading: loading } = useQuery({
-    queryKey: ['user-credits', user?.id],
-    queryFn: async () => {
-      if (!user) return 0;
-      
-      const { data, error } = await supabase
-        .from('user_credits')
-        .select('balance')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      
-      if (!data) {
-        await supabase
-          .from('user_credits')
-          .insert({ user_id: user.id, balance: 50 });
-        return 50;
-      }
-      
-      // Garantir que saldo nunca seja negativo
-      return Math.max(0, Math.ceil(data.balance));
-    },
-    enabled: !!user,
-    staleTime: CREDITS_STALE_TIME,
-    gcTime: CREDITS_GC_TIME,
-  });
-
-  const { data: transactions = [] } = useQuery({
+  // Transactions and usage are only fetched when explicitly needed (lazy)
+  const { data: transactions = [], refetch: fetchTransactionsInternal } = useQuery({
     queryKey: ['credit-transactions', user?.id],
     queryFn: async () => {
       if (!user) return [];
       
       const { data, error } = await supabase
         .from('credit_transactions')
-        .select('*')
+        .select('id, amount, transaction_type, description, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as CreditTransaction[];
     },
-    enabled: !!user,
+    enabled: false, // Lazy - only fetch when requested
     staleTime: CREDITS_STALE_TIME,
     gcTime: CREDITS_GC_TIME,
   });
 
-  const { data: usage = [] } = useQuery({
+  const { data: usage = [], refetch: fetchUsageInternal } = useQuery({
     queryKey: ['credit-usage', user?.id],
     queryFn: async () => {
       if (!user) return [];
       
       const { data, error } = await supabase
         .from('credit_usage')
-        .select('*')
+        .select('id, operation_type, credits_used, model_used, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as CreditUsage[];
     },
-    enabled: !!user,
+    enabled: false, // Lazy - only fetch when requested
     staleTime: CREDITS_STALE_TIME,
     gcTime: CREDITS_GC_TIME,
   });
 
-  const refreshBalance = () => {
-    queryClient.invalidateQueries({ queryKey: ['user-credits', user?.id] });
-  };
-
   const fetchTransactions = () => {
-    queryClient.invalidateQueries({ queryKey: ['credit-transactions', user?.id] });
+    fetchTransactionsInternal();
   };
 
   const fetchUsage = () => {
-    queryClient.invalidateQueries({ queryKey: ['credit-usage', user?.id] });
+    fetchUsageInternal();
   };
 
   return {

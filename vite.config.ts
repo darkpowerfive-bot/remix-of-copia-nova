@@ -24,25 +24,24 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: {
-          // Core React libs
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          // UI components
-          "vendor-ui": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-tooltip",
-            "@radix-ui/react-select",
-            "@radix-ui/react-popover",
-          ],
-          // Charts
+          // Core React libs - smallest critical chunk
+          "vendor-react": ["react", "react-dom"],
+          // Router separate for better caching
+          "vendor-router": ["react-router-dom"],
+          // UI components - split into smaller chunks
+          "vendor-ui-dialog": ["@radix-ui/react-dialog", "@radix-ui/react-alert-dialog"],
+          "vendor-ui-menu": ["@radix-ui/react-dropdown-menu", "@radix-ui/react-popover", "@radix-ui/react-select"],
+          "vendor-ui-base": ["@radix-ui/react-tabs", "@radix-ui/react-tooltip", "@radix-ui/react-checkbox"],
+          // Charts - only load when needed
           "vendor-charts": ["recharts"],
           // Query
           "vendor-query": ["@tanstack/react-query"],
           // Supabase
           "vendor-supabase": ["@supabase/supabase-js"],
-          // Animation
+          // Animation - often not needed immediately
           "vendor-animation": ["framer-motion"],
+          // Icons - separate for tree-shaking
+          "vendor-icons": ["lucide-react"],
         },
       },
     },
