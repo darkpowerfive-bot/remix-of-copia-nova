@@ -867,18 +867,29 @@ Crie uma fórmula que funcione assim:
         
         // ESTRUTURA DETALHADA: Hook, Desenvolvimento, Clímax, CTA, Transições
         const estruturaDetalhada = agentData?.formula_structure?.hook 
-          ? `HOOK: ${agentData.formula_structure.hook}\n` +
-            `DESENVOLVIMENTO: ${agentData.formula_structure.desenvolvimento || ''}\n` +
-            `CLÍMAX: ${agentData.formula_structure.climax || ''}\n` +
-            `CTA: ${agentData.formula_structure.cta || ''}\n` +
-            `TRANSIÇÕES: ${agentData.formula_structure.transicoes || ''}`
+          ? `HOOK (Abertura que captura atenção): ${agentData.formula_structure.hook}\n\n` +
+            `DESENVOLVIMENTO (Como construir o conteúdo): ${agentData.formula_structure.desenvolvimento || ''}\n\n` +
+            `CLÍMAX (Momento de maior impacto): ${agentData.formula_structure.climax || ''}\n\n` +
+            `CTA (Chamada para ação): ${agentData.formula_structure.cta || ''}\n\n` +
+            `TRANSIÇÕES (Como conectar as partes): ${agentData.formula_structure.transicoes || ''}`
           : "";
         
         // EXEMPLOS DE APLICAÇÃO: Frases-chave e estruturas
         const exemplosDeAplicacao = agentData?.formula_structure?.exemplosDeAplicacao;
-        const frasesChave = exemplosDeAplicacao?.fraserChave?.length > 0
-          ? `FRASES-CHAVE PARA ADAPTAR:\n${exemplosDeAplicacao.fraserChave.map((f: string) => `• "${f}"`).join('\n')}`
-          : "";
+        let frasesChave = "";
+        if (exemplosDeAplicacao) {
+          const partes = [];
+          if (exemplosDeAplicacao.fraserChave?.length > 0) {
+            partes.push(`FRASES-MODELO PARA ADAPTAR:\n${exemplosDeAplicacao.fraserChave.map((f: string) => `• "${f}"`).join('\n')}`);
+          }
+          if (exemplosDeAplicacao.estruturaDeFrases) {
+            partes.push(`PADRÃO DE FRASES: ${exemplosDeAplicacao.estruturaDeFrases}`);
+          }
+          if (exemplosDeAplicacao.transicoesUsadas?.length > 0) {
+            partes.push(`TRANSIÇÕES MODELO: ${exemplosDeAplicacao.transicoesUsadas.join(', ')}`);
+          }
+          frasesChave = partes.join('\n\n');
+        }
         
         // TRIGGERS: Manter a estrutura COMPLETA dos gatilhos (podem ter descrições longas)
         // Usar bullet points para cada trigger com seu texto completo
@@ -891,6 +902,17 @@ Crie uma fórmula que funcione assim:
         const agentFileContents = agentData?.files 
           ? agentData.files.map((f: { name: string; content: string }) => `📎 ARQUIVO "${f.name}":\n─────────────────────────────────────────\n${f.content}\n─────────────────────────────────────────`).join('\n\n')
           : "";
+
+        // Log completo para debug
+        console.log(`[AI Assistant] === AGENT DATA DEBUG ===`);
+        console.log(`[AI Assistant] Formula Structure Keys: ${JSON.stringify(Object.keys(agentData?.formula_structure || {}))}`);
+        console.log(`[AI Assistant] Has formulaReplicavel: ${!!formulaReplicavel}, length: ${formulaReplicavel?.length || 0}`);
+        console.log(`[AI Assistant] Has motivoSucesso: ${!!motivoSucesso}, length: ${motivoSucesso?.length || 0}`);
+        console.log(`[AI Assistant] Has estruturaDetalhada: ${!!estruturaDetalhada}, length: ${estruturaDetalhada?.length || 0}`);
+        console.log(`[AI Assistant] Has frasesChave: ${!!frasesChave}, length: ${frasesChave?.length || 0}`);
+        console.log(`[AI Assistant] Has instrucoesParaAgente: ${!!agentInstructions}, length: ${agentInstructions?.length || 0}`);
+        console.log(`[AI Assistant] Mental Triggers: ${agentTriggersArray.length} items`);
+        
         
         // Usar minDuration/maxDuration do request
         const scriptMinDuration = minDuration ? parseInt(minDuration.toString()) : (duration ? parseInt(duration.toString()) : 5);
@@ -934,6 +956,9 @@ Crie uma fórmula que funcione assim:
         };
         const scriptLanguageName = languageNames[language] || language || "Português do Brasil";
         
+        // Obter título original do agente (do qual foi baseado a análise)
+        const basedOnTitle = agentData?.based_on_title || "";
+        
         // CRITICAL: Build system prompt with COMPLETE agent config - NO SIMPLIFICATION
         systemPrompt = `
 ╔═══════════════════════════════════════════════════════════════════════════════════════════╗
@@ -947,6 +972,18 @@ Crie uma fórmula que funcione assim:
 🌍 IDIOMA OBRIGATÓRIO: ${scriptLanguageName}
 ⚠️ ESCREVA 100% DO ROTEIRO EM ${scriptLanguageName.toUpperCase()}. NENHUMA PALAVRA EM OUTRO IDIOMA.
 
+${basedOnTitle ? `
+═══════════════════════════════════════════════════════════════════════════════════════════
+█ CONTEXTO: ESTE AGENTE FOI CRIADO ANALISANDO UM VÍDEO VIRAL █
+═══════════════════════════════════════════════════════════════════════════════════════════
+
+Vídeo original analisado: "${basedOnTitle}"
+Nicho: ${agentData?.niche || 'Não especificado'} / Sub-nicho: ${agentData?.sub_niche || 'Não especificado'}
+
+🎯 SUA MISSÃO: Aplicar EXATAMENTE a mesma fórmula de sucesso deste vídeo viral ao NOVO título solicitado pelo usuário.
+Você deve replicar a estrutura, ritmo, técnicas e gatilhos que fizeram o vídeo original viralizar.
+` : ''}
+
 ═══════════════════════════════════════════════════════════════════════════════════════════
 █ 1. MEMÓRIA DO AGENTE (CONTEXTO OBRIGATÓRIO - ESTA É SUA IDENTIDADE) █
 ═══════════════════════════════════════════════════════════════════════════════════════════
@@ -954,29 +991,38 @@ Crie uma fórmula que funcione assim:
 ${agentMemory || '(Nenhuma memória configurada)'}
 
 ═══════════════════════════════════════════════════════════════════════════════════════════
-█ 2. FÓRMULA E INSTRUÇÕES DO AGENTE (SIGA EXATAMENTE - SEM DESVIOS) █
+█ 2. FÓRMULA VIRAL EXTRAÍDA (SIGA EXATAMENTE - SEM DESVIOS) █
 ═══════════════════════════════════════════════════════════════════════════════════════════
 
+🔑 FÓRMULA PRINCIPAL:
 ${agentFormula || '(Nenhuma fórmula configurada)'}
-${agentInstructions ? `\n--- INSTRUÇÕES ADICIONAIS ---\n${agentInstructions}` : ''}
+
+${agentInstructions ? `
+📋 INSTRUÇÕES ESPECÍFICAS DO AGENTE:
+${agentInstructions}
+` : ''}
 
 ${formulaReplicavel ? `
---- FÓRMULA REPLICÁVEL (PASSO-A-PASSO) ---
+📐 FÓRMULA REPLICÁVEL (PASSO-A-PASSO OBRIGATÓRIO):
 ${formulaReplicavel}
+
+⚠️ VOCÊ DEVE SEGUIR ESTE PASSO-A-PASSO À RISCA AO CRIAR O ROTEIRO!
 ` : ''}
 
 ${motivoSucesso ? `
---- POR QUE ESTA FÓRMULA FUNCIONA ---
+🧠 POR QUE ESTA FÓRMULA VIRALIZA:
 ${motivoSucesso}
 ` : ''}
 
 ${estruturaDetalhada ? `
---- ESTRUTURA OBRIGATÓRIA ---
+📊 ESTRUTURA OBRIGATÓRIA DO ROTEIRO:
 ${estruturaDetalhada}
+
+⚠️ CADA SEÇÃO ACIMA DEVE EXISTIR NO SEU ROTEIRO!
 ` : ''}
 
 ${frasesChave ? `
---- TEMPLATES DE FRASES ---
+💬 EXEMPLOS E TEMPLATES:
 ${frasesChave}
 ` : ''}
 
