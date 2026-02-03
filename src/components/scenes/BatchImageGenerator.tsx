@@ -978,7 +978,7 @@ Retorne APENAS o novo prompt de imagem, sem explicações:`;
       const { data, error } = await supabase.functions.invoke("ai-assistant", {
         body: {
           messages: [{ role: "user", content: contextPrompt }],
-          model: "deepseek-r1",
+          model: "deepseek-v3.2-exp",
           type: "image_prompt"
         }
       });

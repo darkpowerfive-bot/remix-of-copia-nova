@@ -1518,7 +1518,7 @@ ${referencePrompts ? `REFERÊNCIA DE ESTILO (prompts que funcionaram):\n${refere
 Crie um prompt de imagem em inglês que represente visualmente esta cena do roteiro, mantendo o estilo visual consistente.`
                 }
               ],
-              model: 'deepseek-r1',
+              model: 'deepseek-v3.2-exp',
               type: 'image_prompt'
             }
           });
