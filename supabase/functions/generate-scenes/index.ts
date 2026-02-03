@@ -1302,8 +1302,10 @@ serve(async (req) => {
             })}\n\n`);
 
             const allScenes: SceneResult[] = [];
+            let completedScenes = 0; // Contador global para progresso gradual
 
-            // OTIMIZADO v2: Processar até 3 batches em PARALELO para triplicar a velocidade
+            // OTIMIZADO v3: Processar batches em paralelo MAS emitir cenas GRADUALMENTE
+            // Em vez de esperar todos os batches, emitimos cenas assim que cada batch individual termina
             const PARALLEL_BATCHES = 3;
 
             for (let i = 0; i < sceneBatches.length; i += PARALLEL_BATCHES) {
@@ -1323,6 +1325,33 @@ serve(async (req) => {
               })}\n\n`);
 
               // Criar promises para todos os batches em paralelo
+              // NOVA ABORDAGEM: Cada promise emite suas cenas imediatamente ao completar
+              const pendingScenes: Map<number, SceneResult[]> = new Map();
+              let nextBatchToEmit = i + 1; // Qual batch deve emitir próximo (para manter ordem)
+
+              const emitPendingScenes = () => {
+                // Emitir cenas na ordem correta
+                while (pendingScenes.has(nextBatchToEmit)) {
+                  const scenes = pendingScenes.get(nextBatchToEmit)!;
+                  pendingScenes.delete(nextBatchToEmit);
+                  
+                  for (const scene of scenes) {
+                    if (isControllerClosed) break;
+                    allScenes.push(scene);
+                    completedScenes++;
+                    
+                    // IMPORTANTE: Emitir CADA cena individualmente para progresso gradual
+                    safeEnqueue(`data: ${JSON.stringify({ 
+                      type: 'scene', 
+                      scene,
+                      current: completedScenes,
+                      total: actualSceneCount
+                    })}\n\n`);
+                  }
+                  nextBatchToEmit++;
+                }
+              };
+
               const batchPromises = batchesToProcess.map((batch, idx) => {
                 const batchNum = i + idx + 1;
                 
@@ -1348,53 +1377,31 @@ serve(async (req) => {
                 });
 
                 return Promise.race([batchPromise, timeoutPromise])
-                  .then(scenes => ({ batchNum, scenes, error: null }))
-                  .catch(error => ({ batchNum, scenes: null as SceneResult[] | null, error }));
-              });
-
-              // Esperar TODOS os batches paralelos completarem
-              const results = await Promise.all(batchPromises);
-
-              // Processar resultados ordenadamente
-              for (const result of results.sort((a, b) => a.batchNum - b.batchNum)) {
-                if (isControllerClosed) break;
-
-                if (result.scenes && result.scenes.length > 0) {
-                  // Sucesso: enviar cenas individualmente
-                  for (const scene of result.scenes) {
-                    if (isControllerClosed) break;
-                    allScenes.push(scene);
+                  .then(scenes => {
+                    console.log(`[Generate Scenes] Batch ${batchNum} completed: ${scenes.length} scenes`);
+                    // Armazenar cenas para emissão ordenada
+                    pendingScenes.set(batchNum, scenes);
+                    // Tentar emitir cenas pendentes na ordem
+                    emitPendingScenes();
+                    return { batchNum, scenes, error: null };
+                  })
+                  .catch(error => {
+                    console.error(`[Generate Scenes] Batch ${batchNum} failed:`, error);
                     
                     safeEnqueue(`data: ${JSON.stringify({ 
-                      type: 'scene', 
-                      scene,
-                      current: allScenes.length,
-                      total: actualSceneCount
+                      type: 'batch_retry', 
+                      batch: batchNum,
+                      message: 'Usando fallback para este lote'
                     })}\n\n`);
-                  }
-                  console.log(`[Generate Scenes] Batch ${result.batchNum} completed: ${result.scenes.length} scenes`);
-                } else {
-                  // Erro: gerar fallback para este batch
-                  console.error(`[Generate Scenes] Batch ${result.batchNum} failed:`, result.error);
-                  
-                  safeEnqueue(`data: ${JSON.stringify({ 
-                    type: 'batch_retry', 
-                    batch: result.batchNum,
-                    message: 'Usando fallback para este lote'
-                  })}\n\n`);
 
-                  // Encontrar o batch original para gerar fallback
-                  const originalBatch = sceneBatches[result.batchNum - 1];
-                  if (originalBatch) {
-                    for (const preScene of originalBatch) {
-                      if (isControllerClosed) break;
-                      
-                      // Diversificação visual no fallback
+                    // Gerar fallback imediatamente
+                    const fallbackScenes: SceneResult[] = [];
+                    for (const preScene of batch) {
                       const sceneIdx = preScene.number - 1;
                       const cameraAngles = ['wide shot', 'close-up', 'medium shot', 'panoramic view'];
                       const lighting = ['golden hour', 'dramatic lighting', 'soft light', 'atmospheric haze'];
                       
-                      const fallbackScene: SceneResult = {
+                      fallbackScenes.push({
                         number: preScene.number,
                         text: preScene.text,
                         wordCount: preScene.wordCount,
@@ -1402,19 +1409,22 @@ serve(async (req) => {
                         emotion: 'neutral',
                         retentionTrigger: 'continuity',
                         suggestMovement: preScene.number <= 5
-                      };
-                      allScenes.push(fallbackScene);
-                      
-                      safeEnqueue(`data: ${JSON.stringify({ 
-                        type: 'scene', 
-                        scene: fallbackScene,
-                        current: allScenes.length,
-                        total: actualSceneCount
-                      })}\n\n`);
+                      });
                     }
-                  }
-                }
-              }
+                    
+                    // Armazenar fallback para emissão ordenada
+                    pendingScenes.set(batchNum, fallbackScenes);
+                    emitPendingScenes();
+                    
+                    return { batchNum, scenes: fallbackScenes, error };
+                  });
+              });
+
+              // Esperar todos os batches paralelos completarem
+              await Promise.all(batchPromises);
+              
+              // Garantir que todas as cenas pendentes foram emitidas
+              emitPendingScenes();
 
               // Pausa mínima entre grupos de batches paralelos
               if (i + PARALLEL_BATCHES < sceneBatches.length) {
