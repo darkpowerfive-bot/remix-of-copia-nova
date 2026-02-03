@@ -431,25 +431,289 @@ const generateKenBurnsKeyframesXml = (
 };
 
 /**
- * Tipos de transição disponíveis
+ * Tipos de transição disponíveis - Expandido para DaVinci Resolve
  */
-export type TransitionType = 'cross_dissolve' | 'fade_to_black' | 'dip_to_color' | 'wipe' | 'push' | 'none';
+export type TransitionType = 
+  // Dissolve
+  | 'cross_dissolve' 
+  | 'fade_to_black' 
+  | 'dip_to_color' 
+  | 'additive_dissolve'
+  | 'non_additive_dissolve'
+  | 'blur_dissolve'
+  // Íris
+  | 'iris_circle'
+  | 'iris_diamond'
+  | 'iris_cross'
+  | 'iris_oval'
+  | 'iris_star'
+  | 'iris_hexagon'
+  // Movimento
+  | 'push'
+  | 'slide'
+  | 'split'
+  | 'door_open'
+  // Wipe
+  | 'wipe'
+  | 'wipe_up'
+  | 'wipe_down'
+  // Cortina
+  | 'center_curtain'
+  | 'band_curtain'
+  | 'edge_curtain'
+  | 'clock_curtain'
+  | 'spiral_curtain'
+  // Forma
+  | 'heart_shape'
+  | 'star_shape'
+  | 'box_shape'
+  // Nenhum
+  | 'none';
 
 export interface TransitionOption {
   id: TransitionType;
   name: string;
+  namePt: string;
   description: string;
   icon: string;
+  category: 'dissolve' | 'iris' | 'movement' | 'wipe' | 'curtain' | 'shape' | 'none';
+  emotionFit: string[]; // Emoções que combinam com esta transição
 }
 
 export const TRANSITION_OPTIONS: TransitionOption[] = [
-  { id: 'cross_dissolve', name: 'Cross Dissolve', description: 'Dissolução suave entre cenas', icon: '🔄' },
-  { id: 'fade_to_black', name: 'Fade to Black', description: 'Fade para preto entre cenas', icon: '⬛' },
-  { id: 'dip_to_color', name: 'Dip to White', description: 'Flash branco entre cenas', icon: '⬜' },
-  { id: 'wipe', name: 'Wipe', description: 'Cortina lateral entre cenas', icon: '➡️' },
-  { id: 'push', name: 'Push', description: 'Empurra a cena anterior', icon: '👉' },
-  { id: 'none', name: 'Sem Transição', description: 'Corte seco direto', icon: '✂️' },
+  // Dissolve
+  { id: 'cross_dissolve', name: 'Cross Dissolve', namePt: 'Dissolução Cruzada', description: 'Dissolução suave e versátil', icon: '🔄', category: 'dissolve', emotionFit: ['calmo', 'reflexivo', 'neutro', 'triste', 'sereno', 'nostálgico'] },
+  { id: 'fade_to_black', name: 'Fade to Black', namePt: 'Fade para Preto', description: 'Transição dramática via preto', icon: '⬛', category: 'dissolve', emotionFit: ['triste', 'sombrio', 'misterioso', 'tenso', 'fim', 'morte', 'terror'] },
+  { id: 'dip_to_color', name: 'Dip to Color', namePt: 'Clarão Branco', description: 'Flash branco impactante', icon: '⬜', category: 'dissolve', emotionFit: ['choque', 'revelação', 'flashback', 'divino', 'esperança', 'despertar'] },
+  { id: 'additive_dissolve', name: 'Additive Dissolve', namePt: 'Dissolução Aditiva', description: 'Brilho aditivo entre cenas', icon: '✨', category: 'dissolve', emotionFit: ['sonho', 'memória', 'fantasia', 'mágico', 'etéreo'] },
+  { id: 'non_additive_dissolve', name: 'Non-Additive Dissolve', namePt: 'Dissolução Não Aditiva', description: 'Mistura sem brilho extra', icon: '💫', category: 'dissolve', emotionFit: ['neutro', 'documental', 'realista', 'sutil'] },
+  { id: 'blur_dissolve', name: 'Blur Dissolve', namePt: 'Dissolução Desfoque', description: 'Desfoque suave entre cenas', icon: '🌫️', category: 'dissolve', emotionFit: ['sonho', 'confusão', 'vertigem', 'bêbado', 'visão', 'memória'] },
+  
+  // Íris
+  { id: 'iris_circle', name: 'Iris Circle', namePt: 'Íris de Círculo', description: 'Abertura circular clássica', icon: '⭕', category: 'iris', emotionFit: ['foco', 'destaque', 'importante', 'descoberta', 'vintage'] },
+  { id: 'iris_diamond', name: 'Iris Diamond', namePt: 'Íris de Diamante', description: 'Forma de losango', icon: '💎', category: 'iris', emotionFit: ['luxo', 'precioso', 'valioso', 'rico', 'elegante'] },
+  { id: 'iris_cross', name: 'Iris Cross', namePt: 'Íris de Cruz', description: 'Forma de cruz', icon: '➕', category: 'iris', emotionFit: ['espiritual', 'religioso', 'sagrado', 'fé'] },
+  { id: 'iris_oval', name: 'Iris Oval', namePt: 'Íris Oval', description: 'Forma oval suave', icon: '🔘', category: 'iris', emotionFit: ['retrato', 'personagem', 'foco', 'intimidade'] },
+  { id: 'iris_star', name: 'Iris Star', namePt: 'Íris Estrela', description: 'Forma de estrela', icon: '⭐', category: 'iris', emotionFit: ['mágico', 'celebração', 'vitória', 'show', 'famoso'] },
+  { id: 'iris_hexagon', name: 'Iris Hexagon', namePt: 'Íris Hexagonal', description: 'Forma geométrica hexagonal', icon: '⬡', category: 'iris', emotionFit: ['tecnológico', 'futurista', 'científico', 'moderno'] },
+  
+  // Movimento
+  { id: 'push', name: 'Push', namePt: 'Empurrar', description: 'Empurra a cena anterior', icon: '👉', category: 'movement', emotionFit: ['ação', 'rápido', 'urgente', 'próximo', 'progressão'] },
+  { id: 'slide', name: 'Slide', namePt: 'Deslizar', description: 'Desliza lateralmente', icon: '➡️', category: 'movement', emotionFit: ['transição', 'mudança', 'viagem', 'passagem de tempo'] },
+  { id: 'split', name: 'Split', namePt: 'Divisão', description: 'Divide a tela ao meio', icon: '↔️', category: 'movement', emotionFit: ['divisão', 'escolha', 'conflito', 'antes_depois', 'comparação'] },
+  { id: 'door_open', name: 'Door Open', namePt: 'Abertura de Porta', description: 'Efeito de porta abrindo', icon: '🚪', category: 'movement', emotionFit: ['entrada', 'descoberta', 'novo', 'portal', 'mistério'] },
+  
+  // Wipe
+  { id: 'wipe', name: 'Wipe', namePt: 'Cortina Lateral', description: 'Cortina lateral para revelação', icon: '🎭', category: 'wipe', emotionFit: ['revelação', 'lista', 'sequência', 'clássico'] },
+  { id: 'wipe_up', name: 'Wipe Up', namePt: 'Cortina para Cima', description: 'Cortina subindo', icon: '⬆️', category: 'wipe', emotionFit: ['ascensão', 'esperança', 'elevação', 'céu', 'subir'] },
+  { id: 'wipe_down', name: 'Wipe Down', namePt: 'Cortina para Baixo', description: 'Cortina descendo', icon: '⬇️', category: 'wipe', emotionFit: ['queda', 'descenso', 'inferno', 'profundo', 'descer'] },
+  
+  // Cortina
+  { id: 'center_curtain', name: 'Center Curtain', namePt: 'Cortina Central', description: 'Abre do centro', icon: '🎪', category: 'curtain', emotionFit: ['show', 'apresentação', 'palco', 'teatro', 'início'] },
+  { id: 'band_curtain', name: 'Band Curtain', namePt: 'Cortina de Banda', description: 'Faixas múltiplas', icon: '📊', category: 'curtain', emotionFit: ['dados', 'estatísticas', 'comparação', 'múltiplo'] },
+  { id: 'edge_curtain', name: 'Edge Curtain', namePt: 'Cortina de Borda', description: 'Fecha pelas bordas', icon: '🔲', category: 'curtain', emotionFit: ['conclusão', 'fechamento', 'fim', 'encerramento'] },
+  { id: 'clock_curtain', name: 'Clock Curtain', namePt: 'Cortina Relógio', description: 'Movimento circular tipo relógio', icon: '⏰', category: 'curtain', emotionFit: ['tempo', 'passagem', 'relógio', 'deadline', 'urgência'] },
+  { id: 'spiral_curtain', name: 'Spiral Curtain', namePt: 'Cortina Espiral', description: 'Efeito de espiral', icon: '🌀', category: 'curtain', emotionFit: ['hipnose', 'confusão', 'vertigem', 'portal', 'dimensional'] },
+  
+  // Forma
+  { id: 'heart_shape', name: 'Heart Shape', namePt: 'Coração', description: 'Forma de coração', icon: '❤️', category: 'shape', emotionFit: ['amor', 'romance', 'paixão', 'carinho', 'afeição'] },
+  { id: 'star_shape', name: 'Star Shape', namePt: 'Estrela', description: 'Forma de estrela', icon: '⭐', category: 'shape', emotionFit: ['celebração', 'conquista', 'destaque', 'famoso', 'brilho'] },
+  { id: 'box_shape', name: 'Box Shape', namePt: 'Caixa', description: 'Forma quadrada', icon: '⬜', category: 'shape', emotionFit: ['corporativo', 'formal', 'estruturado', 'sério'] },
+  
+  // Nenhum
+  { id: 'none', name: 'Cut', namePt: 'Corte Seco', description: 'Corte direto sem transição', icon: '✂️', category: 'none', emotionFit: ['impacto', 'choque', 'surpresa', 'violento', 'rápido', 'terror', 'susto'] },
 ];
+
+/**
+ * Mapeamento de emoções para transições ideais
+ */
+export const EMOTION_TRANSITION_MAP: Record<string, TransitionType[]> = {
+  // Emoções Positivas
+  'alegria': ['cross_dissolve', 'additive_dissolve', 'star_shape'],
+  'esperança': ['dip_to_color', 'wipe_up', 'iris_star'],
+  'amor': ['heart_shape', 'blur_dissolve', 'cross_dissolve'],
+  'celebração': ['center_curtain', 'star_shape', 'additive_dissolve'],
+  'vitória': ['push', 'iris_star', 'center_curtain'],
+  'paz': ['cross_dissolve', 'blur_dissolve', 'fade_to_black'],
+  
+  // Emoções Negativas
+  'tristeza': ['fade_to_black', 'cross_dissolve', 'blur_dissolve'],
+  'medo': ['fade_to_black', 'none', 'door_open'],
+  'terror': ['none', 'fade_to_black', 'spiral_curtain'],
+  'raiva': ['push', 'none', 'wipe'],
+  'angústia': ['blur_dissolve', 'fade_to_black', 'spiral_curtain'],
+  'desespero': ['fade_to_black', 'wipe_down', 'none'],
+  
+  // Emoções Neutras/Especiais
+  'curiosidade': ['door_open', 'iris_circle', 'wipe'],
+  'surpresa': ['none', 'dip_to_color', 'push'],
+  'mistério': ['fade_to_black', 'door_open', 'spiral_curtain'],
+  'nostalgia': ['blur_dissolve', 'cross_dissolve', 'additive_dissolve'],
+  'tensão': ['none', 'fade_to_black', 'clock_curtain'],
+  'reflexão': ['cross_dissolve', 'blur_dissolve', 'fade_to_black'],
+  
+  // Contextos Especiais
+  'flashback': ['dip_to_color', 'blur_dissolve', 'additive_dissolve'],
+  'sonho': ['blur_dissolve', 'additive_dissolve', 'spiral_curtain'],
+  'revelação': ['dip_to_color', 'iris_circle', 'center_curtain'],
+  'passagem_tempo': ['clock_curtain', 'slide', 'wipe'],
+  'morte': ['fade_to_black', 'wipe_down', 'edge_curtain'],
+  'nascimento': ['dip_to_color', 'wipe_up', 'iris_circle'],
+  
+  // Ritmos
+  'ação': ['push', 'none', 'slide'],
+  'lento': ['cross_dissolve', 'blur_dissolve', 'fade_to_black'],
+  'épico': ['fade_to_black', 'additive_dissolve', 'center_curtain'],
+  'documentário': ['cross_dissolve', 'wipe', 'push'],
+  'espiritual': ['iris_cross', 'dip_to_color', 'additive_dissolve'],
+  'tecnológico': ['iris_hexagon', 'slide', 'push'],
+};
+
+/**
+ * Interface para cena com transição automática
+ */
+export interface SceneTransition {
+  transitionType: TransitionType;
+  transitionDuration: number; // em segundos
+  reason: string;
+}
+
+/**
+ * Analisa a emoção/gatilho da cena e sugere a melhor transição
+ */
+export const analyzeSceneForTransition = (
+  currentText: string,
+  currentEmotion: string | undefined,
+  currentTrigger: string | undefined,
+  nextText: string | undefined,
+  nextEmotion: string | undefined,
+  sceneIndex: number,
+  totalScenes: number,
+  previousTransition?: TransitionType
+): SceneTransition => {
+  // Normalizar emoção para lowercase
+  const emotion = currentEmotion?.toLowerCase().trim() || '';
+  const trigger = currentTrigger?.toLowerCase().trim() || '';
+  const textLower = currentText.toLowerCase();
+  const nextTextLower = nextText?.toLowerCase() || '';
+  
+  // Determinar transição baseada em múltiplos fatores
+  let selectedTransition: TransitionType = 'cross_dissolve';
+  let transitionDuration = 0.5;
+  let reason = 'Padrão versátil';
+  
+  // 1. Prioridade máxima: Emoção explícita
+  if (emotion && EMOTION_TRANSITION_MAP[emotion]) {
+    const candidates = EMOTION_TRANSITION_MAP[emotion];
+    // Evitar repetir a transição anterior
+    selectedTransition = candidates.find(t => t !== previousTransition) || candidates[0];
+    reason = `Emoção "${emotion}" detectada`;
+  }
+  
+  // 2. Análise por gatilho de retenção
+  else if (trigger) {
+    if (trigger.includes('choque') || trigger.includes('impacto') || trigger.includes('revelação')) {
+      selectedTransition = 'none';
+      reason = `Gatilho "${trigger}" - corte seco para impacto`;
+    } else if (trigger.includes('medo') || trigger.includes('terror') || trigger.includes('suspense')) {
+      selectedTransition = 'fade_to_black';
+      transitionDuration = 0.75;
+      reason = `Gatilho "${trigger}" - fade para tensão`;
+    } else if (trigger.includes('curiosidade') || trigger.includes('mistério')) {
+      selectedTransition = 'door_open';
+      reason = `Gatilho "${trigger}" - porta abrindo para mistério`;
+    } else if (trigger.includes('emoção') || trigger.includes('amor') || trigger.includes('família')) {
+      selectedTransition = 'blur_dissolve';
+      transitionDuration = 0.75;
+      reason = `Gatilho "${trigger}" - blur para emoção`;
+    }
+  }
+  
+  // 3. Análise por palavras-chave no texto
+  else {
+    // Detectar contexto pelo texto
+    const contexts = [
+      { keywords: ['morte', 'morreu', 'faleceu', 'perdeu a vida', 'último suspiro'], transition: 'fade_to_black' as TransitionType, duration: 1.0, reason: 'Contexto de morte' },
+      { keywords: ['nasceu', 'nascimento', 'bebê', 'veio ao mundo'], transition: 'dip_to_color' as TransitionType, duration: 0.5, reason: 'Contexto de nascimento' },
+      { keywords: ['de repente', 'subitamente', 'inesperadamente', 'naquele momento'], transition: 'none' as TransitionType, duration: 0, reason: 'Momento súbito' },
+      { keywords: ['sonho', 'sonhava', 'imaginava', 'fantasia'], transition: 'blur_dissolve' as TransitionType, duration: 0.75, reason: 'Contexto de sonho' },
+      { keywords: ['lembrou', 'memória', 'recordou', 'antigamente', 'naquela época'], transition: 'additive_dissolve' as TransitionType, duration: 0.75, reason: 'Flashback/memória' },
+      { keywords: ['anos depois', 'meses depois', 'tempo passou', 'décadas depois'], transition: 'clock_curtain' as TransitionType, duration: 0.5, reason: 'Passagem de tempo' },
+      { keywords: ['amor', 'amou', 'coração', 'paixão', 'abraçou'], transition: 'heart_shape' as TransitionType, duration: 0.5, reason: 'Contexto romântico' },
+      { keywords: ['porta', 'entrou', 'abriu', 'descobriu', 'encontrou'], transition: 'door_open' as TransitionType, duration: 0.5, reason: 'Descoberta/entrada' },
+      { keywords: ['explosão', 'explodiu', 'boom', 'destruiu'], transition: 'dip_to_color' as TransitionType, duration: 0.25, reason: 'Explosão/impacto' },
+      { keywords: ['céu', 'deus', 'divino', 'luz', 'espiritual', 'anjo'], transition: 'iris_cross' as TransitionType, duration: 0.5, reason: 'Contexto espiritual' },
+      { keywords: ['tecnologia', 'computador', 'digital', 'futuro', 'robô'], transition: 'iris_hexagon' as TransitionType, duration: 0.5, reason: 'Contexto tecnológico' },
+      { keywords: ['vitória', 'venceu', 'conquistou', 'sucesso', 'celebrou'], transition: 'star_shape' as TransitionType, duration: 0.5, reason: 'Vitória/celebração' },
+    ];
+    
+    for (const ctx of contexts) {
+      if (ctx.keywords.some(kw => textLower.includes(kw))) {
+        selectedTransition = ctx.transition;
+        transitionDuration = ctx.duration;
+        reason = ctx.reason;
+        break;
+      }
+    }
+  }
+  
+  // 4. Regras especiais por posição
+  if (sceneIndex === 0) {
+    // Primeira cena: sem transição de entrada
+    selectedTransition = 'none';
+    transitionDuration = 0;
+    reason = 'Primeira cena - sem transição de entrada';
+  } else if (sceneIndex === totalScenes - 1) {
+    // Última cena: fade to black para conclusão
+    selectedTransition = 'fade_to_black';
+    transitionDuration = 1.0;
+    reason = 'Última cena - fade para conclusão';
+  } else if (sceneIndex < 3) {
+    // Primeiras 3 cenas: transições rápidas para retenção
+    if (selectedTransition === 'cross_dissolve' || selectedTransition === 'blur_dissolve') {
+      transitionDuration = Math.min(transitionDuration, 0.3);
+    }
+    reason += ' (ritmo rápido para retenção)';
+  }
+  
+  // 5. Evitar repetição excessiva
+  if (selectedTransition === previousTransition && sceneIndex > 2) {
+    const alternatives: TransitionType[] = ['cross_dissolve', 'push', 'slide', 'wipe'];
+    selectedTransition = alternatives.find(t => t !== previousTransition) || 'cross_dissolve';
+    reason = 'Variação para evitar repetição';
+  }
+  
+  return {
+    transitionType: selectedTransition,
+    transitionDuration,
+    reason,
+  };
+};
+
+/**
+ * Aplica análise de transições a todas as cenas
+ */
+export const applyTransitionsToScenes = (
+  scenes: Array<{ text: string; emotion?: string; retentionTrigger?: string }>
+): SceneTransition[] => {
+  let previousTransition: TransitionType | undefined;
+  
+  return scenes.map((scene, index) => {
+    const nextScene = scenes[index + 1];
+    const transition = analyzeSceneForTransition(
+      scene.text,
+      scene.emotion,
+      scene.retentionTrigger,
+      nextScene?.text,
+      nextScene?.emotion,
+      index,
+      scenes.length,
+      previousTransition
+    );
+    previousTransition = transition.transitionType;
+    return transition;
+  });
+};
 
 /**
  * Durações de transição disponíveis
@@ -2203,15 +2467,49 @@ const escapeXml = (text: string): string => {
 const getTransitionXml = (transitionType: TransitionType, transitionFrames: number): string => {
   if (transitionType === 'none') return '';
   
-  const transitionConfigs: Record<Exclude<TransitionType, 'none'>, { name: string; effectId: string; category: string }> = {
+  // Mapeamento completo de todas as transições para XML FCP7/DaVinci
+  const transitionConfigs: Record<string, { name: string; effectId: string; category: string }> = {
+    // Dissolve
     cross_dissolve: { name: 'Cross Dissolve', effectId: 'Cross Dissolve', category: 'Dissolve' },
     fade_to_black: { name: 'Fade In/Fade Out Dissolve', effectId: 'Fade In/Fade Out Dissolve', category: 'Dissolve' },
     dip_to_color: { name: 'Dip to Color Dissolve', effectId: 'Dip to Color Dissolve', category: 'Dissolve' },
-    wipe: { name: 'Wipe', effectId: 'Wipe', category: 'Wipe' },
+    additive_dissolve: { name: 'Additive Dissolve', effectId: 'Additive Dissolve', category: 'Dissolve' },
+    non_additive_dissolve: { name: 'Non-Additive Dissolve', effectId: 'Non-Additive Dissolve', category: 'Dissolve' },
+    blur_dissolve: { name: 'Cross Dissolve', effectId: 'Cross Dissolve', category: 'Dissolve' }, // Usa Cross Dissolve como base, aplicar blur manualmente
+    
+    // Íris
+    iris_circle: { name: 'Iris', effectId: 'Iris', category: 'Iris' },
+    iris_diamond: { name: 'Iris Diamond', effectId: 'Iris Diamond', category: 'Iris' },
+    iris_cross: { name: 'Iris Cross', effectId: 'Iris Cross', category: 'Iris' },
+    iris_oval: { name: 'Iris Oval', effectId: 'Iris Oval', category: 'Iris' },
+    iris_star: { name: 'Iris Star', effectId: 'Iris Star', category: 'Iris' },
+    iris_hexagon: { name: 'Iris', effectId: 'Iris', category: 'Iris' },
+    
+    // Movimento
     push: { name: 'Push', effectId: 'Push', category: 'Wipe' },
+    slide: { name: 'Slide', effectId: 'Slide', category: 'Wipe' },
+    split: { name: 'Split', effectId: 'Split', category: 'Wipe' },
+    door_open: { name: 'Center Split', effectId: 'Center Split', category: 'Wipe' },
+    
+    // Wipe
+    wipe: { name: 'Wipe', effectId: 'Wipe', category: 'Wipe' },
+    wipe_up: { name: 'Wipe Up', effectId: 'Wipe', category: 'Wipe' },
+    wipe_down: { name: 'Wipe Down', effectId: 'Wipe', category: 'Wipe' },
+    
+    // Cortina
+    center_curtain: { name: 'Center Wipe', effectId: 'Center Wipe', category: 'Wipe' },
+    band_curtain: { name: 'Band Wipe', effectId: 'Band Wipe', category: 'Wipe' },
+    edge_curtain: { name: 'Edge Wipe', effectId: 'Edge Wipe', category: 'Wipe' },
+    clock_curtain: { name: 'Clock Wipe', effectId: 'Clock Wipe', category: 'Wipe' },
+    spiral_curtain: { name: 'Spiral', effectId: 'Spiral', category: 'Wipe' },
+    
+    // Forma
+    heart_shape: { name: 'Heart', effectId: 'Heart', category: 'Wipe' },
+    star_shape: { name: 'Star', effectId: 'Star', category: 'Wipe' },
+    box_shape: { name: 'Box', effectId: 'Box', category: 'Wipe' },
   };
   
-  const config = transitionConfigs[transitionType];
+  const config = transitionConfigs[transitionType] || transitionConfigs.cross_dissolve;
   
   return `                <transitionitem>
                   <start>0</start>
@@ -2391,7 +2689,16 @@ export const generateFcp7Xml = (
 };
 
 /**
- * Gera XML com transições entre cenas e keyframes Ken Burns opcionais
+ * Interface de cena extendida com transição e emoção
+ */
+interface SceneForXmlWithTransition extends SceneForXml {
+  emotion?: string;
+  retentionTrigger?: string;
+  sceneTransition?: SceneTransition;
+}
+
+/**
+ * Gera XML com transições INTELIGENTES por cena (analisadas pela IA)
  * Suporta duração alvo (targetTotalSeconds) para sincronia exata com áudio
  */
 export const generateFcp7XmlWithTransitions = (
@@ -2404,18 +2711,32 @@ export const generateFcp7XmlWithTransitions = (
     transitionFrames?: number;
     transitionType?: TransitionType;
     enableKenBurns?: boolean;
-    targetTotalSeconds?: number; // Duração exata alvo (áudio travado)
+    targetTotalSeconds?: number;
+    sceneTransitions?: SceneTransition[]; // NOVO: transições personalizadas por cena
+    sceneEmotions?: Array<{ emotion?: string; retentionTrigger?: string }>; // NOVO: dados de emoção por cena
   } = {}
 ): string => {
   const title = options.title || 'Projeto_Video';
   const fps = options.fps || 24;
   const width = options.width || 1920;
   const height = options.height || 1080;
-  const transitionFrames = options.transitionFrames || Math.round(fps * 0.5);
-  const transitionType = options.transitionType || 'cross_dissolve';
-  const enableKenBurns = options.enableKenBurns !== false; // Habilitado por padrão
+  const defaultTransitionFrames = options.transitionFrames || Math.round(fps * 0.5);
+  const defaultTransitionType = options.transitionType || 'cross_dissolve';
+  const enableKenBurns = options.enableKenBurns !== false;
   const targetTotalSeconds = options.targetTotalSeconds;
   const safeTitle = escapeXml(title.replace(/[^a-zA-Z0-9_-]/g, '_'));
+  
+  // Se temos emoções mas não transições, calcular automaticamente
+  let sceneTransitions = options.sceneTransitions;
+  if (!sceneTransitions && options.sceneEmotions) {
+    const scenesWithEmotion = scenes.map((scene, i) => ({
+      text: scene.text,
+      emotion: options.sceneEmotions?.[i]?.emotion,
+      retentionTrigger: options.sceneEmotions?.[i]?.retentionTrigger,
+    }));
+    sceneTransitions = applyTransitionsToScenes(scenesWithEmotion);
+    console.log('[XML] Transições calculadas automaticamente:', sceneTransitions.map(t => t.transitionType));
+  }
   
   // Aplicar análise Ken Burns se habilitado
   const processedScenes = enableKenBurns ? applyKenBurnsToScenes(scenes) : scenes;
@@ -2527,8 +2848,14 @@ export const generateFcp7XmlWithTransitions = (
 `;
     
     // Adicionar transição de entrada (exceto para o primeiro clip)
-    if (index > 0 && transitionType !== 'none') {
-      xml += getTransitionXml(transitionType, transitionFrames);
+    // Usar transição específica da cena se disponível, ou fallback para padrão
+    const sceneTransition = sceneTransitions?.[index];
+    const currentTransitionType = sceneTransition?.transitionType || defaultTransitionType;
+    const currentTransitionDuration = sceneTransition?.transitionDuration || (defaultTransitionFrames / fps);
+    const currentTransitionFrames = Math.round(currentTransitionDuration * fps);
+    
+    if (index > 0 && currentTransitionType !== 'none') {
+      xml += getTransitionXml(currentTransitionType, currentTransitionFrames);
     }
     
     // Adicionar keyframes Ken Burns se disponível - com boost de intensidade para primeiras cenas
@@ -2536,9 +2863,14 @@ export const generateFcp7XmlWithTransitions = (
       xml += generateKenBurnsKeyframesXml(scene.kenBurnsMotion, durationFrames, fps, index);
     }
     
+    // Incluir informação da transição no comentário
+    const transitionInfo = sceneTransition && index > 0 
+      ? ` [${TRANSITION_OPTIONS.find(o => o.id === sceneTransition.transitionType)?.namePt || sceneTransition.transitionType}]`
+      : '';
+    
     if (shortText) {
       xml += `                <comments>
-                  <mastercomment1>${escapeXml(shortText + motionInfo)}</mastercomment1>
+                  <mastercomment1>${escapeXml(shortText + motionInfo + transitionInfo)}</mastercomment1>
                 </comments>
 `;
     }
@@ -2558,6 +2890,91 @@ export const generateFcp7XmlWithTransitions = (
 </xmeml>`;
 
   return xml;
+};
+
+/**
+ * Gera relatório de transições aplicadas por cena
+ */
+export const generateTransitionReport = (
+  scenes: Array<{ text: string; durationSeconds: number; emotion?: string; retentionTrigger?: string }>,
+  transitions: SceneTransition[]
+): string => {
+  let report = `
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    RELATÓRIO DE TRANSIÇÕES INTELIGENTES                        ║
+║                          Análise Automática por IA                             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📊 RESUMO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total de Cenas: ${scenes.length}
+Total de Transições: ${transitions.filter((t, i) => i > 0 && t.transitionType !== 'none').length}
+`;
+
+  // Contagem por tipo de transição
+  const transitionCounts: Record<string, number> = {};
+  transitions.forEach((t, i) => {
+    if (i > 0) { // Ignora primeira cena (sem transição de entrada)
+      transitionCounts[t.transitionType] = (transitionCounts[t.transitionType] || 0) + 1;
+    }
+  });
+
+  report += `\n📈 DISTRIBUIÇÃO DE TRANSIÇÕES:\n`;
+  Object.entries(transitionCounts).forEach(([type, count]) => {
+    const option = TRANSITION_OPTIONS.find(o => o.id === type);
+    const percentage = ((count / (scenes.length - 1)) * 100).toFixed(1);
+    report += `   ${option?.icon || '❓'} ${option?.namePt || type}: ${count} vezes (${percentage}%)\n`;
+  });
+
+  report += `
+═══════════════════════════════════════════════════════════════════════════════
+                              DETALHES POR CENA
+═══════════════════════════════════════════════════════════════════════════════
+`;
+
+  scenes.forEach((scene, index) => {
+    const transition = transitions[index];
+    const option = TRANSITION_OPTIONS.find(o => o.id === transition?.transitionType);
+    const textPreview = scene.text.substring(0, 50) + (scene.text.length > 50 ? '...' : '');
+    
+    report += `
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CENA ${String(index + 1).padStart(3, '0')} │ ${scene.durationSeconds.toFixed(1)}s │ ${option?.icon || '✂️'} ${option?.namePt || 'Corte'}
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Texto: "${textPreview}"
+│ Emoção: ${scene.emotion || 'Não definida'}
+│ Gatilho: ${scene.retentionTrigger || 'Não definido'}
+│ Transição: ${option?.namePt || transition?.transitionType || 'Corte'} (${transition?.transitionDuration || 0}s)
+│ Razão IA: ${transition?.reason || 'Sem análise'}
+└─────────────────────────────────────────────────────────────────────────────┘`;
+  });
+
+  report += `
+
+═══════════════════════════════════════════════════════════════════════════════
+                          COMO FUNCIONA A ANÁLISE
+═══════════════════════════════════════════════════════════════════════════════
+
+🧠 A IA analisa cada cena considerando:
+
+   1. EMOÇÃO da cena (tristeza, alegria, medo, etc.)
+   2. GATILHO DE RETENÇÃO (curiosidade, mistério, choque, etc.)
+   3. CONTEXTO do texto (morte, nascimento, flashback, etc.)
+   4. POSIÇÃO na timeline (primeiras cenas = ritmo rápido)
+   5. CENA ANTERIOR (evitar repetição)
+
+💡 TRANSIÇÕES RECOMENDADAS POR EMOÇÃO:
+   • 😢 Tristeza/Morte → Fade to Black
+   • 😱 Terror/Susto → Corte Seco
+   • 💫 Sonho/Memória → Blur Dissolve
+   • ⚡ Impacto/Choque → Dip to White
+   • ❤️ Amor/Romance → Heart Shape
+   • ⏰ Passagem de tempo → Clock Curtain
+   • 🚪 Descoberta → Door Open
+   • ✨ Revelação → Iris Circle
+${BRAND_FOOTER}`;
+
+  return report;
 };
 
 /**

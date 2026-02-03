@@ -25,6 +25,8 @@ import {
   generateColorGradingInstructions,
   generateCinematicEffectsInstructions,
   generateKenBurnsReport,
+  generateTransitionReport,
+  applyTransitionsToScenes,
   KEN_BURNS_OPTIONS,
   KenBurnsMotionType,
   CINEMATIC_PRESETS,
@@ -2667,7 +2669,16 @@ echo "Agora importe o video no CapCut!"
       description: `Processando ${scenesWithImages.length} imagens e arquivos de projeto` 
     });
     
-    // 1. XML do projeto - com duração alvo para sincronia exata
+    // 1. Calcular transições inteligentes baseadas na emoção de cada cena
+    const sceneEmotions = generatedScenes.map(s => ({
+      emotion: s.emotion,
+      retentionTrigger: s.retentionTrigger
+    }));
+    const intelligentTransitions = applyTransitionsToScenes(
+      generatedScenes.map(s => ({ text: s.text, emotion: s.emotion, retentionTrigger: s.retentionTrigger }))
+    );
+    
+    // 1a. XML do projeto - com transições INTELIGENTES por cena
     const xmlContent = generateFcp7XmlWithTransitions(scenesForXml, {
       title: projectName || "Projeto_Video",
       fps: cinematicSettings.fps,
@@ -2676,9 +2687,18 @@ echo "Agora importe o video no CapCut!"
       transitionFrames,
       transitionType: cinematicSettings.transitionType,
       enableKenBurns: cinematicSettings.kenBurnsEffect,
-      targetTotalSeconds: lockedDurationSeconds || undefined
+      targetTotalSeconds: lockedDurationSeconds || undefined,
+      sceneTransitions: intelligentTransitions, // TRANSIÇÕES INTELIGENTES!
+      sceneEmotions: sceneEmotions
     });
     zip.file(`${safeFileName}_davinci.xml`, xmlContent);
+    
+    // 1b. Relatório de Transições Inteligentes
+    const transitionReport = generateTransitionReport(
+      generatedScenes.map(s => ({ text: s.text, durationSeconds: getSyncedDuration(s.wordCount), emotion: s.emotion, retentionTrigger: s.retentionTrigger })),
+      intelligentTransitions
+    );
+    zip.file(`${safeFileName}_TRANSICOES_INTELIGENTES.txt`, transitionReport);
     
     // 2a. Relatório de Ken Burns (se habilitado)
     if (cinematicSettings.kenBurnsEffect) {
