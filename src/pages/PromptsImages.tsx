@@ -2613,6 +2613,18 @@ echo "Agora importe o video no CapCut!"
     const safeFileName = (projectName.trim() || "projeto").replace(/[^a-zA-Z0-9_-]/g, "_");
     
     // 1. Exportar XML - com duração alvo para sincronia exata
+    // Importante: quando exportamos somente cenas com imagem, precisamos alinhar
+    // as transições/emoções ao subconjunto exportado para não quebrar os índices.
+    const allTransitions = applyTransitionsToScenes(
+      generatedScenes.map(s => ({ text: s.text, emotion: s.emotion, retentionTrigger: s.retentionTrigger }))
+    );
+
+    const alignedTransitions = scenesForXml.map(s => allTransitions[s.number - 1]).filter(Boolean);
+    const alignedEmotions = scenesForXml.map(s => {
+      const original = generatedScenes[s.number - 1];
+      return { emotion: original?.emotion, retentionTrigger: original?.retentionTrigger };
+    });
+
     const xmlContent = generateFcp7XmlWithTransitions(scenesForXml, {
       title: projectName || "Projeto_Video",
       fps: cinematicSettings.fps,
@@ -2621,7 +2633,9 @@ echo "Agora importe o video no CapCut!"
       transitionFrames,
       transitionType: cinematicSettings.transitionType,
       enableKenBurns: cinematicSettings.kenBurnsEffect,
-      targetTotalSeconds: lockedDurationSeconds || undefined
+      targetTotalSeconds: lockedDurationSeconds || undefined,
+      sceneTransitions: alignedTransitions.length > 0 ? alignedTransitions : undefined,
+      sceneEmotions: alignedEmotions
     });
 
     const xmlBlob = new Blob([xmlContent], { type: "application/xml" });
@@ -2698,13 +2712,20 @@ echo "Agora importe o video no CapCut!"
     });
     
     // 1. Calcular transições inteligentes baseadas na emoção de cada cena
-    const sceneEmotions = generatedScenes.map(s => ({
+    // Calcular transições na timeline COMPLETA e alinhar ao subconjunto exportado (apenas cenas com imagem)
+    const fullSceneEmotions = generatedScenes.map(s => ({
       emotion: s.emotion,
       retentionTrigger: s.retentionTrigger
     }));
-    const intelligentTransitions = applyTransitionsToScenes(
+    const fullTransitions = applyTransitionsToScenes(
       generatedScenes.map(s => ({ text: s.text, emotion: s.emotion, retentionTrigger: s.retentionTrigger }))
     );
+
+    const alignedTransitions = scenesForXml.map(s => fullTransitions[s.number - 1]).filter(Boolean);
+    const alignedEmotions = scenesForXml.map(s => {
+      const original = generatedScenes[s.number - 1];
+      return { emotion: original?.emotion, retentionTrigger: original?.retentionTrigger };
+    });
     
     // 1a. XML do projeto - com transições INTELIGENTES por cena
     const xmlContent = generateFcp7XmlWithTransitions(scenesForXml, {
@@ -2716,15 +2737,23 @@ echo "Agora importe o video no CapCut!"
       transitionType: cinematicSettings.transitionType,
       enableKenBurns: cinematicSettings.kenBurnsEffect,
       targetTotalSeconds: lockedDurationSeconds || undefined,
-      sceneTransitions: intelligentTransitions, // TRANSIÇÕES INTELIGENTES!
-      sceneEmotions: sceneEmotions
+      sceneTransitions: alignedTransitions.length > 0 ? alignedTransitions : undefined, // TRANSIÇÕES INTELIGENTES (alinhadas)!
+      sceneEmotions: alignedEmotions
     });
     zip.file(`${safeFileName}_davinci.xml`, xmlContent);
     
     // 1b. Relatório de Transições Inteligentes
     const transitionReport = generateTransitionReport(
-      generatedScenes.map(s => ({ text: s.text, durationSeconds: getSyncedDuration(s.wordCount), emotion: s.emotion, retentionTrigger: s.retentionTrigger })),
-      intelligentTransitions
+      scenesForXml.map(s => {
+        const original = generatedScenes[s.number - 1];
+        return {
+          text: s.text,
+          durationSeconds: s.durationSeconds,
+          emotion: original?.emotion,
+          retentionTrigger: original?.retentionTrigger,
+        };
+      }),
+      alignedTransitions
     );
     zip.file(`${safeFileName}_TRANSICOES_INTELIGENTES.txt`, transitionReport);
     
@@ -4319,12 +4348,14 @@ INSTRUÇÕES:
       
       // Se deve regenerar imagens, iniciar geração em background
       if (improvedIndexes.length > 0) {
-        const missingCount = updatedScenes.filter(s => !s.generatedImage).length;
+        // IMPORTANTE: não sugerir (nem tentar) gerar cenas fora do alerta.
+        const selectedIndexes = new Set(sceneNumbers.map((n) => n - 1));
+        const selectedMissing = updatedScenes.filter((_, idx) => selectedIndexes.has(idx)).filter(s => !s.generatedImage).length;
         const improvedCount = sceneNumbers.length;
-        
+
         toast({
-          title: "🎬 Otimizando vídeo para 100% cobertura...",
-          description: `${improvedCount} cena(s) melhoradas + ${missingCount > improvedCount ? missingCount - improvedCount : 0} imagem(ns) faltante(s) serão geradas`,
+          title: "🎬 Melhorando + Gerando (somente alerta)",
+          description: `Processando ${improvedCount} cena(s) do alerta${selectedMissing > 0 ? ` • ${selectedMissing} imagem(ns) serão geradas` : ''}`,
         });
         
         // Sincronizar cenas com o hook de background e iniciar geração
