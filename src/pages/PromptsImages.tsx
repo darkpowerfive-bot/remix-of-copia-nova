@@ -3818,14 +3818,33 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
       const improvedIndexes: number[] = [];
       
       // CASO ESPECIAL: Cenas longas - DIVIDIR automaticamente em cenas menores
+      // IMPORTANTE: se a duração estiver TRAVADA para sincronizar com áudio, NÃO dividimos automaticamente.
+      // Dividir nesse caso explode o número de cenas (ex: 120 -> 452) e quebra a previsibilidade do usuário.
+      const isDurationLockedForAudio = lockedDurationSeconds !== null;
+      if (improvementType === 'split_long_scenes' && isDurationLockedForAudio) {
+        toast({
+          title: "🔒 Duração travada",
+          description: "Como a duração está travada para sincronizar com o áudio, não vamos dividir cenas automaticamente (isso pode multiplicar as imagens). Vou apenas reforçar os prompts/ritmo sem aumentar o número de cenas.",
+        });
+        // Degrada para melhoria visual sem alterar a contagem de cenas
+        improvementType = 'improve_all';
+      }
+
       if (improvementType === 'split_long_scenes') {
         const idealDurationMax = 8; // segundos máximo por cena
         const idealDurationMin = 5; // segundos mínimo por cena
+
+        // Quando não há duração travada, podemos dividir cenas longas.
+        // Para evitar explosão por WPM baixo, usamos um limiar híbrido:
+        // - duração longa (>10s)
+        // - E wordCount alto (evita dividir cenas curtas só porque o WPM ficou baixo)
+        const wordsPerSceneNum = Math.max(1, parseInt(wordsPerScene || '25', 10) || 25);
+        const minWordsToSplit = Math.max(50, Math.round(wordsPerSceneNum * 2));
         
         // Encontrar cenas longas que precisam ser divididas
         const longSceneIndexes = updatedScenes
           .map((s, i) => ({ scene: s, index: i, duration: (s.wordCount / currentWpm) * 60 }))
-          .filter(item => item.duration > 10)
+          .filter(item => item.duration > 10 && item.scene.wordCount >= minWordsToSplit)
           .map(item => item.index);
         
         if (longSceneIndexes.length > 0) {
@@ -3872,7 +3891,8 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                   emotion: ['tension', 'curiosity', 'surprise', 'shock'][i % 4],
                   retentionTrigger: ['anticipation', 'curiosity', 'mystery', 'revelation'][i % 4],
                   generatedImage: undefined,
-                  generatingImage: true,
+                  // Não marque como generating aqui; quem controla é o startBgGeneration via improvedIndexes.
+                  generatingImage: false,
                   characterName: scene.characterName
                 });
                 
@@ -4212,14 +4232,43 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
         hasImage: !!scene.generatedImage
       }));
 
-      // Chamar IA para analisar sincronia - Usando DeepSeek R1 via Laozhang
-      const { data, error } = await supabase.functions.invoke('ai-assistant', {
-        body: {
-          type: 'sync_verification',
-          messages: [
-            {
-              role: 'system',
-              content: `Você é um especialista em direção de vídeos e análise de sincronia visual-narração.
+      // Helpers locais: rodar em lotes para evitar payload grande (principal causa de “Failed to send a request”)
+      type SyncItem = { sceneNumber: number; status: string; issue?: string; severity?: string; suggestedPrompt?: string };
+      const parseSyncAnalysis = (rawData: any): { analysis: SyncItem[] } => {
+        const raw = rawData?.result ?? rawData?.content ?? '';
+
+        // Alguns providers já retornam o JSON como objeto
+        if (raw && typeof raw === 'object' && Array.isArray((raw as any).analysis)) {
+          return raw as any;
+        }
+
+        const content = typeof raw === 'string' ? raw : JSON.stringify(raw ?? '');
+        const jsonMatch = content.match(/\{[\s\S]*"analysis"[\s\S]*\[[\s\S]*\][\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            return JSON.parse(jsonMatch[0]);
+          } catch {
+            console.warn('JSON malformado, usando fallback de extração por regex');
+          }
+        }
+
+        const sceneMatches = content.matchAll(/"sceneNumber"\s*:\s*(\d+)\s*,\s*"status"\s*:\s*"(synced|mismatched)"(?:\s*,\s*"issue"\s*:\s*"([^"]*)")?(?:\s*,\s*"severity"\s*:\s*"(low|medium|high)")?(?:\s*,\s*"suggestedPrompt"\s*:\s*"([^"]*)")?/g);
+        const extractedAnalysis: SyncItem[] = [];
+        for (const match of sceneMatches) {
+          extractedAnalysis.push({
+            sceneNumber: parseInt(match[1]),
+            status: match[2],
+            issue: match[3] || undefined,
+            severity: match[4] || undefined,
+            suggestedPrompt: match[5]?.replace(/\\"/g, '"').replace(/\\n/g, '\n') || undefined,
+          });
+        }
+
+        if (extractedAnalysis.length > 0) return { analysis: extractedAnalysis };
+        throw new Error('Resposta não contém estrutura JSON válida');
+      };
+
+      const systemPrompt = `Você é um especialista em direção de vídeos e análise de sincronia visual-narração.
 
 TAREFA: Analisar se os prompts de imagem ilustram LITERALMENTE o que está sendo narrado em cada cena.
 
@@ -4249,107 +4298,58 @@ RESPONDA EM JSON VÁLIDO:
       "suggestedPrompt": "prompt corrigido em inglês (apenas se mismatched)"
     }
   ]
-}`
-            },
-            {
-              role: 'user',
-              content: `Analise a sincronia entre narração e prompts de imagem destas ${scenesData.length} cenas:
+}`;
 
-${scenesData.map(s => `
----
-CENA ${s.number}:
-NARRAÇÃO: "${s.narration}"
-PROMPT ATUAL: "${s.imagePrompt}"
----`).join('\n')}
-
-Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Responda APENAS em JSON válido, sem texto adicional.`
-            }
-          ],
-          model: 'deepseek-r1'
-        }
-      });
-
-      setSyncVerificationProgress({ percent: 70, label: 'Processando resposta…' });
-
-      if (error) {
-        // Reembolsar em caso de erro
-        if (deductionResult.shouldRefund) {
-          await deductionResult.refund();
-        }
-        throw error;
+      const BATCH_SIZE = 25;
+      const batches: Array<typeof scenesData> = [];
+      for (let i = 0; i < scenesData.length; i += BATCH_SIZE) {
+        batches.push(scenesData.slice(i, i + BATCH_SIZE));
       }
 
-      // Parsear resposta com sistema robusto de fallback
-      let analysisResult: { analysis: Array<{ sceneNumber: number; status: string; issue?: string; severity?: string; suggestedPrompt?: string }> };
-      try {
-        const raw = (data as any)?.result ?? (data as any)?.content ?? '';
+      const allAnalysis: SyncItem[] = [];
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        const base = 35;
+        const span = 45; // 35 -> 80
+        const percent = Math.round(base + (span * batchIndex) / Math.max(1, batches.length));
+        setSyncVerificationProgress({ percent, label: `Analisando lote ${batchIndex + 1}/${batches.length}…` });
 
-        // Alguns providers já retornam o JSON como objeto
-        if (raw && typeof raw === 'object' && Array.isArray((raw as any).analysis)) {
-          analysisResult = raw as any;
-        } else {
-          const content = typeof raw === 'string' ? raw : JSON.stringify(raw ?? '');
-          
-          // Tentar primeiro o parse direto do JSON
-          const jsonMatch = content.match(/\{[\s\S]*"analysis"[\s\S]*\[[\s\S]*\][\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              analysisResult = JSON.parse(jsonMatch[0]);
-            } catch (jsonErr) {
-              // Fallback: extrair cenas individuais via regex se JSON estiver truncado/malformado
-              console.warn('JSON malformado, usando fallback de extração por regex');
-              const sceneMatches = content.matchAll(/"sceneNumber"\s*:\s*(\d+)\s*,\s*"status"\s*:\s*"(synced|mismatched)"(?:\s*,\s*"issue"\s*:\s*"([^"]*)")?(?:\s*,\s*"severity"\s*:\s*"(low|medium|high)")?(?:\s*,\s*"suggestedPrompt"\s*:\s*"([^"]*)")?/g);
-              
-              const extractedAnalysis: Array<{ sceneNumber: number; status: string; issue?: string; severity?: string; suggestedPrompt?: string }> = [];
-              for (const match of sceneMatches) {
-                extractedAnalysis.push({
-                  sceneNumber: parseInt(match[1]),
-                  status: match[2],
-                  issue: match[3] || undefined,
-                  severity: match[4] || undefined,
-                  suggestedPrompt: match[5]?.replace(/\\"/g, '"').replace(/\\n/g, '\n') || undefined
-                });
-              }
-              
-              if (extractedAnalysis.length > 0) {
-                analysisResult = { analysis: extractedAnalysis };
-                console.log(`[SyncVerification] Extraídas ${extractedAnalysis.length} cenas via regex fallback`);
-              } else {
-                throw new Error('Não foi possível extrair dados de sincronia da resposta');
-              }
-            }
-          } else {
-            throw new Error('Resposta não contém estrutura JSON válida');
-          }
+        const { data: batchData, error: batchError } = await supabase.functions.invoke('ai-assistant', {
+          body: {
+            type: 'sync_verification',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              {
+                role: 'user',
+                content: `Analise a sincronia entre narração e prompts de imagem destas ${batch.length} cenas (lote ${batchIndex + 1}/${batches.length}):\n\n${batch
+                  .map(
+                    (s) => `---\nCENA ${s.number}:\nNARRAÇÃO: "${s.narration}"\nPROMPT ATUAL: "${s.imagePrompt}"\n---`
+                  )
+                  .join('\n')}\n\nIdentifique TODAS as incongruências, mesmo sutis, e sugira correções. Responda APENAS em JSON válido, sem texto adicional.`,
+              },
+            ],
+            model: 'deepseek-r1',
+          },
+        });
+
+        if (batchError) {
+          if (deductionResult.shouldRefund) await deductionResult.refund();
+          throw batchError;
         }
 
-        if (!analysisResult || !Array.isArray((analysisResult as any).analysis)) {
-          throw new Error('JSON inválido: campo "analysis" ausente ou vazio');
-        }
-
-        // Validar que temos dados suficientes
-        if (analysisResult.analysis.length === 0) {
+        const parsed = parseSyncAnalysis(batchData);
+        if (!parsed?.analysis?.length) {
+          if (deductionResult.shouldRefund) await deductionResult.refund();
           throw new Error('Análise retornou array vazio');
         }
-      } catch (parseErr) {
-        console.error('Erro ao parsear resposta:', parseErr, 'Raw data:', (data as any)?.result?.substring?.(0, 500) || data);
-        // Reembolsar em caso de erro de parse
-        if (deductionResult.shouldRefund) {
-          await deductionResult.refund();
-        }
-        toast({
-          title: "Erro na análise",
-          description: parseErr instanceof Error ? parseErr.message : "Não foi possível interpretar a resposta da IA. Tente novamente.",
-          variant: "destructive"
-        });
-        setShowSyncVerificationModal(false);
-        return;
+
+        allAnalysis.push(...parsed.analysis);
       }
 
       setSyncVerificationProgress({ percent: 90, label: 'Finalizando…' });
 
       // Separar cenas sincronizadas e com problemas
-      const mismatched = analysisResult.analysis
+      const mismatched = allAnalysis
         .filter(a => a.status === 'mismatched')
         .map(a => {
           const scene = generatedScenes.find(s => s.number === a.sceneNumber);
@@ -4363,7 +4363,7 @@ Identifique TODAS as incongruências, mesmo sutis, e sugira correções. Respond
           };
         });
 
-      const synced = analysisResult.analysis
+      const synced = allAnalysis
         .filter(a => a.status === 'synced')
         .map(a => a.sceneNumber);
 
