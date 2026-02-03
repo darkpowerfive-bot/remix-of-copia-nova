@@ -4017,24 +4017,25 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
         // A IA vai analisar o TEXTO DA NARRAÇÃO e definir emoção, gatilho e novo prompt baseado no conteúdo
         const selectedIndexes = new Set(sceneNumbers.map((n) => n - 1));
         
-        // IMPORTANTE: Processar TODAS as cenas selecionadas, independente de ter imagem ou não
-        // Isso garante que a IA ANALISE O ROTEIRO e gere prompts correspondentes
+        // IMPORTANTE: Processar SOMENTE as cenas do alerta específico
+        // Não incluir outras cenas - apenas as que estão em selectedIndexes (do alerta)
         const scenesNeedingPrompt = updatedScenes
           .map((scene, index) => ({ scene, index }))
           .filter(({ index }) => {
-            // SEMPRE processar cenas selecionadas ou marcadas para melhoria
-            // A IA precisa LER o texto para criar prompts que correspondam à narração
-            return selectedIndexes.has(index) || improvedIndexesSet.has(index);
+            // APENAS cenas do alerta específico - não usar improvedIndexesSet
+            return selectedIndexes.has(index);
           });
+        
+        console.log(`[handleImproveScenes] Processando ${scenesNeedingPrompt.length} cenas do alerta:`, sceneNumbers);
         
         if (scenesNeedingPrompt.length > 0) {
           // Progresso visível (o toast sozinho some e dá sensação de “não aconteceu nada”)
           setSceneProgress({ done: 0, total: scenesNeedingPrompt.length });
-          setLoadingMessage(`🎬 IA Diretor analisando cenas... (0/${scenesNeedingPrompt.length})`);
+          setLoadingMessage(`🎬 Melhorando ${scenesNeedingPrompt.length} cenas do alerta... (0/${scenesNeedingPrompt.length})`);
 
           toast({
-            title: "🎬 IA Diretor de Edição ativada",
-            description: `Analisando ${scenesNeedingPrompt.length} cena(s): definindo emoção, gatilho e prompt cinematográfico`,
+            title: `🎬 Melhorando ${scenesNeedingPrompt.length} cenas`,
+            description: `Cenas ${sceneNumbers.slice(0, 5).join(', ')}${sceneNumbers.length > 5 ? '...' : ''} - analisando narração`,
           });
           
           // Pegar o estilo atual selecionado para manter consistência
@@ -4290,7 +4291,7 @@ INSTRUÇÕES:
 
             setSceneProgress({ done: doneCount, total: scenesNeedingPrompt.length });
             setLoadingMessage(
-              `🎬 IA Diretor analisando cenas... (${doneCount}/${scenesNeedingPrompt.length})`
+              `🎬 Melhorando cenas do alerta... (${doneCount}/${scenesNeedingPrompt.length})`
             );
 
             // Atualiza UI incrementalmente (não esperar terminar tudo para “aparecer”)
