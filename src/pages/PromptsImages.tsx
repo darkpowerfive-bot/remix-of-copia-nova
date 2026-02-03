@@ -3815,7 +3815,7 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
 
       // Atualizar as cenas com prompts melhorados
       let updatedScenes = [...generatedScenes];
-      const improvedIndexes: number[] = [];
+      const improvedIndexesSet = new Set<number>();
       
       // CASO ESPECIAL: Cenas longas - DIVIDIR automaticamente em cenas menores
 
@@ -3867,9 +3867,10 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                     ? 'closing shot, emotional climax'
                     : 'medium shot, character focus';
 
-                // Sincronia: prompt nasce do texto exato do trecho
-                const textSummary = partText.slice(0, 120).replace(/[.,!?;:]+$/, '');
-                const partPrompt = `${textSummary}, ${shotType}, dynamic angle variation, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
+                // IMPORTANTE: não usar texto PT-BR diretamente como prompt de imagem.
+                // Vamos gerar um prompt em INGLÊS via IA baseado no texto da narração (mais abaixo),
+                // para garantir fidelidade literal e evitar imagens “nada a ver”.
+                const partPrompt = `Cinematic storyboard frame, ${shotType}, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
 
                 const startTimecode = `${String(Math.floor(currentTime / 60)).padStart(2, '0')}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`;
                 currentTime += partDuration;
@@ -3887,11 +3888,11 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                   emotion: ['tension', 'curiosity', 'surprise', 'shock'][i % 4],
                   retentionTrigger: ['anticipation', 'curiosity', 'mystery', 'revelation'][i % 4],
                   generatedImage: undefined,
-                  generatingImage: false,
+                  generatingImage: true,
                   characterName: scene.characterName,
                 });
 
-                improvedIndexes.push(newIndex);
+                improvedIndexesSet.add(newIndex);
               }
 
               return;
@@ -3915,7 +3916,7 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
           
           toast({
             title: "🎬 Retenção melhorada: cenas divididas",
-            description: `${longSceneIndexes.length} cena(s) selecionada(s) dividida(s). Total: ${generatedScenes.length} → ${newScenes.length} cenas. Gerando ${improvedIndexes.length} nova(s) imagem(ns)...`,
+            description: `${longSceneIndexes.length} cena(s) selecionada(s) dividida(s). Total: ${generatedScenes.length} → ${newScenes.length} cenas. Gerando ${improvedIndexesSet.size} nova(s) imagem(ns)...`,
           });
         }
       }
@@ -3992,22 +3993,30 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
             };
             
             if (needsImage) {
-              improvedIndexes.push(index);
+              improvedIndexesSet.add(index);
             }
           }
         }
       }
       
-      // ADICIONAR: Verificar todas as cenas sem imagem (falhas/perdidas) e regenerar prompts com IA
-      if (regenerateImages) {
-        const scenesWithoutImage = updatedScenes
+      // GARANTIA DE FIDELIDADE: quando dividimos cenas (retenção), SEMPRE reescrevemos prompts com IA (em inglês)
+      // usando o texto exato da narração de cada cena nova.
+      const shouldRewritePromptsWithAI = regenerateImages || improvementType === 'split_long_scenes';
+
+      if (shouldRewritePromptsWithAI) {
+        const scenesNeedingPrompt = updatedScenes
           .map((scene, index) => ({ scene, index }))
-          .filter(({ scene, index }) => !scene.generatedImage && !improvedIndexes.includes(index));
+          .filter(({ scene, index }) => {
+            if (scene.generatedImage) return false;
+            // Se o usuário pediu regeneração, corrigir TODAS sem imagem.
+            // Se foi split, corrigir pelo menos as novas cenas (improvedIndexesSet).
+            return regenerateImages ? true : improvedIndexesSet.has(index);
+          });
         
-        if (scenesWithoutImage.length > 0) {
+        if (scenesNeedingPrompt.length > 0) {
           toast({
-            title: "🔄 Regenerando prompts perdidos...",
-            description: `Criando ${scenesWithoutImage.length} novo(s) prompt(s) fiéis à narração`,
+            title: "🔄 Ajustando prompts para bater com a narração...",
+            description: `Criando ${scenesNeedingPrompt.length} prompt(s) em inglês, fiéis ao texto narrado`,
           });
           
           // Pegar o estilo atual selecionado para manter consistência
@@ -4022,7 +4031,7 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
             : '';
           
           // Para cada cena sem imagem, gerar prompt baseado no roteiro (FIDELIDADE AO TEXTO)
-          for (const { scene, index } of scenesWithoutImage) {
+          for (const { scene, index } of scenesNeedingPrompt) {
             try {
               // Contexto das cenas vizinhas para continuidade visual
               const prevScene = index > 0 ? updatedScenes[index - 1] : null;
@@ -4100,14 +4109,16 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
               console.warn(`Erro ao gerar novo prompt para cena ${scene.number}:`, err);
             }
             
-            // Sempre adicionar ao índice de regeneração
-            improvedIndexes.push(index);
+            // Garantir que esta cena entre na fila de geração
+            improvedIndexesSet.add(index);
           }
         }
         
-        // Ordenar índices para processamento ordenado
-        improvedIndexes.sort((a, b) => a - b);
+        // (índices serão ordenados abaixo)
       }
+
+      // Ordenar índices para processamento ordenado
+      const improvedIndexes = Array.from(improvedIndexesSet).sort((a, b) => a - b);
       
       setGeneratedScenes(updatedScenes);
       setPersistedScenes(updatedScenes.map(({ generatedImage, generatingImage, ...rest }) => rest));
