@@ -1506,33 +1506,43 @@ const [generating, setGenerating] = useState(false);
               messages: [
                 {
                   role: 'system',
-                  content: `Você é um especialista em criar prompts de imagem cinematográficos para vídeos.
+                  content: `Você é um DIRETOR DE EDIÇÃO especialista em criar prompts de imagem cinematográficos.
 
-OBJETIVO: Gerar um prompt em INGLÊS que represente EXATAMENTE o conteúdo do texto da cena.
+TAREFA: LEIA o texto da narração e crie um prompt que ILUSTRE EXATAMENTE o conteúdo.
+
+PROCESSO OBRIGATÓRIO:
+1. LEIA o texto da narração palavra por palavra
+2. EXTRAIA: objetos físicos, locais, ações, épocas históricas mencionados
+3. CRIE um prompt que MOSTRE esses elementos específicos
+4. NUNCA crie imagens genéricas - ilustre o CONTEÚDO LITERAL
 
 ESTILO VISUAL OBRIGATÓRIO (${styleName}):
 ${styleDescription}
 
-REGRAS CRÍTICAS:
-1. O prompt DEVE representar visualmente o que acontece no texto da cena
-2. Mantenha CONSISTÊNCIA com as cenas vizinhas (mesmos personagens, ambiente, iluminação)
-3. NUNCA inclua: violência explícita, armas, sangue, nudez, conteúdo adulto, marcas registradas
-4. Sempre adicione no final: "1280x720, 16:9 aspect ratio, full frame, no black bars"
-5. Use descrições artísticas e cinematográficas
-6. Se houver pessoas, descreva como "silhouette", "figure", "person from behind" - evite rostos
+REGRAS:
+1. O prompt DEVE representar visualmente o que está NO TEXTO
+2. Se o texto menciona "pirâmides", "Egito", "cientistas" - INCLUA no prompt
+3. Mantenha CONSISTÊNCIA com as cenas vizinhas
+4. NUNCA inclua: violência, armas, nudez, marcas registradas
+5. Use termos cinematográficos em INGLÊS
+6. Sempre termine com: "1280x720, 16:9 aspect ratio, full frame, no black bars"
 
-RETORNE APENAS o prompt em inglês, sem explicações ou formatação.`
+RETORNE APENAS o prompt em inglês, sem explicações.`
                 },
                 {
                   role: 'user',
-                  content: `CENA ${lostScene.number} - TEXTO DO ROTEIRO:
+                  content: `CENA ${lostScene.number} - TEXTO DA NARRAÇÃO (LEIA ATENTAMENTE):
 "${lostScene.text}"
 
-${contextScenes ? `CONTEXTO (cenas vizinhas para continuidade):\n${contextScenes}` : ''}
+INSTRUÇÕES:
+1. Identifique TODOS os elementos concretos mencionados no texto acima
+2. Crie um prompt que ILUSTRE LITERALMENTE esse conteúdo
 
-${referencePrompts ? `REFERÊNCIA DE ESTILO (prompts que funcionaram):\n${referencePrompts}` : ''}
+${contextScenes ? `CONTEXTO (cenas vizinhas):\n${contextScenes}` : ''}
 
-Crie um prompt de imagem em inglês que represente visualmente esta cena do roteiro, mantendo o estilo visual consistente.`
+${referencePrompts ? `ESTILO DE REFERÊNCIA:\n${referencePrompts}` : ''}
+
+Retorne APENAS o prompt em inglês que ilustra o conteúdo do texto.`
                 }
               ],
               model: 'deepseek-v3.2-exp',
@@ -4003,22 +4013,18 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
         improvementType === 'improve_hook';
 
       if (shouldRewritePromptsWithAI) {
-        // Para "Melhorar + Gerar", processar TODAS as cenas selecionadas (mesmo com imagem)
-        // A IA vai analisar e definir emoção, gatilho e novo prompt
+        // CRÍTICO: Para "Melhorar + Gerar", SEMPRE processar TODAS as cenas selecionadas
+        // A IA vai analisar o TEXTO DA NARRAÇÃO e definir emoção, gatilho e novo prompt baseado no conteúdo
         const selectedIndexes = new Set(sceneNumbers.map((n) => n - 1));
         
+        // IMPORTANTE: Processar TODAS as cenas selecionadas, independente de ter imagem ou não
+        // Isso garante que a IA ANALISE O ROTEIRO e gere prompts correspondentes
         const scenesNeedingPrompt = updatedScenes
           .map((scene, index) => ({ scene, index }))
-          .filter(({ scene, index }) => {
-            // Se regenerateImages: processar todas as cenas selecionadas
-            if (regenerateImages) {
-              return selectedIndexes.has(index);
-            }
-            // Se não tem imagem, processar
-            if (!scene.generatedImage) {
-              return selectedIndexes.has(index) || improvedIndexesSet.has(index);
-            }
-            return false;
+          .filter(({ index }) => {
+            // SEMPRE processar cenas selecionadas ou marcadas para melhoria
+            // A IA precisa LER o texto para criar prompts que correspondam à narração
+            return selectedIndexes.has(index) || improvedIndexesSet.has(index);
           });
         
         if (scenesNeedingPrompt.length > 0) {
@@ -4087,44 +4093,62 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                     role: "system",
                     content: `Você é um DIRETOR DE EDIÇÃO especialista em vídeos virais de alta retenção.
 
-OBJETIVO: Analisar a narração e definir: EMOÇÃO, GATILHO DE RETENÇÃO e PROMPT DE IMAGEM cinematográfico.
+TAREFA PRINCIPAL: LEIA o texto da narração palavra por palavra e crie uma imagem que ILUSTRE EXATAMENTE o que está sendo dito.
 
 ESTILO VISUAL OBRIGATÓRIO (${styleName}):
 ${styleDescription}
 
 ${improvementFocus}
 
+PROCESSO OBRIGATÓRIO (siga passo a passo):
+1. LEIA o texto da narração completamente
+2. EXTRAIA: nomes próprios, objetos físicos, locais geográficos, ações descritas, épocas históricas
+3. DESCREVA visualmente CADA elemento encontrado no texto
+4. NUNCA invente elementos que NÃO estão no texto
+5. Se o texto fala de "pirâmides", mostre pirâmides. Se fala de "cientistas", mostre cientistas.
+
 REGRAS PARA EMOÇÃO (emotion):
-- Analise o TOM da narração: urgência? mistério? revelação? conflito?
+- Baseie-se no TOM do texto: urgência, mistério, revelação, conflito, descoberta
 - Opções: tension, curiosity, surprise, shock, wonder, fear, hope, determination
-- NUNCA use "neutral" - SEMPRE defina uma emoção baseada no texto
+- Escolha a emoção que COMBINA com o conteúdo narrado
 
 REGRAS PARA GATILHO (retentionTrigger):
-- Analise o CONTEÚDO: pergunta? promessa? revelação? cliffhanger?
+- Baseie-se no TIPO de conteúdo: pergunta, promessa, revelação, cliffhanger
 - Opções: curiosity, anticipation, mystery, revelation, pattern_break, suspense, urgency, fomo
-- NUNCA use "continuity" - SEMPRE defina um gatilho que prenda a atenção
+- Escolha o gatilho que AUMENTA o interesse no conteúdo específico
 
-REGRAS PARA PROMPT DE IMAGEM:
-1. LEIA o texto e identifique: objetos, ações, locais, personagens MENCIONADOS
-2. Ilustre LITERALMENTE o que o narrador está falando
-3. NUNCA crie imagens genéricas - ilustre o CONTEÚDO ESPECÍFICO
-4. Adicione elementos cinematográficos: iluminação, ângulo, composição
-5. NUNCA inclua: violência, armas, nudez, marcas registradas
-6. Sempre termine com: "1280x720, 16:9 aspect ratio, full frame, no black bars"
+REGRAS PARA PROMPT DE IMAGEM (CRÍTICO - imagePrompt):
+1. O prompt DEVE conter os MESMOS elementos mencionados na narração
+2. Se o texto menciona "Egito antigo", "faraós", "pirâmides" → inclua esses elementos
+3. Se o texto menciona "laboratório", "experimento", "cientista" → ilustre isso
+4. NUNCA crie imagens genéricas ou abstratas quando há elementos concretos no texto
+5. Use termos cinematográficos em INGLÊS: lighting, composition, camera angle
+6. NUNCA inclua: violência, armas, nudez, marcas registradas
+7. Sempre termine com: "1280x720, 16:9 aspect ratio, full frame, no black bars"
+
+EXEMPLO:
+- Narração: "Há 3.000 anos, uma civilização desapareceu misteriosamente no deserto"
+- Prompt correto: "Ancient desert ruins at sunset, crumbling stone temples half-buried in sand, dramatic lighting, cinematic wide shot showing abandoned civilization remnants, mysterious atmosphere, 1280x720..."
+- Prompt ERRADO: "Beautiful landscape" ou "Abstract mystery scene"
 
 RESPONDA APENAS em JSON válido (sem markdown, sem explicações):
 {"emotion": "...", "retentionTrigger": "...", "imagePrompt": "..."}`,
                   },
                   {
                     role: "user",
-                    content: `CENA ${scene.number} - TEXTO DA NARRAÇÃO:
+                    content: `CENA ${scene.number} - TEXTO DA NARRAÇÃO (LEIA COM ATENÇÃO):
 "${scene.text}"
 
-${contextScenes ? `CONTEXTO (cenas vizinhas):\n${contextScenes}` : ""}
+INSTRUÇÕES:
+1. LEIA o texto acima e identifique TODOS os elementos concretos mencionados
+2. Crie um imagePrompt que ILUSTRE LITERALMENTE o conteúdo do texto
+3. Se o texto menciona lugares, objetos, pessoas ou épocas específicas, INCLUA no prompt
 
-${referencePrompts ? `REFERÊNCIA DE ESTILO (prompts que funcionaram):\n${referencePrompts}` : ""}
+${contextScenes ? `CONTEXTO (cenas vizinhas para continuidade visual):\n${contextScenes}` : ""}
 
-Analise a narração e retorne JSON com emotion, retentionTrigger e imagePrompt.`,
+${referencePrompts ? `REFERÊNCIA DE ESTILO (use como base para consistência):\n${referencePrompts}` : ""}
+
+Retorne JSON com emotion (baseada no tom), retentionTrigger (baseado no conteúdo) e imagePrompt (que ILUSTRE o texto).`,
                   },
                 ],
                 model: "deepseek-v3.2-exp",
