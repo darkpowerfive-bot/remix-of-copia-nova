@@ -473,12 +473,12 @@ serve(async (req) => {
           "claude-sonnet": "claude-3-5-sonnet-20241022",
           "claude-sonnet-4-20250514": "claude-3-5-sonnet-20241022",
 
-          // DeepSeek Models - using deepseek-v3.2-exp (experimental)
-          "deepseek-chat": "deepseek-v3.2-exp",
-          "deepseek-v3": "deepseek-v3.2-exp",
-          "deepseek-r1": "deepseek-v3.2-exp",
-          "deepseek-reasoner": "deepseek-v3.2-exp",
-          "deepseek-coder": "deepseek-v3.2-exp",
+          // DeepSeek Models - using gemini-2.5-pro as fallback (deepseek-v3.2-exp instável)
+          "deepseek-chat": "gemini-2.5-pro",
+          "deepseek-v3": "gemini-2.5-pro",
+          "deepseek-r1": "gemini-2.5-pro",
+          "deepseek-reasoner": "gemini-2.5-pro",
+          "deepseek-coder": "gemini-2.5-pro",
 
           // Gemini Models -> gemini-2.5-pro (modelo correto no Laozhang)
           "gemini": "gemini-2.5-pro",
@@ -502,7 +502,7 @@ serve(async (req) => {
         } else if (modelToMap?.includes("claude")) {
           laozhangModel = "claude-3-5-sonnet-20241022";
         } else if (modelToMap?.includes("deepseek")) {
-          laozhangModel = "deepseek-v3.2-exp";
+          laozhangModel = "gemini-2.5-pro"; // DeepSeek models mapeados para Gemini (mais estável)
         } else if (modelToMap?.includes("gemini")) {
           laozhangModel = "gemini-2.5-pro"; // modelo correto no Laozhang
         } else {
@@ -1805,11 +1805,11 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       const agentPreferredModel = agentData?.preferredModel || agentData?.preferred_model || null;
       
       // ====================================================================
-      // FORÇAR MODELO: deepseek-v3.2-exp para roteiros e prompts de imagem
-      // Ignora qualquer seleção do frontend - SEMPRE usa DeepSeek v3.2 exp
+      // FORÇAR MODELO: gemini-2.5-pro para roteiros e prompts de imagem
+      // Ignora qualquer seleção do frontend - SEMPRE usa Gemini 2.5 Pro (mais estável)
       // ====================================================================
-      const FORCED_MODEL = "deepseek-v3.2-exp";
-      const FORCE_DEEPSEEK_TYPES = [
+      const FORCED_MODEL = "gemini-2.5-pro";
+      const FORCE_GEMINI_TYPES = [
         'generate_script_with_formula',
         'generate_script',
         'viral-script',
@@ -1818,7 +1818,7 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         'video_script',
         'optimize_script'
       ];
-      const shouldForceDeepSeek = FORCE_DEEPSEEK_TYPES.includes(type);
+      const shouldForceGemini = FORCE_GEMINI_TYPES.includes(type);
       
       // Strong models list for validation
       const strongModels = [
@@ -1838,10 +1838,10 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         apiUrl = "https://api.laozhang.ai/v1/chat/completions";
         apiKey = userApiKeyToUse;
         
-        // FORÇAR DeepSeek para roteiros e prompts de imagem
-        if (shouldForceDeepSeek) {
+        // FORÇAR Gemini para roteiros e prompts de imagem
+        if (shouldForceGemini) {
           selectedModel = FORCED_MODEL;
-          console.log(`[AI Assistant] ⚡ FORCED DeepSeek v3.2 exp para ${type}`);
+          console.log(`[AI Assistant] ⚡ FORCED Gemini 2.5 Pro para ${type}`);
         } else {
           // Map agent's preferred model to Laozhang API models (docs.laozhang.ai)
           const laozhangAgentModelMap: Record<string, string> = {
@@ -1850,11 +1850,11 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
             "gpt-5": "gpt-4o",
             "claude-sonnet-4-20250514": "claude-3-5-sonnet-20241022",
             "claude-4-sonnet": "claude-3-5-sonnet-20241022",
-            "gemini-2.5-pro": "gemini-1.5-pro",
-            "gemini-pro": "gemini-1.5-pro",
-            "deepseek-r1": "deepseek-v3.2-exp",
-            "deepseek-v3": "deepseek-v3.2-exp",
-            "deepseek-chat": "deepseek-v3.2-exp",
+            "gemini-2.5-pro": "gemini-2.5-pro",
+            "gemini-pro": "gemini-2.5-pro",
+            "deepseek-r1": "gemini-2.5-pro",
+            "deepseek-v3": "gemini-2.5-pro",
+            "deepseek-chat": "gemini-2.5-pro",
           };
           
           // Priority: Agent preferred model > laozhangModel (from initial mapping) > default
