@@ -3806,6 +3806,11 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
     if (!user || sceneNumbers.length === 0) return;
     
     try {
+      // Feedback visível durante a melhoria (especialmente quando há muitas cenas/pedidos de IA)
+      setGenerating(true);
+      setProgress(0);
+      setLoadingMessage("Preparando melhorias...");
+
       // Pegar as cenas que precisam de melhoria
       const scenesToImprove = generatedScenes.filter((_, index) => 
         sceneNumbers.includes(index + 1)
@@ -4014,6 +4019,10 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
           });
         
         if (scenesNeedingPrompt.length > 0) {
+          // Progresso visível (o toast sozinho some e dá sensação de “não aconteceu nada”)
+          setSceneProgress({ done: 0, total: scenesNeedingPrompt.length });
+          setLoadingMessage(`Ajustando prompts para bater com a narração... (0/${scenesNeedingPrompt.length})`);
+
           toast({
             title: "🔄 Ajustando prompts para bater com a narração...",
             description: `Criando ${scenesNeedingPrompt.length} prompt(s) em inglês, fiéis ao texto narrado`,
@@ -4031,24 +4040,40 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
             : '';
           
           // Para cada cena sem imagem, gerar prompt baseado no roteiro (FIDELIDADE AO TEXTO)
-          for (const { scene, index } of scenesNeedingPrompt) {
-            try {
-              // Contexto das cenas vizinhas para continuidade visual
-              const prevScene = index > 0 ? updatedScenes[index - 1] : null;
-              const nextScene = index < updatedScenes.length - 1 ? updatedScenes[index + 1] : null;
-              
-              const contextScenes = [
-                prevScene ? `Cena anterior (${prevScene.number}): "${prevScene.text}"` : '',
-                nextScene ? `Próxima cena (${nextScene.number}): "${nextScene.text}"` : ''
-              ].filter(Boolean).join('\n');
+          // IMPORTANTE: processar em lotes concorrentes para não “parecer travado”
+          // e atualizar o estado incrementalmente para feedback imediato.
+          const CONCURRENCY = 6;
+          const TIMEOUT_MS = 25_000;
+          let doneCount = 0;
+          let failedCount = 0;
 
-              // Usar IA para gerar prompt baseado no TEXTO EXATO da cena (narração)
-              const { data, error } = await supabase.functions.invoke('ai-assistant', {
-                body: {
-                  messages: [
-                    {
-                      role: 'system',
-                      content: `Você é um especialista em criar prompts de imagem cinematográficos para vídeos narrados.
+          const withTimeout = async <T,>(p: Promise<T>, ms: number): Promise<T> => {
+            return await Promise.race([
+              p,
+              new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+            ]);
+          };
+
+          const rewriteOnePrompt = async ({ scene, index }: { scene: ScenePrompt; index: number }) => {
+            // Contexto das cenas vizinhas para continuidade visual
+            const prevScene = index > 0 ? updatedScenes[index - 1] : null;
+            const nextScene = index < updatedScenes.length - 1 ? updatedScenes[index + 1] : null;
+
+            const contextScenes = [
+              prevScene ? `Cena anterior (${prevScene.number}): "${prevScene.text}"` : "",
+              nextScene ? `Próxima cena (${nextScene.number}): "${nextScene.text}"` : "",
+            ]
+              .filter(Boolean)
+              .join("\n");
+
+            const invokePromise = supabase.functions.invoke("ai-assistant", {
+              body: {
+                // Importante para a Edge Function aplicar regras corretas e evitar cair no default
+                type: "image_prompt",
+                messages: [
+                  {
+                    role: "system",
+                    content: `Você é um especialista em criar prompts de imagem cinematográficos para vídeos narrados.
 
 OBJETIVO: Gerar um prompt em INGLÊS que ilustre LITERALMENTE o conteúdo do texto de narração.
 
@@ -4058,59 +4083,86 @@ ${styleDescription}
 REGRAS CRÍTICAS - FIDELIDADE À NARRAÇÃO:
 1. LEIA o texto da narração e identifique: objetos, ações, locais, personagens MENCIONADOS
 2. O prompt DEVE representar visualmente o que o NARRADOR ESTÁ FALANDO, não uma interpretação genérica
-3. Se o narrador menciona "pergaminhos antigos", o prompt DEVE ter pergaminhos antigos
-4. Se o narrador menciona "uma floresta escura", o prompt DEVE ter floresta escura
-5. NUNCA crie imagens genéricas ou apenas temáticas - ilustre o CONTEÚDO ESPECÍFICO
-6. Mantenha CONSISTÊNCIA com as cenas vizinhas (mesmos personagens, ambiente, iluminação)
-7. NUNCA inclua: violência explícita, armas, sangue, nudez, conteúdo adulto, marcas registradas
-8. Sempre adicione no final: "1280x720, 16:9 aspect ratio, full frame, no black bars"
-9. Use descrições artísticas e cinematográficas
-10. Se houver pessoas, descreva como "silhouette", "figure", "person" - evite rostos
+3. NUNCA crie imagens genéricas; ilustre o CONTEÚDO ESPECÍFICO
+4. Mantenha CONSISTÊNCIA com as cenas vizinhas (mesmos personagens, ambiente, iluminação)
+5. NUNCA inclua: violência explícita, armas, sangue, nudez, conteúdo adulto, marcas registradas
+6. Sempre adicione no final: "1280x720, 16:9 aspect ratio, full frame, no black bars"
+7. Se houver pessoas, descreva como "silhouette", "figure", "person" - evite rostos
 
-AUTO-VERIFICAÇÃO: Ao criar o prompt, pergunte-se: "Se alguém ouvir a narração e ver esta imagem, fará sentido imediato?"
+AUTO-VERIFICAÇÃO: "Se alguém ouvir a narração e ver esta imagem, fará sentido imediato?"
 
-RETORNE APENAS o prompt em inglês, sem explicações ou formatação.`
-                    },
-                    {
-                      role: 'user',
-                      content: `CENA ${scene.number} - TEXTO DA NARRAÇÃO (O QUE O NARRADOR ESTÁ FALANDO):
+RETORNE APENAS o prompt em inglês, sem explicações ou formatação.`,
+                  },
+                  {
+                    role: "user",
+                    content: `CENA ${scene.number} - TEXTO DA NARRAÇÃO:
 "${scene.text}"
 
-${contextScenes ? `CONTEXTO (cenas vizinhas para continuidade visual):\n${contextScenes}` : ''}
+${contextScenes ? `CONTEXTO (cenas vizinhas):\n${contextScenes}` : ""}
 
-${referencePrompts ? `REFERÊNCIA DE ESTILO (prompts que funcionaram):\n${referencePrompts}` : ''}
+${referencePrompts ? `REFERÊNCIA DE ESTILO (prompts que funcionaram):\n${referencePrompts}` : ""}
 
-Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador está falando nesta cena.`
-                    }
-                  ],
-                  model: 'gemini-2.5-flash'
-                }
-              });
+Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador está falando nesta cena.`,
+                  },
+                ],
+                model: "gemini-2.5-flash",
+              },
+            });
 
-              if (!error && data) {
-                let newPrompt = (data.result || data.content || '').toString().trim();
-                
-                if (newPrompt) {
-                  // Garantir que tenha os requisitos de formato
-                  if (!newPrompt.includes('1280x720')) {
-                    newPrompt = `${newPrompt}, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
-                  }
-                  
-                  updatedScenes[index] = {
-                    ...updatedScenes[index],
-                    imagePrompt: newPrompt,
-                    generatingImage: true
-                  };
-                  
-                  console.log(`[Melhorar+Regenerar] Cena ${scene.number}: novo prompt fiel à narração gerado`);
-                }
-              }
-            } catch (err) {
-              console.warn(`Erro ao gerar novo prompt para cena ${scene.number}:`, err);
+            const { data, error } = await withTimeout(invokePromise, TIMEOUT_MS);
+            if (error) throw error;
+
+            let newPrompt = (data?.result || data?.content || "").toString().trim();
+            if (!newPrompt) throw new Error("empty_prompt");
+
+            if (!newPrompt.includes("1280x720")) {
+              newPrompt = `${newPrompt}, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
             }
-            
+
+            updatedScenes[index] = {
+              ...updatedScenes[index],
+              imagePrompt: newPrompt,
+              generatingImage: true,
+            };
+
             // Garantir que esta cena entre na fila de geração
             improvedIndexesSet.add(index);
+          };
+
+          for (let start = 0; start < scenesNeedingPrompt.length; start += CONCURRENCY) {
+            const batch = scenesNeedingPrompt.slice(start, start + CONCURRENCY);
+
+            await Promise.all(
+              batch.map(async (item) => {
+                try {
+                  await rewriteOnePrompt(item);
+                } catch (err) {
+                  failedCount += 1;
+                  console.warn(`Erro ao gerar novo prompt para cena ${item.scene.number}:`, err);
+                  // Mesmo com falha, garantimos que entra na fila (para não bloquear o fluxo)
+                  improvedIndexesSet.add(item.index);
+                } finally {
+                  doneCount += 1;
+                }
+              })
+            );
+
+            setSceneProgress({ done: doneCount, total: scenesNeedingPrompt.length });
+            setLoadingMessage(
+              `Ajustando prompts para bater com a narração... (${doneCount}/${scenesNeedingPrompt.length})`
+            );
+
+            // Atualiza UI incrementalmente (não esperar terminar tudo para “aparecer”)
+            setGeneratedScenes([...updatedScenes]);
+            setPersistedScenes(updatedScenes.map(({ generatedImage, generatingImage, ...rest }) => rest));
+          }
+
+          if (failedCount > 0) {
+            toast({
+              variant: "destructive",
+              title: "⚠️ Algumas cenas não foram ajustadas",
+              description: `${failedCount} prompt(s) falharam ao ajustar. O restante continuou normalmente.`,
+            });
           }
         }
         
@@ -4139,6 +4191,9 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
         // Pequeno delay para garantir sincronização
         setTimeout(() => {
           const cookieCount = getImageFXCookieCount() || 1;
+          // A partir daqui, o progresso fica a cargo do gerador em background
+          setGenerating(false);
+          setLoadingMessage("");
           startBgGeneration(updatedScenes, style, improvedIndexes, detectedCharacters, cookieCount);
         }, 100);
         
@@ -4147,6 +4202,8 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
           title: "✅ Cenas melhoradas!",
           description: `${sceneNumbers.length} cena(s) otimizada(s) para maior retenção`,
         });
+        setGenerating(false);
+        setLoadingMessage("");
       }
       
       // Log activity
@@ -4162,6 +4219,8 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
         description: "Não foi possível melhorar as cenas",
         variant: "destructive"
       });
+      setGenerating(false);
+      setLoadingMessage("");
     }
   };
 
