@@ -3820,23 +3820,26 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
       // CASO ESPECIAL: Cenas longas - DIVIDIR automaticamente em cenas menores
 
       if (improvementType === 'split_long_scenes') {
-        const idealDurationMax = 8; // segundos máximo por cena
-        const idealDurationMin = 5; // segundos mínimo por cena
+        // Preferência do produto: melhorar retenção => dividir e criar mais cenas.
+        // Aqui dividimos pelo TEMPO (>10s) com base no WPM atual.
+        // Importante: dividir APENAS as cenas selecionadas (sceneNumbers) para não “explodir” o projeto inteiro.
+        const targetDuration = 6; // segundos por parte (meta ~5–8s)
+        const selectedIndexes = new Set(sceneNumbers.map((n) => n - 1));
 
-        // Quando não há duração travada, podemos dividir cenas longas.
-        // Para evitar explosão por WPM baixo, usamos um limiar híbrido:
-        // - duração longa (>10s)
-        // - E wordCount alto (evita dividir cenas curtas só porque o WPM ficou baixo)
-        const wordsPerSceneNum = Math.max(1, parseInt(wordsPerScene || '25', 10) || 25);
-        const minWordsToSplit = Math.max(50, Math.round(wordsPerSceneNum * 2));
-        
-        // Encontrar cenas longas que precisam ser divididas
         const longSceneIndexes = updatedScenes
           .map((s, i) => ({ scene: s, index: i, duration: (s.wordCount / currentWpm) * 60 }))
-          .filter(item => item.duration > 10 && item.scene.wordCount >= minWordsToSplit)
-          .map(item => item.index);
-        
-        if (longSceneIndexes.length > 0) {
+          .filter((item) => selectedIndexes.has(item.index) && item.duration > 10)
+          .map((item) => item.index);
+
+        if (longSceneIndexes.length === 0) {
+          toast({
+            title: "ℹ️ Nada para dividir",
+            description: "Nenhuma das cenas selecionadas está acima de 10s com o WPM atual.",
+          });
+          return;
+        }
+
+        {
           // Criar array de novas cenas
           const newScenes: ScenePrompt[] = [];
           let newSceneNumber = 1;
@@ -3844,74 +3847,75 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
           
           updatedScenes.forEach((scene, originalIndex) => {
             const duration = (scene.wordCount / currentWpm) * 60;
-            
-            if (duration > 10) {
-              // Dividir esta cena em partes menores
-              const targetDuration = 6; // segundos por parte
-              const numParts = Math.ceil(duration / targetDuration);
+
+            const shouldSplit = longSceneIndexes.includes(originalIndex);
+
+            if (shouldSplit) {
+              const numParts = Math.max(2, Math.ceil(duration / targetDuration));
               const wordsPerPart = Math.ceil(scene.wordCount / numParts);
               const words = scene.text.split(/\s+/);
-              
+
               for (let i = 0; i < numParts; i++) {
                 const partWords = words.slice(i * wordsPerPart, (i + 1) * wordsPerPart);
                 const partText = partWords.join(' ');
                 const partWordCount = partWords.length;
                 const partDuration = (partWordCount / currentWpm) * 60;
-                
-                // Gerar prompt fiel ao texto da parte (sincronizado com a narração)
-                // Combina o prefixo do estilo com uma descrição literal do conteúdo
-                const shotType = i === 0 
-                  ? 'establishing shot, wide angle' 
-                  : i === numParts - 1 
-                    ? 'closing shot, emotional climax' 
+
+                const shotType = i === 0
+                  ? 'establishing shot, wide angle'
+                  : i === numParts - 1
+                    ? 'closing shot, emotional climax'
                     : 'medium shot, character focus';
-                
-                // Adicionar resumo curto do texto (até 80 chars) para garantir sincronia
-                const textSummary = partText.slice(0, 80).replace(/[.,!?;:]+$/, '');
+
+                // Sincronia: prompt nasce do texto exato do trecho
+                const textSummary = partText.slice(0, 120).replace(/[.,!?;:]+$/, '');
                 const partPrompt = `${textSummary}, ${shotType}, dynamic angle variation, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
-                
+
                 const startTimecode = `${String(Math.floor(currentTime / 60)).padStart(2, '0')}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`;
                 currentTime += partDuration;
                 const endTimecode = `${String(Math.floor(currentTime / 60)).padStart(2, '0')}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`;
-                
+
+                const newIndex = newSceneNumber - 1;
                 newScenes.push({
                   number: newSceneNumber++,
                   text: partText,
                   wordCount: partWordCount,
                   imagePrompt: partPrompt,
                   timecode: startTimecode,
-                  endTimecode: endTimecode,
+                  endTimecode,
                   estimatedTime: `${partDuration.toFixed(1)}s`,
                   emotion: ['tension', 'curiosity', 'surprise', 'shock'][i % 4],
                   retentionTrigger: ['anticipation', 'curiosity', 'mystery', 'revelation'][i % 4],
                   generatedImage: undefined,
                   generatingImage: false,
-                  characterName: scene.characterName
+                  characterName: scene.characterName,
                 });
-                
-                improvedIndexes.push(newSceneNumber - 2);
+
+                improvedIndexes.push(newIndex);
               }
-            } else {
-              // Manter cena original mas atualizar número e timecodes
-              const startTimecode = `${String(Math.floor(currentTime / 60)).padStart(2, '0')}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`;
-              currentTime += duration;
-              const endTimecode = `${String(Math.floor(currentTime / 60)).padStart(2, '0')}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`;
-              
-              newScenes.push({
-                ...scene,
-                number: newSceneNumber++,
-                timecode: startTimecode,
-                endTimecode: endTimecode,
-                estimatedTime: `${duration.toFixed(1)}s`
-              });
+
+              return;
             }
+
+            // Manter cena original mas atualizar número e timecodes
+            const startTimecode = `${String(Math.floor(currentTime / 60)).padStart(2, '0')}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`;
+            currentTime += duration;
+            const endTimecode = `${String(Math.floor(currentTime / 60)).padStart(2, '0')}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`;
+
+            newScenes.push({
+              ...scene,
+              number: newSceneNumber++,
+              timecode: startTimecode,
+              endTimecode,
+              estimatedTime: `${duration.toFixed(1)}s`,
+            });
           });
           
           updatedScenes = newScenes;
           
           toast({
-            title: "🎬 Cenas divididas automaticamente!",
-            description: `${longSceneIndexes.length} cena(s) longa(s) dividida(s). Total: ${newScenes.length} cenas. Gerando ${improvedIndexes.length} novas imagens...`,
+            title: "🎬 Retenção melhorada: cenas divididas",
+            description: `${longSceneIndexes.length} cena(s) selecionada(s) dividida(s). Total: ${generatedScenes.length} → ${newScenes.length} cenas. Gerando ${improvedIndexes.length} nova(s) imagem(ns)...`,
           });
         }
       }
