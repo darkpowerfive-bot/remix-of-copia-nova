@@ -3818,17 +3818,6 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
       const improvedIndexes: number[] = [];
       
       // CASO ESPECIAL: Cenas longas - DIVIDIR automaticamente em cenas menores
-      // IMPORTANTE: se a duração estiver TRAVADA para sincronizar com áudio, NÃO dividimos automaticamente.
-      // Dividir nesse caso explode o número de cenas (ex: 120 -> 452) e quebra a previsibilidade do usuário.
-      const isDurationLockedForAudio = lockedDurationSeconds !== null;
-      if (improvementType === 'split_long_scenes' && isDurationLockedForAudio) {
-        toast({
-          title: "🔒 Duração travada",
-          description: "Como a duração está travada para sincronizar com o áudio, não vamos dividir cenas automaticamente (isso pode multiplicar as imagens). Vou apenas reforçar os prompts/ritmo sem aumentar o número de cenas.",
-        });
-        // Degrada para melhoria visual sem alterar a contagem de cenas
-        improvementType = 'improve_all';
-      }
 
       if (improvementType === 'split_long_scenes') {
         const idealDurationMax = 8; // segundos máximo por cena
@@ -3869,12 +3858,17 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                 const partWordCount = partWords.length;
                 const partDuration = (partWordCount / currentWpm) * 60;
                 
-                // Gerar prompt adaptado para a parte
-                const partPrompt = `${scene.imagePrompt}, scene ${i + 1} of ${numParts}, dynamic angle variation, ${
-                  i === 0 ? 'establishing shot, wide angle' : 
-                  i === numParts - 1 ? 'closing shot, emotional climax' : 
-                  'medium shot, character focus'
-                }`;
+                // Gerar prompt fiel ao texto da parte (sincronizado com a narração)
+                // Combina o prefixo do estilo com uma descrição literal do conteúdo
+                const shotType = i === 0 
+                  ? 'establishing shot, wide angle' 
+                  : i === numParts - 1 
+                    ? 'closing shot, emotional climax' 
+                    : 'medium shot, character focus';
+                
+                // Adicionar resumo curto do texto (até 80 chars) para garantir sincronia
+                const textSummary = partText.slice(0, 80).replace(/[.,!?;:]+$/, '');
+                const partPrompt = `${textSummary}, ${shotType}, dynamic angle variation, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
                 
                 const startTimecode = `${String(Math.floor(currentTime / 60)).padStart(2, '0')}:${String(Math.floor(currentTime % 60)).padStart(2, '0')}`;
                 currentTime += partDuration;
@@ -3891,7 +3885,6 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                   emotion: ['tension', 'curiosity', 'surprise', 'shock'][i % 4],
                   retentionTrigger: ['anticipation', 'curiosity', 'mystery', 'revelation'][i % 4],
                   generatedImage: undefined,
-                  // Não marque como generating aqui; quem controla é o startBgGeneration via improvedIndexes.
                   generatingImage: false,
                   characterName: scene.characterName
                 });
