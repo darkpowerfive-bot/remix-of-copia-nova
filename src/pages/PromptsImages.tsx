@@ -3927,72 +3927,17 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
       }
       
       // Para outros tipos de melhoria OU se split não foi necessário
+      // AGORA: SEMPRE usamos IA para analisar a narração e definir emoção/gatilho/prompt apropriados
       if (improvementType !== 'split_long_scenes') {
+        // Marcar cenas para melhoria com IA
         for (const sceneNum of sceneNumbers) {
           const index = sceneNum - 1;
           if (index >= 0 && index < updatedScenes.length) {
             const scene = updatedScenes[index];
-            
-            // Melhorar o prompt localmente (rápido, sem API)
-            let improvedPrompt = scene.imagePrompt;
-            let improvedEmotion = scene.emotion || 'neutral';
-            let improvedTrigger = scene.retentionTrigger || 'continuity';
-            
-            // Adicionar elementos de melhoria baseado no tipo
-            if (improvementType === 'add_emotion' || improvementType === 'add_emotion_ending' || improvementType === 'improve_all') {
-              const emotions = ['tension', 'curiosity', 'surprise', 'shock'];
-              improvedEmotion = emotions[index % emotions.length];
-              
-              // Adicionar termos cinematográficos ao prompt baseado no roteiro
-              const cinematicEnhancements = [
-                'dramatic lighting, intense atmosphere, emotional storytelling',
-                'cinematic composition, powerful visual impact, high tension',
-                'striking imagery, high contrast lighting, narrative tension',
-                'epic visual storytelling, dramatic shadows, emotional depth'
-              ];
-              if (!improvedPrompt.toLowerCase().includes('dramatic') && !improvedPrompt.toLowerCase().includes('cinematic')) {
-                improvedPrompt = `${improvedPrompt}, ${cinematicEnhancements[index % cinematicEnhancements.length]}`;
-              }
-            }
-            
-            if (improvementType === 'add_triggers' || improvementType === 'add_triggers_ending' || improvementType === 'improve_all') {
-              const triggers = ['curiosity', 'anticipation', 'mystery', 'revelation'];
-              improvedTrigger = triggers[index % triggers.length];
-            }
-            
-            if (improvementType === 'improve_hook' && sceneNum <= 3) {
-              improvedEmotion = 'shock';
-              improvedTrigger = 'curiosity';
-              if (!improvedPrompt.toLowerCase().includes('dramatic close-up') && !improvedPrompt.toLowerCase().includes('intense')) {
-                improvedPrompt = `${improvedPrompt}, dramatic close-up, intense gaze, high stakes moment, ultra cinematic, powerful hook`;
-              }
-            }
-            
-            // Para cenas longas, SEMPRE forçar melhorias visuais para compensar a duração
-            if (improvementType === 'split_long_scenes') {
-              const strongEmotions = ['tension', 'shock', 'curiosity', 'surprise'];
-              const strongTriggers = ['anticipation', 'revelation', 'mystery', 'pattern_break'];
-              improvedEmotion = strongEmotions[index % strongEmotions.length];
-              improvedTrigger = strongTriggers[index % strongTriggers.length];
-              
-              // FORÇAR adição de elementos dinâmicos mesmo se já existirem
-              const dynamicEnhancements = [
-                'dynamic composition, fast visual rhythm, engaging close-up, dramatic angle',
-                'striking perspective, intense movement, high energy framing, powerful contrast',
-                'bold visual storytelling, cinematic movement, impactful composition, dramatic lighting',
-                'epic scale, intense action framing, dynamic camera movement, high stakes tension'
-              ];
-              improvedPrompt = `${scene.imagePrompt}, ${dynamicEnhancements[index % dynamicEnhancements.length]}`;
-            }
-            
-            // Se vai regenerar OU se não tem imagem, marca para gerar
             const needsImage = regenerateImages || !scene.generatedImage;
             
             updatedScenes[index] = {
               ...scene,
-              imagePrompt: improvedPrompt,
-              emotion: improvedEmotion,
-              retentionTrigger: improvedTrigger,
               generatedImage: needsImage ? undefined : scene.generatedImage,
               generatingImage: needsImage ? true : false
             };
@@ -4004,28 +3949,46 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
         }
       }
       
-      // GARANTIA DE FIDELIDADE: quando dividimos cenas (retenção), SEMPRE reescrevemos prompts com IA (em inglês)
-      // usando o texto exato da narração de cada cena nova.
-      const shouldRewritePromptsWithAI = regenerateImages || improvementType === 'split_long_scenes';
+      // ============================================================
+      // IA DIRETOR DE EDIÇÃO: Análise inteligente de TODAS as cenas
+      // A IA analisa a narração e define: emoção, gatilho e prompt
+      // ============================================================
+      const shouldRewritePromptsWithAI = regenerateImages || 
+        improvementType === 'split_long_scenes' || 
+        improvementType === 'add_emotion' ||
+        improvementType === 'add_emotion_ending' ||
+        improvementType === 'add_triggers' ||
+        improvementType === 'add_triggers_ending' ||
+        improvementType === 'improve_all' ||
+        improvementType === 'improve_hook';
 
       if (shouldRewritePromptsWithAI) {
+        // Para "Melhorar + Gerar", processar TODAS as cenas selecionadas (mesmo com imagem)
+        // A IA vai analisar e definir emoção, gatilho e novo prompt
+        const selectedIndexes = new Set(sceneNumbers.map((n) => n - 1));
+        
         const scenesNeedingPrompt = updatedScenes
           .map((scene, index) => ({ scene, index }))
           .filter(({ scene, index }) => {
-            if (scene.generatedImage) return false;
-            // Se o usuário pediu regeneração, corrigir TODAS sem imagem.
-            // Se foi split, corrigir pelo menos as novas cenas (improvedIndexesSet).
-            return regenerateImages ? true : improvedIndexesSet.has(index);
+            // Se regenerateImages: processar todas as cenas selecionadas
+            if (regenerateImages) {
+              return selectedIndexes.has(index);
+            }
+            // Se não tem imagem, processar
+            if (!scene.generatedImage) {
+              return selectedIndexes.has(index) || improvedIndexesSet.has(index);
+            }
+            return false;
           });
         
         if (scenesNeedingPrompt.length > 0) {
           // Progresso visível (o toast sozinho some e dá sensação de “não aconteceu nada”)
           setSceneProgress({ done: 0, total: scenesNeedingPrompt.length });
-          setLoadingMessage(`Ajustando prompts para bater com a narração... (0/${scenesNeedingPrompt.length})`);
+          setLoadingMessage(`🎬 IA Diretor analisando cenas... (0/${scenesNeedingPrompt.length})`);
 
           toast({
-            title: "🔄 Ajustando prompts para bater com a narração...",
-            description: `Criando ${scenesNeedingPrompt.length} prompt(s) em inglês, fiéis ao texto narrado`,
+            title: "🎬 IA Diretor de Edição ativada",
+            description: `Analisando ${scenesNeedingPrompt.length} cena(s): definindo emoção, gatilho e prompt cinematográfico`,
           });
           
           // Pegar o estilo atual selecionado para manter consistência
@@ -4066,32 +4029,51 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
               .filter(Boolean)
               .join("\n");
 
+            // Determinar o foco com base no tipo de melhoria
+            const improvementFocus = improvementType === 'improve_hook' && scene.number <= 3
+              ? 'FOCO: Esta é uma cena de GANCHO INICIAL. Use emoção SHOCK e gatilho CURIOSITY para prender a atenção nos primeiros segundos.'
+              : improvementType.includes('emotion')
+                ? 'FOCO: Adicionar EMOÇÃO forte (tension, curiosity, surprise, shock) para aumentar retenção.'
+                : improvementType.includes('trigger')
+                  ? 'FOCO: Adicionar GATILHO DE RETENÇÃO (curiosity, anticipation, mystery, revelation) para manter audiência.'
+                  : 'FOCO: Otimizar retenção máxima com emoção + gatilho + prompt cinematográfico.';
+
             const invokePromise = supabase.functions.invoke("ai-assistant", {
               body: {
-                // Importante para a Edge Function aplicar regras corretas e evitar cair no default
+                // Importante para a Edge Function aplicar regras corretas
                 type: "image_prompt",
                 messages: [
                   {
                     role: "system",
-                    content: `Você é um especialista em criar prompts de imagem cinematográficos para vídeos narrados.
+                    content: `Você é um DIRETOR DE EDIÇÃO especialista em vídeos virais de alta retenção.
 
-OBJETIVO: Gerar um prompt em INGLÊS que ilustre LITERALMENTE o conteúdo do texto de narração.
+OBJETIVO: Analisar a narração e definir: EMOÇÃO, GATILHO DE RETENÇÃO e PROMPT DE IMAGEM cinematográfico.
 
 ESTILO VISUAL OBRIGATÓRIO (${styleName}):
 ${styleDescription}
 
-REGRAS CRÍTICAS - FIDELIDADE À NARRAÇÃO:
-1. LEIA o texto da narração e identifique: objetos, ações, locais, personagens MENCIONADOS
-2. O prompt DEVE representar visualmente o que o NARRADOR ESTÁ FALANDO, não uma interpretação genérica
-3. NUNCA crie imagens genéricas; ilustre o CONTEÚDO ESPECÍFICO
-4. Mantenha CONSISTÊNCIA com as cenas vizinhas (mesmos personagens, ambiente, iluminação)
-5. NUNCA inclua: violência explícita, armas, sangue, nudez, conteúdo adulto, marcas registradas
-6. Sempre adicione no final: "1280x720, 16:9 aspect ratio, full frame, no black bars"
-7. Se houver pessoas, descreva como "silhouette", "figure", "person" - evite rostos
+${improvementFocus}
 
-AUTO-VERIFICAÇÃO: "Se alguém ouvir a narração e ver esta imagem, fará sentido imediato?"
+REGRAS PARA EMOÇÃO (emotion):
+- Analise o TOM da narração: urgência? mistério? revelação? conflito?
+- Opções: tension, curiosity, surprise, shock, wonder, fear, hope, determination
+- NUNCA use "neutral" - SEMPRE defina uma emoção baseada no texto
 
-RETORNE APENAS o prompt em inglês, sem explicações ou formatação.`,
+REGRAS PARA GATILHO (retentionTrigger):
+- Analise o CONTEÚDO: pergunta? promessa? revelação? cliffhanger?
+- Opções: curiosity, anticipation, mystery, revelation, pattern_break, suspense, urgency, fomo
+- NUNCA use "continuity" - SEMPRE defina um gatilho que prenda a atenção
+
+REGRAS PARA PROMPT DE IMAGEM:
+1. LEIA o texto e identifique: objetos, ações, locais, personagens MENCIONADOS
+2. Ilustre LITERALMENTE o que o narrador está falando
+3. NUNCA crie imagens genéricas - ilustre o CONTEÚDO ESPECÍFICO
+4. Adicione elementos cinematográficos: iluminação, ângulo, composição
+5. NUNCA inclua: violência, armas, nudez, marcas registradas
+6. Sempre termine com: "1280x720, 16:9 aspect ratio, full frame, no black bars"
+
+RESPONDA APENAS em JSON válido (sem markdown, sem explicações):
+{"emotion": "...", "retentionTrigger": "...", "imagePrompt": "..."}`,
                   },
                   {
                     role: "user",
@@ -4102,7 +4084,7 @@ ${contextScenes ? `CONTEXTO (cenas vizinhas):\n${contextScenes}` : ""}
 
 ${referencePrompts ? `REFERÊNCIA DE ESTILO (prompts que funcionaram):\n${referencePrompts}` : ""}
 
-Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador está falando nesta cena.`,
+Analise a narração e retorne JSON com emotion, retentionTrigger e imagePrompt.`,
                   },
                 ],
                 model: "deepseek-v3.2-exp",
@@ -4112,16 +4094,38 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
             const { data, error } = await withTimeout(invokePromise, TIMEOUT_MS);
             if (error) throw error;
 
-            let newPrompt = (data?.result || data?.content || "").toString().trim();
-            if (!newPrompt) throw new Error("empty_prompt");
+            const rawResult = (data?.result || data?.content || "").toString().trim();
+            if (!rawResult) throw new Error("empty_response");
 
+            // Tentar parsear JSON da resposta
+            let parsedResult: { emotion?: string; retentionTrigger?: string; imagePrompt?: string } = {};
+            try {
+              // Extrair JSON do texto (pode vir com markdown ou texto extra)
+              const jsonMatch = rawResult.match(/\{[\s\S]*"emotion"[\s\S]*"retentionTrigger"[\s\S]*"imagePrompt"[\s\S]*\}/);
+              if (jsonMatch) {
+                parsedResult = JSON.parse(jsonMatch[0]);
+              } else {
+                // Fallback: usar resposta como prompt direto
+                parsedResult = { imagePrompt: rawResult };
+              }
+            } catch {
+              // Se não conseguir parsear, usar como prompt direto
+              parsedResult = { imagePrompt: rawResult };
+            }
+
+            let newPrompt = (parsedResult.imagePrompt || rawResult).trim();
             if (!newPrompt.includes("1280x720")) {
               newPrompt = `${newPrompt}, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
             }
 
+            const newEmotion = parsedResult.emotion || 'tension';
+            const newTrigger = parsedResult.retentionTrigger || 'curiosity';
+
             updatedScenes[index] = {
               ...updatedScenes[index],
               imagePrompt: newPrompt,
+              emotion: newEmotion,
+              retentionTrigger: newTrigger,
               generatingImage: true,
             };
 
@@ -4149,7 +4153,7 @@ Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador es
 
             setSceneProgress({ done: doneCount, total: scenesNeedingPrompt.length });
             setLoadingMessage(
-              `Ajustando prompts para bater com a narração... (${doneCount}/${scenesNeedingPrompt.length})`
+              `🎬 IA Diretor analisando cenas... (${doneCount}/${scenesNeedingPrompt.length})`
             );
 
             // Atualiza UI incrementalmente (não esperar terminar tudo para “aparecer”)
