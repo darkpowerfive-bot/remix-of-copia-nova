@@ -4105,7 +4105,7 @@ ${referencePrompts ? `REFERÊNCIA DE ESTILO (prompts que funcionaram):\n${refere
 Crie um prompt de imagem em inglês que ilustre LITERALMENTE o que o narrador está falando nesta cena.`,
                   },
                 ],
-                model: "gemini-2.5-flash",
+                model: "deepseek-v3.2-exp",
               },
             });
 
@@ -4395,7 +4395,7 @@ RESPONDA EM JSON VÁLIDO:
                   .join('\n')}\n\nIdentifique TODAS as incongruências, mesmo sutis, e sugira correções. Responda APENAS em JSON válido, sem texto adicional.`,
               },
             ],
-            model: 'deepseek-r1',
+            model: 'deepseek-v3.2-exp',
           },
         });
 
