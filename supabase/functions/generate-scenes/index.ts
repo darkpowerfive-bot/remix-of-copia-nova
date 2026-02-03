@@ -1105,17 +1105,17 @@ serve(async (req) => {
     let apiKey: string;
     let apiModel: string;
 
-    // OTIMIZADO: Usar gpt-4.1 da Laozhang (mais rápido + melhor qualidade que deepseek-v3)
+    // FORÇAR: Usar deepseek-v3.2-exp da Laozhang (modelo obrigatório conforme regra do sistema)
     if (LAOZHANG_API_KEY) {
       apiUrl = "https://api.laozhang.ai/v1/chat/completions";
       apiKey = LAOZHANG_API_KEY;
-      apiModel = "gpt-4.1"; // gpt-4.1 é mais rápido e melhor qualidade na Laozhang
-      console.log(`[Generate Scenes] Using Laozhang AI - Model: gpt-4.1 (env)`);
+      apiModel = "deepseek-v3.2-exp"; // Modelo obrigatório para geração de cenas
+      console.log(`[Generate Scenes] Using Laozhang AI - Model: deepseek-v3.2-exp (env)`);
     } else if (adminApiKeys?.laozhang) {
       apiUrl = "https://api.laozhang.ai/v1/chat/completions";
       apiKey = adminApiKeys.laozhang;
-      apiModel = "gpt-4.1";
-      console.log(`[Generate Scenes] Using Laozhang AI - Model: gpt-4.1 (admin_settings)`);
+      apiModel = "deepseek-v3.2-exp";
+      console.log(`[Generate Scenes] Using Laozhang AI - Model: deepseek-v3.2-exp (admin_settings)`);
     } else {
       return new Response(
         JSON.stringify({ error: "Chave DeepSeek (Laozhang) não configurada. Configure LAOZHANG_API_KEY." }),
