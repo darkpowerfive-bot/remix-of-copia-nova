@@ -854,58 +854,74 @@ const [generating, setGenerating] = useState(false);
               const { done, value } = await reader.read();
               if (done) break;
 
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split('\n\n');
-              buffer = lines.pop() || '';
+               buffer += decoder.decode(value, { stream: true });
 
-              for (const line of lines) {
-                if (line.startsWith(':')) {
-                  // heartbeat
-                  lastEventAt = Date.now();
-                  continue;
-                }
-                if (!line.startsWith('data: ')) continue;
-                const jsonStr = line.slice(6).trim();
-                if (!jsonStr) continue;
+               // SSE parsing robusto (linha-a-linha) para não quebrar JSON em chunks
+               // Regra: processar cada linha conforme chega; rebuffer em caso de JSON parcial.
+               let newlineIndex: number;
+               while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+                 let line = buffer.slice(0, newlineIndex);
+                 buffer = buffer.slice(newlineIndex + 1);
 
-                try {
-                  const event = JSON.parse(jsonStr);
-                  lastEventAt = Date.now();
+                 if (line.endsWith("\r")) line = line.slice(0, -1); // CRLF
+                 if (!line || line.trim() === "") continue;
 
-                  if (event.type === 'init') {
-                    totalExpectedScenes = event.estimatedScenes || 0;
-                    totalBatches = event.totalBatches || 1;
-                    onProgress(`Iniciando geração de ${event.estimatedScenes} cenas em ${event.totalBatches} lotes...`);
-                    if (event.characters) {
-                      receivedCharacters = event.characters;
-                    }
-                  } else if (event.type === 'batch_start') {
-                    currentBatch = event.batch || 0;
-                    onProgress(`Processando lote ${event.batch}/${event.totalBatches}...`);
-                  } else if (event.type === 'scene') {
-                    const scene = event.scene;
-                    if (scene) {
-                      totalScenesReceived++;
-                      onBatchComplete([scene], currentBatch, totalBatches, receivedCharacters);
-                      onProgress(`Cena ${event.current}/${event.total} gerada`);
-                    }
-                  } else if (event.type === 'batch') {
-                    const batchScenes = event.scenes || [];
-                    totalScenesReceived += batchScenes.length;
-                    onBatchComplete(batchScenes, event.batchNumber, event.totalBatches, receivedCharacters);
-                    onProgress(`Lote ${event.batchNumber}/${event.totalBatches} concluído: ${batchScenes.length} cenas`);
-                  } else if (event.type === 'batch_retry') {
-                    onProgress(`Lote ${event.batch}: ${event.message || 'Reprocessando...'}`);
-                  } else if (event.type === 'complete') {
-                    totalCredits = event.creditsUsed || 0;
-                    onProgress(`Geração completa: ${event.totalScenes} cenas`);
-                  } else if (event.type === 'error') {
-                    throw new Error(event.error || 'Erro na geração');
-                  }
-                } catch (parseErr) {
-                  console.warn('[SSE] Parse error:', parseErr, jsonStr);
-                }
-              }
+                 // Heartbeat / comentários
+                 if (line.startsWith(":")) {
+                   lastEventAt = Date.now();
+                   continue;
+                 }
+
+                 if (!line.startsWith("data: ")) continue;
+                 const jsonStr = line.slice(6).trim();
+                 if (!jsonStr) continue;
+
+                 // [DONE] (compatibilidade)
+                 if (jsonStr === "[DONE]") {
+                   lastEventAt = Date.now();
+                   continue;
+                 }
+
+                 try {
+                   const event = JSON.parse(jsonStr);
+                   lastEventAt = Date.now();
+
+                   if (event.type === "init") {
+                     totalExpectedScenes = event.estimatedScenes || 0;
+                     totalBatches = event.totalBatches || 1;
+                     onProgress(`Iniciando geração de ${event.estimatedScenes} cenas em ${event.totalBatches} lotes...`);
+                     if (event.characters) {
+                       receivedCharacters = event.characters;
+                     }
+                   } else if (event.type === "batch_start") {
+                     currentBatch = event.batch || 0;
+                     onProgress(`Processando lote ${event.batch}/${event.totalBatches}...`);
+                   } else if (event.type === "scene") {
+                     const scene = event.scene;
+                     if (scene) {
+                       totalScenesReceived++;
+                       onBatchComplete([scene], currentBatch, totalBatches, receivedCharacters);
+                       onProgress(`Cena ${event.current}/${event.total} gerada`);
+                     }
+                   } else if (event.type === "batch") {
+                     const batchScenes = event.scenes || [];
+                     totalScenesReceived += batchScenes.length;
+                     onBatchComplete(batchScenes, event.batchNumber, event.totalBatches, receivedCharacters);
+                     onProgress(`Lote ${event.batchNumber}/${event.totalBatches} concluído: ${batchScenes.length} cenas`);
+                   } else if (event.type === "batch_retry") {
+                     onProgress(`Lote ${event.batch}: ${event.message || "Reprocessando..."}`);
+                   } else if (event.type === "complete") {
+                     totalCredits = event.creditsUsed || 0;
+                     onProgress(`Geração completa: ${event.totalScenes} cenas`);
+                   } else if (event.type === "error") {
+                     throw new Error(event.error || "Erro na geração");
+                   }
+                 } catch (parseErr) {
+                   // JSON pode ter vindo cortado entre chunks → coloca a linha de volta no buffer
+                   buffer = line + "\n" + buffer;
+                   break;
+                 }
+               }
             }
 
             if (idleInterval) window.clearInterval(idleInterval);
