@@ -1805,10 +1805,10 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
       const agentPreferredModel = agentData?.preferredModel || agentData?.preferred_model || null;
       
       // ====================================================================
-      // FORÇAR MODELO: deepseek-r1 para roteiros e prompts de imagem
-      // DeepSeek R1 é excelente para raciocínio complexo e geração de conteúdo
+      // FORÇAR MODELO: deepseek-v3.2-exp para TODOS os prompts e imagens
+      // DeepSeek v3.2 experimental é obrigatório para roteiros e geração
       // ====================================================================
-      const FORCED_MODEL = "deepseek-r1";
+      const FORCED_MODEL = "deepseek-v3.2-exp";
       const FORCE_DEEPSEEK_TYPES = [
         'generate_script_with_formula',
         'generate_script',
@@ -1817,7 +1817,8 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         'batch_images',
         'video_script',
         'optimize_script',
-        'sync_verification'
+        'sync_verification',
+        'image_prompt'  // NOVO: força deepseek para prompts de imagem também
       ];
       const shouldForceDeepSeek = FORCE_DEEPSEEK_TYPES.includes(type);
       
@@ -1839,10 +1840,10 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
         apiUrl = "https://api.laozhang.ai/v1/chat/completions";
         apiKey = userApiKeyToUse;
         
-        // FORÇAR DeepSeek para roteiros e prompts de imagem
+        // FORÇAR DeepSeek v3.2-exp para roteiros e prompts de imagem
         if (shouldForceDeepSeek) {
           selectedModel = FORCED_MODEL;
-          console.log(`[AI Assistant] ⚡ FORCED DeepSeek R1 para ${type}`);
+          console.log(`[AI Assistant] ⚡ FORCED DeepSeek v3.2-exp para ${type}`);
         } else {
           // Map agent's preferred model to Laozhang API models (docs.laozhang.ai)
           const laozhangAgentModelMap: Record<string, string> = {
@@ -1853,9 +1854,10 @@ NÃO ignore nenhuma instrução. NÃO improvise. SIGA o contexto fornecido À RI
             "claude-4-sonnet": "claude-3-5-sonnet-20241022",
             "gemini-2.5-pro": "gemini-2.5-pro",
             "gemini-pro": "gemini-2.5-pro",
-            "deepseek-r1": "deepseek-r1",
-            "deepseek-v3": "deepseek-r1",
-            "deepseek-chat": "deepseek-r1",
+            "deepseek-r1": "deepseek-v3.2-exp",
+            "deepseek-v3": "deepseek-v3.2-exp",
+            "deepseek-v3.2-exp": "deepseek-v3.2-exp",
+            "deepseek-chat": "deepseek-v3.2-exp",
           };
           
           // Priority: Agent preferred model > laozhangModel (from initial mapping) > default
