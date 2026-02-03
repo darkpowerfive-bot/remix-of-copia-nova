@@ -489,31 +489,21 @@ ${characters.map(c => `- ${c.name}: ${c.description}`).join('\n')}`
     visualMap.mainTheme + ' ' + scriptContext.period + ' ' + scriptContext.setting
   );
   
-  // Regras de vestuário baseadas no período histórico - EXTREMAMENTE RIGOROSAS
-  const clothingRules = isHistoricalContent 
-    ? `\n👔 ABSOLUTE PROHIBITION - CLOTHING RULES FOR HISTORICAL CONTENT:
+  // Regras de vestuário baseadas no período histórico (SEM bloquear o roteiro)
+  // IMPORTANTE: o texto da cena manda. Se o narrador falar de arqueólogos/pesquisadores/arquivos modernos,
+  // é PERMITIDO mostrar pessoas e ambiente contemporâneo.
+  const clothingRules = isHistoricalContent
+    ? `\n👔 HISTORICAL CONTEXT GUIDELINE (TEXT OVERRIDES):
 
-⛔ ZERO TOLERANCE POLICY - DO NOT INCLUDE ANY OF THESE:
-- NO suits, blazers, ties, formal attire, business attire, dress shirts
-- NO modern officials, bureaucrats, government workers in suits
-- NO researchers, scientists, archaeologists, explorers in modern clothing
-- NO people examining, studying, observing artifacts in contemporary attire
-- NO archive rooms with suited officials - show ONLY the artifacts/papyrus
-- NO police, security, military in modern uniforms
-- NO construction workers with modern safety equipment
-- NO women in blazers, modern dresses, or contemporary fashion
-- NO men in suits standing in ancient locations
-- NO "formal attire", "professional clothing", "office wear"
+✅ If the scene text describes an ANCIENT moment (rituals, cities, temples, ancient workers):
+- Avoid modern clothing, modern officials, modern uniforms, and modern safety equipment.
+- Prefer period-accurate clothing OR show the ancient location/object itself.
 
-✅ WHAT TO SHOW INSTEAD:
-- ARTIFACTS ONLY: papyrus scrolls, hieroglyphics, statues, tombs, temples
-- LOCATIONS ONLY: pyramid interiors, chambers, ancient archives, excavation sites
-- If HANDS are needed: show ONLY hands (no sleeves, no clothing visible) touching artifacts
-- If SILHOUETTES are needed: dark undefined shapes, no clothing details
-- ANCIENT WORKERS: wearing tunics, robes, sandals - ONLY if the script mentions workers
-- EMPTY SCENES: most scenes should have NO human presence at all
+✅ If the scene text describes MODERN investigation (archaeologists, researchers, excavation reports, maps, archives, laboratories):
+- It is ALLOWED to show modern people and modern environments, as long as they match the narration.
+- Keep it documentary and grounded (no random luxury, no unrelated modern lifestyle).
 
-🚨 DEFAULT RULE: When in doubt, DO NOT INCLUDE PEOPLE. Focus on OBJECTS and LOCATIONS.`
+🚫 Always avoid random anachronisms that are NOT in the text (sports cars, luxury watches, generic business office vibes) unless explicitly mentioned.`
     : '';
 
   // PROMPT ULTRA-FOCADO EM FIDELIDADE AO TEXTO DA NARRAÇÃO
@@ -543,7 +533,7 @@ The viewer should look at the image and IMMEDIATELY understand what the narrator
 - If narrator says "ancient scrolls reveal secrets" → show SCROLLS with mysterious symbols, close-up
 - If narrator says "workers moved massive stones" → show the ACTION of moving stones
 - If narrator says "inside the chamber, gold treasures" → show the INTERIOR with treasures
-- If narrator says "scientists discovered evidence" → show the EVIDENCE/ARTIFACT, not scientists
+ - If narrator focuses on the EVIDENCE → show the evidence/artefact; if narrator focuses on the RESEARCHER/ACTION → show the researcher doing that action
 - If narrator mentions a specific NUMBER or DATE → represent that concept visually
 
 🎬 GLOBAL CONTEXT (for consistency, but TEXT CONTENT takes PRIORITY):
