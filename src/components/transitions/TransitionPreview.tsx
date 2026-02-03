@@ -226,15 +226,37 @@ export const TransitionPreview = ({ transitionType, className }: TransitionPrevi
   };
 
   const getTransitionLabel = () => {
-    const labels: Record<TransitionType, string> = {
+    const labels: Record<string, string> = {
       cross_dissolve: 'Cross Dissolve',
       fade_to_black: 'Fade to Black',
       dip_to_color: 'Dip to White',
+      additive_dissolve: 'Additive Dissolve',
+      non_additive_dissolve: 'Non-Additive',
+      blur_dissolve: 'Blur Dissolve',
+      iris_circle: 'Íris Círculo',
+      iris_diamond: 'Íris Diamante',
+      iris_cross: 'Íris Cruz',
+      iris_oval: 'Íris Oval',
+      iris_star: 'Íris Estrela',
+      iris_hexagon: 'Íris Hexagonal',
       wipe: 'Wipe',
+      wipe_up: 'Wipe Cima',
+      wipe_down: 'Wipe Baixo',
       push: 'Push',
+      slide: 'Slide',
+      split: 'Split',
+      door_open: 'Porta',
+      center_curtain: 'Cortina Central',
+      band_curtain: 'Cortina Banda',
+      edge_curtain: 'Cortina Borda',
+      clock_curtain: 'Relógio',
+      spiral_curtain: 'Espiral',
+      heart_shape: 'Coração',
+      star_shape: 'Estrela',
+      box_shape: 'Caixa',
       none: 'Corte Seco'
     };
-    return labels[transitionType];
+    return labels[transitionType] || transitionType;
   };
 
   return (
