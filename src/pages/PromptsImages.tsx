@@ -1518,7 +1518,8 @@ ${referencePrompts ? `REFERÊNCIA DE ESTILO (prompts que funcionaram):\n${refere
 Crie um prompt de imagem em inglês que represente visualmente esta cena do roteiro, mantendo o estilo visual consistente.`
                 }
               ],
-              model: 'gemini-2.5-flash'
+              model: 'deepseek-r1',
+              type: 'image_prompt'
             }
           });
 
