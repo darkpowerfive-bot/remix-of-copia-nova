@@ -179,6 +179,7 @@ interface SceneHistory {
 }
 
 const AI_MODELS = [
+  { value: "deepseek-v3.2-exp", label: "DeepSeek v3.2 (exp)" },
   { value: "gpt-4.1", label: "GPT-4.1" },
   { value: "claude-sonnet-4-20250514", label: "Claude 4 Sonnet" },
   { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
@@ -256,7 +257,7 @@ const PromptsImages = () => {
   // Persisted states (sem imagens - muito grandes para localStorage)
   const [script, setScript] = usePersistedState("prompts_script", "");
   const [style, setStyle] = usePersistedState("prompts_style", "cinematografico");
-  const [model, setModel] = usePersistedState("prompts_model", "gpt-4.1");
+  const [model, setModel] = usePersistedState("prompts_model", "deepseek-v3.2-exp");
   const [wordsPerScene, setWordsPerScene] = usePersistedState("prompts_wordsPerScene", "25");
   
   // Cenas - persistimos apenas os prompts, não as imagens (base64 muito grande)
@@ -3769,13 +3770,15 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
 
     return scenes.map((scene) => {
       const startSeconds = cumulativeSeconds;
-      const durationSeconds = (scene.wordCount / wpm) * 60;
+      const baseDurationSeconds = (scene.wordCount / wpm) * 60;
+      const multiplier = scene.retentionMultiplier ?? 1.0;
+      const durationSeconds = baseDurationSeconds * multiplier;
       const endSeconds = startSeconds + durationSeconds;
       cumulativeSeconds = endSeconds;
 
       return {
         ...scene,
-        estimatedTime: calculateEstimatedTimeWithWpm(scene.wordCount, wpm),
+        estimatedTime: `${Math.max(0.5, durationSeconds).toFixed(1)}s`,
         timecode: formatTimecode(startSeconds),
         endTimecode: formatTimecode(endSeconds),
       };
@@ -4131,26 +4134,41 @@ Analise a narração e retorne JSON com emotion, retentionTrigger e imagePrompt.
             const { data, error } = await withTimeout(invokePromise, TIMEOUT_MS);
             if (error) throw error;
 
-            const rawResult = (data?.result || data?.content || "").toString().trim();
-            if (!rawResult) throw new Error("empty_response");
+            // A função pode retornar string (JSON/texto) OU objeto já parseado.
+            const raw = (data as any)?.result ?? (data as any)?.content ?? (data as any);
 
-            // Tentar parsear JSON da resposta
             let parsedResult: { emotion?: string; retentionTrigger?: string; imagePrompt?: string } = {};
-            try {
-              // Extrair JSON do texto (pode vir com markdown ou texto extra)
-              const jsonMatch = rawResult.match(/\{[\s\S]*"emotion"[\s\S]*"retentionTrigger"[\s\S]*"imagePrompt"[\s\S]*\}/);
-              if (jsonMatch) {
-                parsedResult = JSON.parse(jsonMatch[0]);
-              } else {
-                // Fallback: usar resposta como prompt direto
-                parsedResult = { imagePrompt: rawResult };
+
+            if (raw && typeof raw === "object") {
+              // Caso ideal: já veio um objeto
+              parsedResult = {
+                emotion: (raw as any).emotion,
+                retentionTrigger: (raw as any).retentionTrigger,
+                imagePrompt: (raw as any).imagePrompt,
+              };
+            } else {
+              const rawText = String(raw ?? "").trim();
+              if (!rawText) throw new Error("empty_response");
+
+              // Tentar parsear JSON da resposta
+              try {
+                const jsonMatch = rawText.match(/\{[\s\S]*"emotion"[\s\S]*"retentionTrigger"[\s\S]*"imagePrompt"[\s\S]*\}/);
+                if (jsonMatch) {
+                  parsedResult = JSON.parse(jsonMatch[0]);
+                } else {
+                  parsedResult = { imagePrompt: rawText };
+                }
+              } catch {
+                parsedResult = { imagePrompt: rawText };
               }
-            } catch {
-              // Se não conseguir parsear, usar como prompt direto
-              parsedResult = { imagePrompt: rawResult };
             }
 
-            let newPrompt = (parsedResult.imagePrompt || rawResult).trim();
+            let newPrompt = String(parsedResult.imagePrompt ?? "").trim();
+
+            // Proteção: nunca deixar virar "[object Object]" ou vazio (isso parece "apagou tudo")
+            if (!newPrompt || newPrompt === "[object Object]") {
+              throw new Error("invalid_prompt_output");
+            }
             if (!newPrompt.includes("1280x720")) {
               newPrompt = `${newPrompt}, 1280x720, 16:9 aspect ratio, full frame, no black bars`;
             }
