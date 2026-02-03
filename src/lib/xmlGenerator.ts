@@ -2464,8 +2464,15 @@ const escapeXml = (text: string): string => {
 /**
  * Gera o XML da transição baseado no tipo
  */
-const getTransitionXml = (transitionType: TransitionType, transitionFrames: number): string => {
-  if (transitionType === 'none') return '';
+const getTransitionXml = (
+  transitionType: TransitionType,
+  transitionFrames: number,
+  fps: number,
+  cutFrame: number,
+  outgoingClipId: string,
+  incomingClipId: string
+): string => {
+  if (transitionType === 'none' || transitionFrames <= 0) return '';
   
   // Mapeamento completo de todas as transições para XML FCP7/DaVinci
   const transitionConfigs: Record<string, { name: string; effectId: string; category: string }> = {
@@ -2511,18 +2518,41 @@ const getTransitionXml = (transitionType: TransitionType, transitionFrames: numb
   
   const config = transitionConfigs[transitionType] || transitionConfigs.cross_dissolve;
   
-  return `                <transitionitem>
-                  <start>0</start>
-                  <end>${transitionFrames}</end>
-                  <alignment>start-black</alignment>
-                  <effect>
-                    <name>${config.name}</name>
-                    <effectid>${config.effectId}</effectid>
-                    <effectcategory>${config.category}</effectcategory>
-                    <effecttype>transition</effecttype>
-                    <mediatype>video</mediatype>
-                  </effect>
-                </transitionitem>
+  // FCP7 transitions live as siblings of clipitems inside <track>.
+  // DaVinci Resolve expects the transition to reference the two adjacent clipitems.
+  const half = Math.max(1, Math.floor(transitionFrames / 2));
+  const start = Math.max(0, cutFrame - half);
+  const end = cutFrame + (transitionFrames - half);
+
+  return `              <transitionitem>
+                <start>${start}</start>
+                <end>${end}</end>
+                <alignment>center</alignment>
+                <cutpoint>${cutFrame}</cutpoint>
+                <rate>
+                  <timebase>${fps}</timebase>
+                  <ntsc>FALSE</ntsc>
+                </rate>
+                <effect>
+                  <name>${config.name}</name>
+                  <effectid>${config.effectId}</effectid>
+                  <effectcategory>${config.category}</effectcategory>
+                  <effecttype>transition</effecttype>
+                  <mediatype>video</mediatype>
+                </effect>
+                <link>
+                  <linkclipref>${outgoingClipId}</linkclipref>
+                  <mediatype>video</mediatype>
+                  <trackindex>1</trackindex>
+                  <clipindex>1</clipindex>
+                </link>
+                <link>
+                  <linkclipref>${incomingClipId}</linkclipref>
+                  <mediatype>video</mediatype>
+                  <trackindex>1</trackindex>
+                  <clipindex>1</clipindex>
+                </link>
+              </transitionitem>
 `;
 }
 
@@ -2805,6 +2835,8 @@ export const generateFcp7XmlWithTransitions = (
 `;
 
   let currentFrame = 0;
+  let previousClipId: string | null = null;
+  let previousTransitionInfo: string | null = null;
   
   processedScenes.forEach((scene, index) => {
     // Usar frames pré-calculados (com ajuste de última cena para sincronia exata)
@@ -2816,6 +2848,32 @@ export const generateFcp7XmlWithTransitions = (
     const shortText = scene.text ? escapeXml(scene.text.substring(0, 100)) : '';
     const motionInfo = scene.kenBurnsMotion ? ` [${KEN_BURNS_OPTIONS.find(o => o.id === scene.kenBurnsMotion?.type)?.name || scene.kenBurnsMotion.type}]` : '';
     
+    // Se existir transição ENTRE a cena anterior e esta, ela deve ser adicionada como irmã do clip
+    // dentro da track (não dentro do <clipitem>), senão o DaVinci ignora.
+    if (index > 0 && previousClipId) {
+      const sceneTransition = sceneTransitions?.[index];
+      const currentTransitionType = sceneTransition?.transitionType || defaultTransitionType;
+      const currentTransitionDuration = sceneTransition?.transitionDuration || (defaultTransitionFrames / fps);
+      const currentTransitionFrames = Math.round(currentTransitionDuration * fps);
+
+      if (currentTransitionType !== 'none' && currentTransitionFrames > 0) {
+        xml += getTransitionXml(
+          currentTransitionType,
+          currentTransitionFrames,
+          fps,
+          currentFrame,
+          previousClipId,
+          clipId
+        );
+
+        previousTransitionInfo = sceneTransition
+          ? ` [${TRANSITION_OPTIONS.find(o => o.id === sceneTransition.transitionType)?.namePt || sceneTransition.transitionType}]`
+          : null;
+      } else {
+        previousTransitionInfo = null;
+      }
+    }
+
     xml += `              <clipitem id="${clipId}">
                 <name>${fileName}</name>
                 <duration>${durationFrames}</duration>
@@ -2845,39 +2903,30 @@ export const generateFcp7XmlWithTransitions = (
                     </video>
                   </media>
                 </file>
+                 <sourcetrack>
+                   <mediatype>video</mediatype>
+                   <trackindex>1</trackindex>
+                 </sourcetrack>
 `;
-    
-    // Adicionar transição de entrada (exceto para o primeiro clip)
-    // Usar transição específica da cena se disponível, ou fallback para padrão
-    const sceneTransition = sceneTransitions?.[index];
-    const currentTransitionType = sceneTransition?.transitionType || defaultTransitionType;
-    const currentTransitionDuration = sceneTransition?.transitionDuration || (defaultTransitionFrames / fps);
-    const currentTransitionFrames = Math.round(currentTransitionDuration * fps);
-    
-    if (index > 0 && currentTransitionType !== 'none') {
-      xml += getTransitionXml(currentTransitionType, currentTransitionFrames);
-    }
     
     // Adicionar keyframes Ken Burns se disponível - com boost de intensidade para primeiras cenas
     if (enableKenBurns && scene.kenBurnsMotion) {
       xml += generateKenBurnsKeyframesXml(scene.kenBurnsMotion, durationFrames, fps, index);
     }
     
-    // Incluir informação da transição no comentário
-    const transitionInfo = sceneTransition && index > 0 
-      ? ` [${TRANSITION_OPTIONS.find(o => o.id === sceneTransition.transitionType)?.namePt || sceneTransition.transitionType}]`
-      : '';
-    
+    // Incluir informação de Ken Burns no comentário (transição fica registrada no relatório separado)
+    // Obs: a transição ocorre ANTES deste clip (entre prev e current), por isso não anexamos no texto da cena.
     if (shortText) {
       xml += `                <comments>
-                  <mastercomment1>${escapeXml(shortText + motionInfo + transitionInfo)}</mastercomment1>
+                  <mastercomment1>${escapeXml(shortText + motionInfo)}</mastercomment1>
                 </comments>
 `;
     }
     
     xml += `              </clipitem>
 `;
-    
+
+    previousClipId = clipId;
     currentFrame += durationFrames;
   });
 
