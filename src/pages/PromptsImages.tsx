@@ -4082,7 +4082,7 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                 ? 'FOCO: Adicionar EMOÇÃO forte (tension, curiosity, surprise, shock) para aumentar retenção.'
                 : improvementType.includes('trigger')
                   ? 'FOCO: Adicionar GATILHO DE RETENÇÃO (curiosity, anticipation, mystery, revelation) para manter audiência.'
-                  : 'FOCO: Otimizar retenção máxima com emoção + gatilho + prompt cinematográfico.';
+                : 'FOCO: Otimizar retenção máxima com emoção + gatilho + prompt cinematográfico + tempo dinâmico.';
 
             const invokePromise = supabase.functions.invoke("ai-assistant", {
               body: {
@@ -4091,64 +4091,100 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
                 messages: [
                   {
                     role: "system",
-                    content: `Você é um DIRETOR DE EDIÇÃO especialista em vídeos virais de alta retenção.
+                    content: `Você é um DIRETOR DE EDIÇÃO especialista em vídeos virais de alta retenção para YouTube.
 
-TAREFA PRINCIPAL: LEIA o texto da narração palavra por palavra e crie uma imagem que ILUSTRE EXATAMENTE o que está sendo dito.
+MISSÃO: Ler o texto da narração e criar uma CENA CINEMATOGRÁFICA que ilustre EXATAMENTE o que está sendo dito, com timing DINÂMICO para máxima retenção.
 
 ESTILO VISUAL OBRIGATÓRIO (${styleName}):
 ${styleDescription}
 
 ${improvementFocus}
 
-PROCESSO OBRIGATÓRIO (siga passo a passo):
-1. LEIA o texto da narração completamente
-2. EXTRAIA: nomes próprios, objetos físicos, locais geográficos, ações descritas, épocas históricas
-3. DESCREVA visualmente CADA elemento encontrado no texto
-4. NUNCA invente elementos que NÃO estão no texto
-5. Se o texto fala de "pirâmides", mostre pirâmides. Se fala de "cientistas", mostre cientistas.
+═══════════════════════════════════════════
+PROCESSO DE ANÁLISE LITERAL (SIGA PASSO A PASSO):
+═══════════════════════════════════════════
+1. LEIA a narração palavra por palavra
+2. EXTRAIA elementos concretos:
+   - Nomes próprios (pessoas, lugares, objetos)
+   - Ações físicas (o que acontece)
+   - Locais específicos (onde acontece)
+   - Época/período (quando acontece)
+3. Para CADA elemento extraído, descreva visualmente:
+   - "pirâmides" → "ancient stone pyramids with weathered blocks"
+   - "cientistas" → "researchers in field gear examining artifacts"
+   - "floresta" → "dense jungle with towering trees and filtered sunlight"
 
-REGRAS PARA EMOÇÃO (emotion):
-- Baseie-se no TOM do texto: urgência, mistério, revelação, conflito, descoberta
-- Opções: tension, curiosity, surprise, shock, wonder, fear, hope, determination
-- Escolha a emoção que COMBINA com o conteúdo narrado
+═══════════════════════════════════════════
+REGRAS DE TEMPO DINÂMICO (retentionMultiplier):
+═══════════════════════════════════════════
+Baseado no TIPO de conteúdo, defina o multiplicador de duração:
 
-REGRAS PARA GATILHO (retentionTrigger):
-- Baseie-se no TIPO de conteúdo: pergunta, promessa, revelação, cliffhanger
-- Opções: curiosity, anticipation, mystery, revelation, pattern_break, suspense, urgency, fomo
-- Escolha o gatilho que AUMENTA o interesse no conteúdo específico
+🚀 GANCHO/HOOK (primeiros 30s): 0.7x - 0.8x
+   → Ritmo RÁPIDO para prender atenção
+   → Cortes frequentes, impacto visual
 
-REGRAS PARA PROMPT DE IMAGEM (CRÍTICO - imagePrompt):
-1. O prompt DEVE conter os MESMOS elementos mencionados na narração
-2. Se o texto menciona "Egito antigo", "faraós", "pirâmides" → inclua esses elementos
-3. Se o texto menciona "laboratório", "experimento", "cientista" → ilustre isso
-4. NUNCA crie imagens genéricas ou abstratas quando há elementos concretos no texto
-5. Use termos cinematográficos em INGLÊS: lighting, composition, camera angle
-6. NUNCA inclua: violência, armas, nudez, marcas registradas
-7. Sempre termine com: "1280x720, 16:9 aspect ratio, full frame, no black bars"
+📖 CONTEXTO/EXPOSIÇÃO: 0.9x - 1.0x
+   → Ritmo MÉDIO para explicar
+   → Dar tempo para absorver informação
 
-EXEMPLO:
-- Narração: "Há 3.000 anos, uma civilização desapareceu misteriosamente no deserto"
-- Prompt correto: "Ancient desert ruins at sunset, crumbling stone temples half-buried in sand, dramatic lighting, cinematic wide shot showing abandoned civilization remnants, mysterious atmosphere, 1280x720..."
-- Prompt ERRADO: "Beautiful landscape" ou "Abstract mystery scene"
+💡 REVELAÇÃO/CLÍMAX: 1.1x - 1.3x
+   → Ritmo LENTO para impacto
+   → Dar peso ao momento importante
 
-RESPONDA APENAS em JSON válido (sem markdown, sem explicações):
-{"emotion": "...", "retentionTrigger": "...", "imagePrompt": "..."}`,
+😲 CHOQUE/SURPRESA: 0.6x - 0.7x
+   → Ritmo MUITO RÁPIDO
+   → Impacto visual imediato
+
+🔄 TRANSIÇÃO: 0.8x - 0.9x
+   → Movimento entre ideias
+
+═══════════════════════════════════════════
+PROMPT DE IMAGEM CINEMATOGRÁFICO (imagePrompt):
+═══════════════════════════════════════════
+1. SEMPRE em INGLÊS com termos técnicos de cinema
+2. INCLUA elementos CONCRETOS do texto da narração
+3. USE ângulos cinematográficos: wide shot, medium shot, close-up, extreme close-up, bird's eye, low angle
+4. USE iluminação: dramatic lighting, golden hour, rim light, chiaroscuro, volumetric light
+5. USE composição: rule of thirds, leading lines, depth of field, bokeh
+6. NUNCA: violência, armas, nudez, marcas registradas
+7. SEMPRE termine com: "1280x720, 16:9 aspect ratio, full frame, no black bars"
+
+EXEMPLOS DE CORRESPONDÊNCIA LITERAL:
+- Narração: "Os olmecas esculpiram cabeças gigantes de basalto"
+  → Prompt: "Olmec artisans carving massive basalt head sculpture, ancient Mesoamerican workshop, stone dust in air, dramatic side lighting, wide establishing shot, 1280x720..."
+
+- Narração: "Cientistas descobriram um padrão oculto"
+  → Prompt: "Archaeologist examining carved stone surface with magnifying glass, dramatic discovery moment, intense focus lighting, medium close-up shot, 1280x720..."
+
+RESPONDA APENAS em JSON válido (sem markdown):
+{
+  "emotion": "tension|curiosity|surprise|shock|wonder|fear|hope|determination",
+  "retentionTrigger": "curiosity|anticipation|mystery|revelation|pattern_break|suspense|urgency|fomo",
+  "retentionMultiplier": 0.7 a 1.3 (número decimal),
+  "retentionReason": "breve explicação do timing escolhido",
+  "imagePrompt": "prompt cinematográfico em inglês"
+}`,
                   },
                   {
                     role: "user",
-                    content: `CENA ${scene.number} - TEXTO DA NARRAÇÃO (LEIA COM ATENÇÃO):
+                    content: `═══════════════════════════════════════════
+CENA ${scene.number} - ANÁLISE OBRIGATÓRIA
+═══════════════════════════════════════════
+
+TEXTO DA NARRAÇÃO (LEIA CADA PALAVRA):
 "${scene.text}"
 
+POSIÇÃO NO VÍDEO: ${scene.number <= 3 ? '🚀 GANCHO INICIAL (primeiros 30s) - ritmo RÁPIDO!' : scene.number <= 10 ? '📖 DESENVOLVIMENTO - ritmo variado' : '💡 CORPO DO VÍDEO - manter engajamento'}
+
+${contextScenes ? `CONTEXTO VISUAL (cenas vizinhas):\n${contextScenes}` : ""}
+
+${referencePrompts ? `REFERÊNCIA DE ESTILO:\n${referencePrompts}` : ""}
+
 INSTRUÇÕES:
-1. LEIA o texto acima e identifique TODOS os elementos concretos mencionados
-2. Crie um imagePrompt que ILUSTRE LITERALMENTE o conteúdo do texto
-3. Se o texto menciona lugares, objetos, pessoas ou épocas específicas, INCLUA no prompt
-
-${contextScenes ? `CONTEXTO (cenas vizinhas para continuidade visual):\n${contextScenes}` : ""}
-
-${referencePrompts ? `REFERÊNCIA DE ESTILO (use como base para consistência):\n${referencePrompts}` : ""}
-
-Retorne JSON com emotion (baseada no tom), retentionTrigger (baseado no conteúdo) e imagePrompt (que ILUSTRE o texto).`,
+1. Identifique TODOS os elementos concretos mencionados na narração
+2. Crie um prompt que ILUSTRE LITERALMENTE esses elementos
+3. Defina retentionMultiplier baseado no tipo de conteúdo
+4. Retorne JSON completo`,
                   },
                 ],
                 model: "deepseek-v3.2-exp",
@@ -4161,13 +4197,21 @@ Retorne JSON com emotion (baseada no tom), retentionTrigger (baseado no conteúd
             // A função pode retornar string (JSON/texto) OU objeto já parseado.
             const raw = (data as any)?.result ?? (data as any)?.content ?? (data as any);
 
-            let parsedResult: { emotion?: string; retentionTrigger?: string; imagePrompt?: string } = {};
+            let parsedResult: { 
+              emotion?: string; 
+              retentionTrigger?: string; 
+              retentionMultiplier?: number;
+              retentionReason?: string;
+              imagePrompt?: string 
+            } = {};
 
             if (raw && typeof raw === "object") {
               // Caso ideal: já veio um objeto
               parsedResult = {
                 emotion: (raw as any).emotion,
                 retentionTrigger: (raw as any).retentionTrigger,
+                retentionMultiplier: (raw as any).retentionMultiplier,
+                retentionReason: (raw as any).retentionReason,
                 imagePrompt: (raw as any).imagePrompt,
               };
             } else {
@@ -4176,7 +4220,7 @@ Retorne JSON com emotion (baseada no tom), retentionTrigger (baseado no conteúd
 
               // Tentar parsear JSON da resposta
               try {
-                const jsonMatch = rawText.match(/\{[\s\S]*"emotion"[\s\S]*"retentionTrigger"[\s\S]*"imagePrompt"[\s\S]*\}/);
+                const jsonMatch = rawText.match(/\{[\s\S]*"emotion"[\s\S]*"imagePrompt"[\s\S]*\}/);
                 if (jsonMatch) {
                   parsedResult = JSON.parse(jsonMatch[0]);
                 } else {
@@ -4199,12 +4243,26 @@ Retorne JSON com emotion (baseada no tom), retentionTrigger (baseado no conteúd
 
             const newEmotion = parsedResult.emotion || 'tension';
             const newTrigger = parsedResult.retentionTrigger || 'curiosity';
+            
+            // Parse retentionMultiplier com validação
+            let newMultiplier = parsedResult.retentionMultiplier;
+            if (typeof newMultiplier !== 'number' || isNaN(newMultiplier)) {
+              // Default baseado na posição: primeiras cenas mais rápidas
+              newMultiplier = scene.number <= 3 ? 0.75 : scene.number <= 10 ? 0.9 : 1.0;
+            } else {
+              // Clamp entre 0.6 e 1.4
+              newMultiplier = Math.max(0.6, Math.min(1.4, newMultiplier));
+            }
+            
+            const newReason = parsedResult.retentionReason || '';
 
             updatedScenes[index] = {
               ...updatedScenes[index],
               imagePrompt: newPrompt,
               emotion: newEmotion,
               retentionTrigger: newTrigger,
+              retentionMultiplier: newMultiplier,
+              retentionReason: newReason,
               generatingImage: true,
             };
 
@@ -6118,7 +6176,7 @@ RESPONDA EM JSON VÁLIDO:
             </Button>
           </div>
 
-          {/* Contador de partes */}
+          {/* Contador de partes - mais compacto */}
           {chunkProgress.total > 1 && (
             <div className="flex items-center gap-1 mb-2">
               {Array.from({ length: chunkProgress.total }).map((_, idx) => (
@@ -6139,11 +6197,31 @@ RESPONDA EM JSON VÁLIDO:
             </div>
           )}
 
-          <Progress value={progress} className="h-1.5 mb-2" />
+          {/* Progress bar com animação suave */}
+          <div className="relative mb-2">
+            <Progress value={sceneProgress.total > 0 ? (sceneProgress.done / sceneProgress.total) * 100 : progress} className="h-2" />
+            {/* Partícula brilhante no ponto de progresso */}
+            <div 
+              className="absolute top-0 h-2 w-2 rounded-full bg-primary shadow-lg shadow-primary/50 transition-all duration-300"
+              style={{ 
+                left: `calc(${sceneProgress.total > 0 ? (sceneProgress.done / sceneProgress.total) * 100 : progress}% - 4px)`,
+                opacity: sceneProgress.done > 0 ? 1 : 0
+              }}
+            />
+          </div>
+
+          {/* Contador de cenas grande e centralizado */}
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-2xl font-bold text-primary tabular-nums">
+              {sceneProgress.done}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              / {sceneProgress.total > 0 ? sceneProgress.total : '...'} cenas
+            </span>
+          </div>
           
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{loadingMessage}</span>
-            <span>{sceneProgress.total > 0 ? `${sceneProgress.done}/${sceneProgress.total}` : `${progress}%`}</span>
+          <div className="text-center text-xs text-muted-foreground">
+            <span className="truncate block">{loadingMessage}</span>
           </div>
         </div>
       )}
