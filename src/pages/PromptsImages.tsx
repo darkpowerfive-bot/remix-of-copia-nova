@@ -4169,6 +4169,32 @@ Baseado no TIPO de conteúdo, defina o multiplicador de duração:
    → Movimento entre ideias
 
 ═══════════════════════════════════════════
+KEYFRAME DE CÂMERA CINEMATOGRÁFICO (kenBurnsMotion):
+═══════════════════════════════════════════
+Escolha o MOVIMENTO DE CÂMERA ideal para a emoção:
+
+🔍 zoom_in: Foco, tensão, intimidade, detalhe importante
+🔭 zoom_out: Revelação épica, contexto, grandeza, conclusão
+⬅️ pan_left: Passado, memória, retorno, origem
+➡️ pan_right: Futuro, progresso, evolução, avanço
+⬆️ pan_up: Céu, esperança, liberdade, ascensão
+⬇️ pan_down: Peso, tristeza, introspecção, queda
+↗️ zoom_in_pan_right: Ação intensa, perseguição, drama
+↖️ zoom_in_pan_left: Descoberta dramática
+↘️ zoom_out_pan_right: Revelação épica progressiva
+↙️ zoom_out_pan_left: Conclusão grandiosa
+⏸️ static: Pausa dramática, momento de reflexão
+
+REGRAS DE CÂMERA:
+- Primeiras 3 cenas: SEMPRE zoom_in_pan_right ou zoom_out_pan_left (impacto máximo)
+- Última cena: SEMPRE zoom_out (conclusão épica)
+- Morte/tristeza: pan_down ou fade para dramaticidade
+- Revelação: zoom_out para grandeza
+- Mistério: zoom_in para tensão
+- Ação: combinações de zoom + pan para dinamismo
+- NUNCA repetir o mesmo movimento 3x seguidas
+
+═══════════════════════════════════════════
 PROMPT DE IMAGEM CINEMATOGRÁFICO (imagePrompt):
 ═══════════════════════════════════════════
 1. SEMPRE em INGLÊS com termos técnicos de cinema
@@ -4179,19 +4205,23 @@ PROMPT DE IMAGEM CINEMATOGRÁFICO (imagePrompt):
 6. NUNCA: violência, armas, nudez, marcas registradas
 7. SEMPRE termine com: "1280x720, 16:9 aspect ratio, full frame, no black bars"
 
-EXEMPLOS DE CORRESPONDÊNCIA LITERAL:
+EXEMPLOS COM KEYFRAME DE CÂMERA:
 - Narração: "Os olmecas esculpiram cabeças gigantes de basalto"
-  → Prompt: "Olmec artisans carving massive basalt head sculpture, ancient Mesoamerican workshop, stone dust in air, dramatic side lighting, wide establishing shot, 1280x720..."
+  → Prompt: "Olmec artisans carving massive basalt head sculpture, ancient Mesoamerican workshop..."
+  → kenBurnsMotion: "zoom_in" (foco no detalhe)
 
-- Narração: "Cientistas descobriram um padrão oculto"
-  → Prompt: "Archaeologist examining carved stone surface with magnifying glass, dramatic discovery moment, intense focus lighting, medium close-up shot, 1280x720..."
+- Narração: "A revelação chocou o mundo inteiro"
+  → Prompt: "Dramatic reveal shot, massive ancient structure emerging from jungle..."
+  → kenBurnsMotion: "zoom_out" (revelação épica)
 
 RESPONDA APENAS em JSON válido (sem markdown):
 {
   "emotion": "tension|curiosity|surprise|shock|wonder|fear|hope|determination",
   "retentionTrigger": "curiosity|anticipation|mystery|revelation|pattern_break|suspense|urgency|fomo",
   "retentionMultiplier": 0.7 a 1.3 (número decimal),
-  "retentionReason": "breve explicação do timing escolhido",
+  "retentionReason": "breve explicação do timing",
+  "kenBurnsMotion": "zoom_in|zoom_out|pan_left|pan_right|pan_up|pan_down|zoom_in_pan_right|zoom_in_pan_left|zoom_out_pan_right|zoom_out_pan_left|static",
+  "kenBurnsIntensity": "subtle|normal|dramatic",
   "imagePrompt": "prompt cinematográfico em inglês"
 }`,
                   },
@@ -4232,6 +4262,8 @@ INSTRUÇÕES:
               retentionTrigger?: string; 
               retentionMultiplier?: number;
               retentionReason?: string;
+              kenBurnsMotion?: string;
+              kenBurnsIntensity?: string;
               imagePrompt?: string 
             } = {};
 
@@ -4242,6 +4274,8 @@ INSTRUÇÕES:
                 retentionTrigger: (raw as any).retentionTrigger,
                 retentionMultiplier: (raw as any).retentionMultiplier,
                 retentionReason: (raw as any).retentionReason,
+                kenBurnsMotion: (raw as any).kenBurnsMotion,
+                kenBurnsIntensity: (raw as any).kenBurnsIntensity,
                 imagePrompt: (raw as any).imagePrompt,
               };
             } else {
@@ -4285,6 +4319,23 @@ INSTRUÇÕES:
             }
             
             const newReason = parsedResult.retentionReason || '';
+            
+            // Ken Burns Motion definido pela IA
+            const validMotions = ['zoom_in', 'zoom_out', 'pan_left', 'pan_right', 'pan_up', 'pan_down', 
+                                  'zoom_in_pan_right', 'zoom_in_pan_left', 'zoom_out_pan_right', 'zoom_out_pan_left', 'static'];
+            let newKenBurnsMotion = parsedResult.kenBurnsMotion || '';
+            if (!validMotions.includes(newKenBurnsMotion)) {
+              // Default baseado na posição
+              newKenBurnsMotion = scene.number <= 2 ? 'zoom_in_pan_right' : 
+                                  scene.number === 3 ? 'zoom_out_pan_left' : 
+                                  'zoom_in';
+            }
+            
+            const validIntensities = ['subtle', 'normal', 'dramatic'];
+            let newKenBurnsIntensity = parsedResult.kenBurnsIntensity || '';
+            if (!validIntensities.includes(newKenBurnsIntensity)) {
+              newKenBurnsIntensity = scene.number <= 3 ? 'dramatic' : 'normal';
+            }
 
             updatedScenes[index] = {
               ...updatedScenes[index],
@@ -4293,6 +4344,11 @@ INSTRUÇÕES:
               retentionTrigger: newTrigger,
               retentionMultiplier: newMultiplier,
               retentionReason: newReason,
+              kenBurnsMotion: {
+                type: newKenBurnsMotion,
+                intensity: newKenBurnsIntensity as 'subtle' | 'normal' | 'dramatic',
+                reason: `IA: ${newEmotion} - ${newReason || 'movimento otimizado para retenção'}`
+              },
               generatingImage: true,
             };
 
