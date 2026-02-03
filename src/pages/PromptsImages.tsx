@@ -1449,8 +1449,12 @@ const [generating, setGenerating] = useState(false);
       const styleDescription = selectedStyle?.promptPrefix || 'cinematic professional photography';
       const styleName = selectedStyle?.name || 'Cinematográfico';
       
-      // Pegar cenas com imagem para referência de consistência visual
-      const successfulScenes = generatedScenes.filter(s => s.generatedImage).slice(0, 5);
+      // Pegar cenas com imagem bem-sucedidas (não incluir as que estão presas em loading)
+      // Usar cenas que NÃO estão na lista de perdidas
+      const lostNumbers = new Set(lostScenes.map(s => s.number));
+      const successfulScenes = generatedScenes
+        .filter(s => s.generatedImage && !s.generatingImage && !lostNumbers.has(s.number))
+        .slice(0, 5);
       const referencePrompts = successfulScenes.length > 0 
         ? successfulScenes.map(s => `Cena ${s.number}: ${s.imagePrompt}`).join('\n')
         : '';
@@ -1550,8 +1554,23 @@ Crie um prompt de imagem em inglês que represente visualmente esta cena do rote
         return;
       }
 
-      // Atualizar cenas com novos prompts
-      updateScenes(updatedScenes);
+      // Limpar imagens das cenas perdidas para forçar regeneração
+      // Isso é necessário porque cenas podem estar com generatingImage: true mas ter imagem antiga
+      const scenesReadyForRegeneration = updatedScenes.map((scene, idx) => {
+        // Se esta cena estava na lista de perdidas, limpar a imagem para forçar regeneração
+        const wasLost = lostScenes.some(l => l.number === scene.number);
+        if (wasLost) {
+          return {
+            ...scene,
+            generatedImage: undefined, // Forçar regeneração
+            generatingImage: false
+          };
+        }
+        return scene;
+      });
+
+      // Atualizar cenas com novos prompts e imagens limpas
+      updateScenes(scenesReadyForRegeneration);
 
       toast({
         title: "✨ Prompts regenerados!",
@@ -1559,13 +1578,26 @@ Crie um prompt de imagem em inglês que represente visualmente esta cena do rote
       });
 
       // Iniciar geração das imagens com os novos prompts
-      const pendingIndexes = updatedScenes
+      // Usar as cenas que foram marcadas como perdidas
+      const pendingIndexes = scenesReadyForRegeneration
         .map((s, idx) => ({ s, idx }))
         .filter(({ s }) => !s.generatedImage)
         .map(({ idx }) => idx);
 
+      console.log(`[Regenerar Perdidas] ${lostScenes.length} cenas perdidas identificadas, ${pendingIndexes.length} pendentes para geração`);
+      
+      if (pendingIndexes.length === 0) {
+        toast({
+          title: "Nenhuma imagem para regenerar",
+          description: "Todas as cenas já possuem imagem ou houve um erro ao identificar as perdidas",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const cookieCount = Math.max(1, getImageFXCookieCount() || 1);
-      startBgGeneration(updatedScenes, style, pendingIndexes, detectedCharacters, cookieCount);
+      // IMPORTANTE: usar scenesReadyForRegeneration que tem as imagens limpas
+      startBgGeneration(scenesReadyForRegeneration, style, pendingIndexes, detectedCharacters, cookieCount);
 
     } catch (error: any) {
       console.error('Erro ao regenerar perdidas:', error);
