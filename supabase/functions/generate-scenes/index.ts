@@ -626,10 +626,30 @@ The viewer should look at the image and IMMEDIATELY understand what the narrator
 Set TRUE for: action scenes, natural phenomena, camera movements, emotional peaks, first 5 scenes
 TARGET: 40-50% of scenes should have movement=true
 
-⏱️ RETENTION MULTIPLIERS:
-- 0.7-0.85: opening hooks, action, tension (faster)
-- 0.9-1.1: standard narration (normal)
-- 1.15-1.4: revelations, climaxes, endings (slower)
+⏱️ YOU ARE AN AUDIOVISUAL RETENTION EXPERT - TIMING IS YOUR EXPERTISE:
+You define HOW LONG each image stays on screen. This is CRITICAL for viewer retention.
+The retentionMultiplier controls the ACTUAL duration of each scene in the final video.
+
+📊 RETENTION SCIENCE - RULES FROM TOP YOUTUBE CREATORS:
+- Human attention span drops after 3-5 seconds on same visual → FAST cuts = HIGH retention
+- Revelations need PAUSE for brain to process → SLOWER = more impact
+- Hooks (first 30s) need RAPID cuts to prevent click-away → 0.6x-0.75x
+- Pattern breaks (unexpected timing changes) RESET attention → alternate fast/slow
+
+🎯 MANDATORY TIMING RULES (retentionMultiplier):
+- 0.55-0.70: HOOK scenes (first 5 scenes) - rapid fire visual assault, grab attention NOW
+- 0.60-0.75: SHOCK/SURPRISE - hit hard, move on fast before brain processes
+- 0.70-0.80: ACTION/TENSION - keep energy high, don't let viewer breathe  
+- 0.75-0.85: TRANSITION between ideas - smooth but quick
+- 0.85-1.00: STANDARD narration - comfortable pace
+- 1.00-1.15: IMPORTANT context - give time to absorb
+- 1.15-1.30: REVELATION/CLIMAX - let the impact LAND, dramatic pause
+- 1.25-1.40: EPIC CONCLUSION (last 3 scenes) - cinematic slowdown for emotional payoff
+- 0.65-0.80: PATTERN BREAK - randomly speed up after slow scenes to RESET attention
+
+⚠️ CRITICAL: DO NOT make all scenes the same multiplier. 
+The VARIATION between fast and slow is what creates cinematic rhythm.
+AIM for: 30% fast (0.6-0.8), 40% medium (0.8-1.0), 20% slow (1.0-1.3), 10% pattern breaks
 
 FORMAT (MANDATORY - 50-70 words):
 "16:9 horizontal landscape, edge-to-edge full bleed composition, [CAMERA ANGLE], ${stylePrefix || style}, [SPECIFIC LIGHTING], [DESCRIPTION THAT DIRECTLY ILLUSTRATES THE NARRATOR'S TEXT - what they are SAYING must be VISIBLE], ${scriptContext.atmosphere} atmosphere, fill entire frame, no text, no watermarks"
@@ -867,28 +887,36 @@ RETURN ONLY JSON:
           const positionPercent = scenePosition / totalScenes;
           
           // Multiplicador padrão baseado na posição se a IA não fornecer
+          // APRIMORADO: Segue as mesmas regras do audiovisual expert
           let defaultMultiplier = 1.0;
           let defaultReason = "ritmo padrão";
           
           if (scenePosition <= 5) {
-            // Primeiras cenas: rápidas para hook
-            defaultMultiplier = 0.8;
-            defaultReason = "hook inicial - capturar atenção";
-          } else if (positionPercent >= 0.9) {
-            // Últimas cenas: mais lentas para conclusão
-            defaultMultiplier = 1.25;
-            defaultReason = "conclusão - momento de reflexão";
-          } else if (aiScene?.emotion && ['choque', 'shock', 'tensão', 'tension'].includes(aiScene.emotion.toLowerCase())) {
-            defaultMultiplier = 0.85;
-            defaultReason = "tensão/choque - manter ritmo acelerado";
+            // Primeiras cenas: HOOK rápido (0.55-0.70)
+            defaultMultiplier = 0.65;
+            defaultReason = "hook inicial - cortes rápidos para prender atenção";
+          } else if (positionPercent >= 0.92) {
+            // Últimas cenas: conclusão épica (1.25-1.40)
+            defaultMultiplier = 1.3;
+            defaultReason = "conclusão épica - desaceleração cinematográfica";
+          } else if (aiScene?.emotion && ['choque', 'shock', 'surprise', 'surpresa'].includes(aiScene.emotion.toLowerCase())) {
+            defaultMultiplier = 0.7;
+            defaultReason = "choque/surpresa - impacto visual rápido";
+          } else if (aiScene?.emotion && ['tensão', 'tension', 'fear', 'medo'].includes(aiScene.emotion.toLowerCase())) {
+            defaultMultiplier = 0.75;
+            defaultReason = "tensão - manter energia alta";
           } else if (aiScene?.retentionTrigger && ['revelação', 'revelation'].includes(aiScene.retentionTrigger.toLowerCase())) {
             defaultMultiplier = 1.2;
-            defaultReason = "revelação - deixar o impacto absorver";
+            defaultReason = "revelação - pausa dramática para impacto";
+          } else if (scenePosition % 7 === 0) {
+            // Pattern break a cada ~7 cenas
+            defaultMultiplier = 0.7;
+            defaultReason = "pattern break - resetar atenção do espectador";
           }
           
-          // Usar multiplicador da IA se fornecido e válido, senão usar calculado
+          // Usar multiplicador da IA se fornecido e válido (range expandido: 0.55-1.4)
           const aiMultiplier = typeof aiScene?.retentionMultiplier === 'number' 
-            ? Math.max(0.7, Math.min(1.4, aiScene.retentionMultiplier)) 
+            ? Math.max(0.55, Math.min(1.4, aiScene.retentionMultiplier)) 
             : null;
           
           results.push({
@@ -999,14 +1027,17 @@ RETURN ONLY JSON:
     let fallbackReason = "ritmo padrão";
     
     if (isEarlyScene) {
-      fallbackMultiplier = 0.8;
-      fallbackReason = "hook inicial - capturar atenção";
-    } else if (positionPercent >= 0.9) {
-      fallbackMultiplier = 1.25;
-      fallbackReason = "conclusão - momento de reflexão";
+      fallbackMultiplier = 0.65;
+      fallbackReason = "hook inicial - cortes rápidos para prender atenção";
+    } else if (positionPercent >= 0.92) {
+      fallbackMultiplier = 1.3;
+      fallbackReason = "conclusão épica - desaceleração cinematográfica";
     } else if (hasDynamicContent) {
-      fallbackMultiplier = 0.85;
+      fallbackMultiplier = 0.75;
       fallbackReason = "conteúdo dinâmico - ritmo acelerado";
+    } else if (scene.number % 7 === 0) {
+      fallbackMultiplier = 0.7;
+      fallbackReason = "pattern break - resetar atenção";
     }
     
     return {

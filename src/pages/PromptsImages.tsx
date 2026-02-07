@@ -646,25 +646,34 @@ const [generating, setGenerating] = useState(false);
     ? (parseInt(customWpm) || 150) 
     : (parseInt(narrationSpeed) || 150);
   
-  // Função para converter palavras em segundos usando o WPM atual
-  const wordCountToSeconds = (wordCount: number): number => (wordCount / currentWpm) * 60;
+  // Função para converter palavras em segundos usando o WPM atual + retentionMultiplier da IA
+  const wordCountToSeconds = (wordCount: number, retentionMultiplier?: number): number => {
+    const base = (wordCount / currentWpm) * 60;
+    return base * (retentionMultiplier ?? 1.0);
+  };
+  
+  // Função unificada: duração de uma cena respeitando o multiplicador da IA
+  const getSceneDuration = (scene: ScenePrompt): number => {
+    return Math.max(0.5, wordCountToSeconds(scene.wordCount, scene.retentionMultiplier));
+  };
   
   // Calcular total de palavras das cenas geradas
   const totalWords = generatedScenes.reduce((acc, scene) => acc + scene.wordCount, 0);
   
   // Calcular scaleFactor para sincronização com áudio travado
+  // AGORA usa retentionMultiplier da IA para cálculo preciso
   const getAudioScaleFactor = (): number => {
     if (lockedDurationSeconds === null || generatedScenes.length === 0) return 1;
     const totalBaseDuration = generatedScenes.reduce(
-      (acc, scene) => acc + Math.max(0.5, wordCountToSeconds(scene.wordCount)),
+      (acc, scene) => acc + getSceneDuration(scene),
       0
     );
     return totalBaseDuration > 0 ? lockedDurationSeconds / totalBaseDuration : 1;
   };
   
-  // Função para obter duração sincronizada com áudio travado
-  const getSyncedDuration = (wordCount: number): number => {
-    return Math.max(0.5, wordCountToSeconds(wordCount)) * getAudioScaleFactor();
+  // Função para obter duração sincronizada com áudio travado (inclui retentionMultiplier)
+  const getSyncedDuration = (scene: ScenePrompt): number => {
+    return getSceneDuration(scene) * getAudioScaleFactor();
   };
   
   const { user } = useAuth();
@@ -1307,7 +1316,8 @@ const [generating, setGenerating] = useState(false);
       let cumulativeSeconds = 0;
       const enrichedScenes: ScenePrompt[] = allScenes.map((scene: ScenePrompt) => {
         const startSeconds = cumulativeSeconds;
-        const durationSeconds = wordCountToSeconds(scene.wordCount);
+        // Usar retentionMultiplier da IA para duração precisa
+        const durationSeconds = wordCountToSeconds(scene.wordCount, scene.retentionMultiplier);
         const endSeconds = startSeconds + durationSeconds;
         cumulativeSeconds = endSeconds;
 
@@ -2533,9 +2543,9 @@ echo "Agora importe o video no CapCut!"
       return [];
     }
     
-    // Calcular duração base total APENAS das cenas COM imagem
+    // Calcular duração base total APENAS das cenas COM imagem (com retentionMultiplier da IA)
     const totalBaseWithImages = scenesWithImages.reduce(
-      (acc, scene) => acc + Math.max(0.5, wordCountToSeconds(scene.wordCount)),
+      (acc, scene) => acc + getSceneDuration(scene),
       0
     );
     
@@ -2547,8 +2557,8 @@ echo "Agora importe o video no CapCut!"
     console.log(`[XML Export] lockedDuration: ${lockedDurationSeconds}s, totalBaseWithImages: ${totalBaseWithImages.toFixed(2)}s, effectiveScaleFactor: ${effectiveScaleFactor.toFixed(4)}, fps: ${cinematicSettings.fps}, scenesWithImages: ${scenesWithImages.length}/${generatedScenes.length}`);
     
     const exportedScenes = scenesWithImages.map(scene => {
-      // Usar scaleFactor calculado especificamente para cenas com imagem
-      const baseDuration = Math.max(0.5, wordCountToSeconds(scene.wordCount));
+      // Usar duração da IA (retentionMultiplier) + scaleFactor do áudio
+      const baseDuration = getSceneDuration(scene);
       const durationSeconds = Math.max(0.5, baseDuration * effectiveScaleFactor);
       
       const imagePath = `cena_${String(scene.number).padStart(3, "0")}.jpg`;
@@ -3106,7 +3116,7 @@ ${cinematicSettings.colorGrading !== 'neutral' ? `
         number: scene.number,
         text: scene.text,
         generatedImage: scene.generatedImage,
-        durationSeconds: Math.max(0.5, getSyncedDuration(scene.wordCount))
+        durationSeconds: Math.max(0.5, getSyncedDuration(scene))
       }));
 
     const blob = await generateVideo({
@@ -3408,7 +3418,7 @@ Você precisa IMPORTAR as imagens diretamente no CapCut.
           let t = 0;
           return sorted.map((s, idx) => {
             const startSeconds = t;
-            const durationSeconds = Math.max(0.5, wordCountToSeconds(s.wordCount || 0));
+            const durationSeconds = Math.max(0.5, wordCountToSeconds(s.wordCount || 0, s.retentionMultiplier));
             t += durationSeconds;
             return {
               number: s.number ?? idx + 1,
@@ -6775,7 +6785,7 @@ RESPONDA EM JSON VÁLIDO:
                     number: scene.number,
                     text: scene.text,
                     wordCount: scene.wordCount,
-                    durationSeconds: Math.max(1, getSyncedDuration(scene.wordCount)),
+                    durationSeconds: Math.max(1, getSyncedDuration(scene)),
                     generatedImage: scene.generatedImage
                   }))}
                   className="p-3 bg-secondary/30 rounded-lg border border-border"
