@@ -273,15 +273,38 @@ const PromptsImages = () => {
     }
   }, [persistedScenes]);
 
-  // Sincronizar com o estado do background quando estiver gerando ou quando voltar para a página
+  // Sincronizar com o estado do background - MERGE em vez de sobrescrever
+  // Isso garante que prompts melhorados localmente não sejam perdidos
   useEffect(() => {
-    if (bgState.isGenerating || bgState.scenes.length > 0) {
-      // Atualizar cenas locais com as do background (que contém as imagens geradas)
-      if (bgState.scenes.length > 0) {
-        setGeneratedScenes(bgState.scenes);
-        // Persistir metadados
-        setPersistedScenes(bgState.scenes.map(({ generatedImage, generatingImage, ...rest }) => rest));
-      }
+    if (bgState.scenes.length > 0) {
+      setGeneratedScenes(prev => {
+        // Se não temos cenas locais, usar as do background
+        if (prev.length === 0) return bgState.scenes;
+        
+        // Se os comprimentos são iguais, fazer MERGE:
+        // - Pegar generatedImage/generatingImage do bgState (fonte de verdade para imagens)
+        // - Manter prompts/emoções/etc do estado local (podem ter sido melhorados)
+        if (prev.length === bgState.scenes.length) {
+          return prev.map((localScene, idx) => {
+            const bgScene = bgState.scenes[idx];
+            return {
+              ...localScene,
+              // Atualizar imagem do background (nova geração ou conclusão)
+              generatedImage: bgScene.generatedImage ?? localScene.generatedImage,
+              generatingImage: bgScene.generatingImage,
+            };
+          });
+        }
+        
+        // Se comprimentos diferem (ex: após split), usar bgState
+        return bgState.scenes;
+      });
+      
+      // Persistir metadados após merge
+      setPersistedScenes(prev => {
+        const currentScenes = generatedScenes.length > 0 ? generatedScenes : bgState.scenes;
+        return currentScenes.map(({ generatedImage, generatingImage, ...rest }) => rest);
+      });
     }
   }, [bgState.scenes, bgState.isGenerating]);
   
@@ -1446,6 +1469,16 @@ const [generating, setGenerating] = useState(false);
 
   // Regenerar cenas perdidas com novos prompts gerados pela IA baseados no roteiro
   const handleRegenerateLostWithAI = async () => {
+    // Se geração já está rodando, avisar o usuário
+    if (bgState.isGenerating) {
+      toast({ 
+        title: "⏳ Geração em andamento", 
+        description: "Aguarde a geração atual terminar antes de regenerar as perdidas.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     // Considerar perdidas: sem imagem OU com generatingImage preso em true
     const lostScenes = generatedScenes.filter(s => !s.generatedImage || s.generatingImage);
     if (lostScenes.length === 0) {
@@ -3884,6 +3917,8 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
   const handleImproveScenes = async (sceneNumbers: number[], improvementType: string, regenerateImages: boolean = false) => {
     if (!user || sceneNumbers.length === 0) return;
     
+    const isGenerationRunning = bgState.isGenerating;
+    
     try {
       // Feedback visível durante a melhoria (especialmente quando há muitas cenas/pedidos de IA)
       setGenerating(true);
@@ -4013,7 +4048,9 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
           const index = sceneNum - 1;
           if (index >= 0 && index < updatedScenes.length) {
             const scene = updatedScenes[index];
-            const needsImage = regenerateImages || !scene.generatedImage;
+            // Se geração já está rodando, NÃO limpar imagens existentes nem marcar como gerando
+            // Isso evita que cenas fiquem "stuck loading" quando não há geração para elas
+            const needsImage = !isGenerationRunning && (regenerateImages || !scene.generatedImage);
             
             updatedScenes[index] = {
               ...scene,
@@ -4349,11 +4386,14 @@ INSTRUÇÕES:
                 intensity: newKenBurnsIntensity as 'subtle' | 'normal' | 'dramatic',
                 reason: `IA: ${newEmotion} - ${newReason || 'movimento otimizado para retenção'}`
               },
-              generatingImage: true,
+              // Só marcar como gerando se NÃO há geração em andamento
+              generatingImage: !isGenerationRunning,
             };
 
-            // Garantir que esta cena entre na fila de geração
-            improvedIndexesSet.add(index);
+            // Só adicionar à fila de geração se NÃO há geração em andamento
+            if (!isGenerationRunning) {
+              improvedIndexesSet.add(index);
+            }
           };
 
           for (let start = 0; start < scenesNeedingPrompt.length; start += CONCURRENCY) {
@@ -4403,8 +4443,7 @@ INSTRUÇÕES:
       setPersistedScenes(updatedScenes.map(({ generatedImage, generatingImage, ...rest }) => rest));
       
       // Se deve regenerar imagens, iniciar geração em background
-      if (improvedIndexes.length > 0) {
-        // IMPORTANTE: não sugerir (nem tentar) gerar cenas fora do alerta.
+      if (improvedIndexes.length > 0 && !isGenerationRunning) {
         const selectedIndexes = new Set(sceneNumbers.map((n) => n - 1));
         const selectedMissing = updatedScenes.filter((_, idx) => selectedIndexes.has(idx)).filter(s => !s.generatedImage).length;
         const improvedCount = sceneNumbers.length;
@@ -4414,23 +4453,30 @@ INSTRUÇÕES:
           description: `Processando ${improvedCount} cena(s) do alerta${selectedMissing > 0 ? ` • ${selectedMissing} imagem(ns) serão geradas` : ''}`,
         });
         
-        // Sincronizar cenas com o hook de background e iniciar geração
         syncScenes(updatedScenes);
         
-        // Pequeno delay para garantir sincronização
         setTimeout(() => {
           const cookieCount = getImageFXCookieCount() || 1;
-          // A partir daqui, o progresso fica a cargo do gerador em background
           setGenerating(false);
           setLoadingMessage("");
           startBgGeneration(updatedScenes, style, improvedIndexes, detectedCharacters, cookieCount);
         }, 100);
         
       } else {
-        toast({
-          title: "✅ Cenas melhoradas!",
-          description: `${sceneNumbers.length} cena(s) otimizada(s) para maior retenção`,
-        });
+        // Prompts melhorados mas sem geração de imagens (geração já em andamento ou sem necessidade)
+        syncScenes(updatedScenes);
+        
+        if (isGenerationRunning) {
+          toast({
+            title: "✅ Prompts melhorados!",
+            description: `${sceneNumbers.length} prompt(s) atualizados. Após a geração atual terminar, use "Regenerar Perdidas" para gerar as novas imagens.`,
+          });
+        } else {
+          toast({
+            title: "✅ Cenas melhoradas!",
+            description: `${sceneNumbers.length} cena(s) otimizada(s) para maior retenção`,
+          });
+        }
         setGenerating(false);
         setLoadingMessage("");
       }

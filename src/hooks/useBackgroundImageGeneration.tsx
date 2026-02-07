@@ -627,10 +627,15 @@ Reescreva o prompt de forma segura.`
   }, []);
 
   const syncScenes = useCallback((scenes: ScenePrompt[]) => {
+    // ALWAYS update ref so background generation uses latest prompts
+    scenesRef.current = scenes;
     if (!state.isGenerating) {
-      scenesRef.current = scenes;
+      // When not generating, update state directly
       setState(prev => ({ ...prev, scenes }));
     }
+    // When generating, ref is updated but state is NOT changed
+    // to avoid interfering with the active generation loop.
+    // The generation loop reads from scenesRef.current for prompts.
   }, [state.isGenerating]);
 
   const setCharacters = useCallback((characters: CharacterDescription[]) => {
