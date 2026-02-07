@@ -56,6 +56,8 @@ interface ScriptPreviewTimelineProps {
   wordsPerScene: number;
   wpm: number;
   className?: string;
+  dynamicScenesEnabled?: boolean;
+  maxSecondsPerScene?: number;
   onSyncAudio?: (newWpm: number) => void;
   onLockedDurationChange?: (lockedSeconds: number | null) => void;
   initialLockedDuration?: number | null; // Valor inicial para persistência
@@ -144,33 +146,83 @@ const formatTimecode = (seconds: number): string => {
 };
 
 // Dividir script em cenas estimadas baseado em palavras
-function estimateScenes(script: string, wordsPerScene: number, wpm: number): PreviewScene[] {
+// Aplica split dinâmico quando ativado (mesma lógica do backend splitLongScenes)
+function estimateScenes(script: string, wordsPerScene: number, wpm: number, dynamicSplit?: boolean, maxSecPerScene?: number): PreviewScene[] {
   const words = script.split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
 
+  // Primeiro: segmentar em cenas base (idêntico ao backend preSegmentScript)
+  const baseChunks: { text: string; wordCount: number }[] = [];
+  for (let i = 0; i < words.length; i += wordsPerScene) {
+    const sceneWords = words.slice(i, i + wordsPerScene);
+    baseChunks.push({ text: sceneWords.join(' '), wordCount: sceneWords.length });
+  }
+
+  // Segundo: aplicar split dinâmico se ativado (idêntico ao backend splitLongScenes)
+  const finalChunks: { text: string; wordCount: number }[] = [];
+  if (dynamicSplit && maxSecPerScene && maxSecPerScene > 0) {
+    const maxWordsPerSub = Math.max(5, Math.round((maxSecPerScene * wpm) / 60));
+    
+    for (const chunk of baseChunks) {
+      const durationSeconds = (chunk.wordCount / wpm) * 60;
+      
+      if (durationSeconds <= maxSecPerScene + 1) {
+        finalChunks.push(chunk);
+        continue;
+      }
+      
+      // Split em sub-cenas
+      const chunkWords = chunk.text.split(/\s+/).filter(Boolean);
+      const numSubScenes = Math.max(2, Math.ceil(chunkWords.length / maxWordsPerSub));
+      const targetWordsPerSub = Math.ceil(chunkWords.length / numSubScenes);
+      
+      let wordIdx = 0;
+      let subsCreated = 0;
+      while (wordIdx < chunkWords.length) {
+        const isLast = subsCreated === numSubScenes - 1;
+        const targetEnd = isLast ? chunkWords.length : Math.min(wordIdx + targetWordsPerSub, chunkWords.length);
+        
+        let breakAt = targetEnd;
+        if (!isLast && targetEnd < chunkWords.length) {
+          for (let j = Math.min(targetEnd + 3, chunkWords.length - 1); j >= Math.max(wordIdx + 3, targetEnd - 3); j--) {
+            const w = chunkWords[j];
+            if (w.endsWith('.') || w.endsWith('!') || w.endsWith('?') || w.endsWith(':') || w.endsWith(';') || w.endsWith(',')) {
+              breakAt = j + 1;
+              break;
+            }
+          }
+        }
+        
+        const subWords = chunkWords.slice(wordIdx, breakAt);
+        if (subWords.length > 0) {
+          finalChunks.push({ text: subWords.join(' '), wordCount: subWords.length });
+          subsCreated++;
+        }
+        wordIdx = breakAt;
+      }
+    }
+  } else {
+    finalChunks.push(...baseChunks);
+  }
+
+  // Converter para PreviewScene com timecodes
   const scenes: PreviewScene[] = [];
   let currentTime = 0;
   let sceneNumber = 1;
-  
-  // Dividir em chunks de aproximadamente wordsPerScene palavras
-  for (let i = 0; i < words.length; i += wordsPerScene) {
-    const sceneWords = words.slice(i, i + wordsPerScene);
-    const text = sceneWords.join(' ');
-    const wordCount = sceneWords.length;
-    const durationSeconds = (wordCount / wpm) * 60;
-    
+
+  for (const chunk of finalChunks) {
+    const durationSeconds = (chunk.wordCount / wpm) * 60;
     scenes.push({
       number: sceneNumber++,
-      text,
-      wordCount,
+      text: chunk.text,
+      wordCount: chunk.wordCount,
       durationSeconds,
       startTime: currentTime,
       endTime: currentTime + durationSeconds,
     });
-    
     currentTime += durationSeconds;
   }
-  
+
   return scenes;
 }
 
@@ -179,6 +231,8 @@ export function ScriptPreviewTimeline({
   wordsPerScene, 
   wpm, 
   className = "",
+  dynamicScenesEnabled = false,
+  maxSecondsPerScene = 6,
   onSyncAudio,
   onLockedDurationChange,
   initialLockedDuration,
@@ -350,7 +404,7 @@ export function ScriptPreviewTimeline({
         };
       });
     } else {
-      baseScenes = estimateScenes(script, wordsPerScene, wpm);
+      baseScenes = estimateScenes(script, wordsPerScene, wpm, dynamicScenesEnabled, maxSecondsPerScene);
     }
     
     // Se a duração está TRAVADA, redistribuir proporcionalmente
@@ -379,7 +433,7 @@ export function ScriptPreviewTimeline({
     }
     
     return baseScenes;
-  }, [script, wordsPerScene, wpm, generatedScenes, isDurationLocked, lockedDurationSeconds]);
+  }, [script, wordsPerScene, wpm, generatedScenes, isDurationLocked, lockedDurationSeconds, dynamicScenesEnabled, maxSecondsPerScene]);
   
   // Quando a duração está travada, usamos o tempo travado, não o calculado
   const totalDuration = useMemo(() => {

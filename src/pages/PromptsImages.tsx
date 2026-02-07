@@ -5196,6 +5196,8 @@ RESPONDA EM JSON VÁLIDO:
                       script={script}
                       wordsPerScene={parseInt(wordsPerScene) || 80}
                       wpm={currentWpm}
+                      dynamicScenesEnabled={dynamicScenesEnabled}
+                      maxSecondsPerScene={dynamicScenesEnabled ? parseInt(maxSecondsPerScene) || 6 : 0}
                       initialLockedDuration={lockedDurationSeconds}
                       onSyncAudio={generating ? undefined : (newWpm) => {
                         setNarrationSpeed(newWpm.toString());
