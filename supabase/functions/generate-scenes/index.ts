@@ -137,6 +137,73 @@ function preSegmentScript(script: string, wordsPerScene: number, startNumber: nu
   return scenes;
 }
 
+// NOVA FUNÇÃO: Split dinâmico de cenas longas para vídeos mais dinâmicos
+// Divide cenas que excedem maxSecondsPerScene em sub-cenas menores
+// sem alterar a duração total (apenas mais trocas de imagem)
+function splitLongScenes(
+  scenes: PreSegmentedScene[], 
+  wpm: number, 
+  maxSecondsPerScene: number
+): PreSegmentedScene[] {
+  if (maxSecondsPerScene <= 0) return scenes;
+  
+  const maxWordsPerSubScene = Math.max(5, Math.round((maxSecondsPerScene * wpm) / 60));
+  const result: PreSegmentedScene[] = [];
+  let newNumber = scenes.length > 0 ? scenes[0].number : 1;
+  
+  for (const scene of scenes) {
+    const durationSeconds = (scene.wordCount / wpm) * 60;
+    
+    // Se a cena não excede o limite, manter como está
+    if (durationSeconds <= maxSecondsPerScene + 1) { // +1s tolerância
+      result.push({ ...scene, number: newNumber++ });
+      continue;
+    }
+    
+    // Dividir em sub-cenas de ~maxWordsPerSubScene palavras
+    const words = scene.text.split(/\s+/).filter(Boolean);
+    const numSubScenes = Math.max(2, Math.ceil(words.length / maxWordsPerSubScene));
+    const targetWordsPerSub = Math.ceil(words.length / numSubScenes);
+    
+    let wordIdx = 0;
+    let subsCreated = 0;
+    
+    while (wordIdx < words.length) {
+      const remaining = words.length - wordIdx;
+      const isLast = subsCreated === numSubScenes - 1;
+      const targetEnd = isLast ? words.length : Math.min(wordIdx + targetWordsPerSub, words.length);
+      
+      // Tentar quebrar em ponto natural (., !, ?, :, ;, ,) 
+      let breakAt = targetEnd;
+      if (!isLast && targetEnd < words.length) {
+        // Procurar ponto de quebra natural 3 palavras antes e 3 depois do target
+        for (let j = Math.min(targetEnd + 3, words.length - 1); j >= Math.max(wordIdx + 3, targetEnd - 3); j--) {
+          const w = words[j];
+          if (w.endsWith('.') || w.endsWith('!') || w.endsWith('?') || w.endsWith(':') || w.endsWith(';') || w.endsWith(',')) {
+            breakAt = j + 1;
+            break;
+          }
+        }
+      }
+      
+      const subWords = words.slice(wordIdx, breakAt);
+      if (subWords.length > 0) {
+        result.push({
+          number: newNumber++,
+          text: subWords.join(' '),
+          wordCount: subWords.length
+        });
+        subsCreated++;
+      }
+      
+      wordIdx = breakAt;
+    }
+  }
+  
+  console.log(`[Split Long Scenes] ${scenes.length} scenes → ${result.length} scenes (max ${maxSecondsPerScene}s/scene, ${maxWordsPerSubScene} words/sub)`);
+  return result;
+}
+
 // FUNÇÃO UNIFICADA: Detectar contexto, personagens E criar mapa visual do roteiro COMPLETO
 interface ContextAndCharacters {
   context: ScriptContext;
@@ -1025,6 +1092,7 @@ serve(async (req) => {
       startSceneNumber = 1, // NOVO: numeração correta quando o roteiro é dividido em partes
       existingCharacters = [] as CharacterDescription[], // NOVO: manter consistência entre partes
       referenceCharacters: referenceCharactersRaw = [] as ReferenceCharacterInput[], // NOVO: Personagens com imagens de referência
+      maxSecondsPerScene = 0, // NOVO: Split dinâmico - 0 = desativado
     } = body;
 
     // Sanear/limitar imagens de referência (evita payloads e tempo excessivo de visão)
@@ -1247,7 +1315,14 @@ serve(async (req) => {
 
     // PRÉ-SEGMENTAR o roteiro inteiro ANTES de chamar a IA
     // Isso garante sincronização PERFEITA: cada cena tem texto exato que será narrado
-    const allPreSegmentedScenes = preSegmentScript(resolvedScript, wordsPerScene, startSceneNumber);
+    let allPreSegmentedScenes = preSegmentScript(resolvedScript, wordsPerScene, startSceneNumber);
+    
+    // NOVO: Split dinâmico para criar mais cenas sem aumentar a duração total
+    if (maxSecondsPerScene > 0) {
+      console.log(`[Generate Scenes] Dynamic split enabled: max ${maxSecondsPerScene}s per scene at ${wpm} WPM`);
+      allPreSegmentedScenes = splitLongScenes(allPreSegmentedScenes, wpm, maxSecondsPerScene);
+    }
+    
     const actualSceneCount = allPreSegmentedScenes.length;
     console.log(`[Generate Scenes] Pre-segmented into ${actualSceneCount} scenes`);
 
