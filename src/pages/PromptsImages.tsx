@@ -259,6 +259,8 @@ const PromptsImages = () => {
   const [style, setStyle] = usePersistedState("prompts_style", "cinematografico");
   const [model, setModel] = usePersistedState("prompts_model", "deepseek-v3.2-exp");
   const [wordsPerScene, setWordsPerScene] = usePersistedState("prompts_wordsPerScene", "25");
+  const [dynamicScenesEnabled, setDynamicScenesEnabled] = usePersistedState("prompts_dynamic_scenes", true);
+  const [maxSecondsPerScene, setMaxSecondsPerScene] = usePersistedState("prompts_max_seconds_scene", "6");
   
   // Cenas - persistimos apenas os prompts, não as imagens (base64 muito grande)
   const [persistedScenes, setPersistedScenes] = usePersistedState<Omit<ScenePrompt, 'generatedImage' | 'generatingImage'>[]>("prompts_scenes_meta", []);
@@ -1088,6 +1090,7 @@ const [generating, setGenerating] = useState(false);
             wpm: currentWpm,
             includeVeo3: includeVeo3Prompts,
             startSceneNumber: globalSceneNumber,
+            maxSecondsPerScene: dynamicScenesEnabled ? parseInt(maxSecondsPerScene) || 6 : 0,
           };
           
           // Script: preferir scriptId (payload menor)
@@ -1209,6 +1212,7 @@ const [generating, setGenerating] = useState(false);
               includeVeo3: includeVeo3Prompts,
               startSceneNumber: globalSceneNumber,
               stream: false,
+              maxSecondsPerScene: dynamicScenesEnabled ? parseInt(maxSecondsPerScene) || 6 : 0,
             };
             
             if (scenePromptId) {
@@ -3828,14 +3832,30 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
   };
 
   // Estatísticas do roteiro atual (usando WPM configurado ou duração travada)
-  const scriptStats = {
-    words: script.split(/\s+/).filter(Boolean).length,
-    estimatedScenes: Math.ceil(script.split(/\s+/).filter(Boolean).length / (parseInt(wordsPerScene) || 80)),
-    estimatedDuration: lockedDurationSeconds !== null 
-      ? formatTimecode(lockedDurationSeconds)
-      : calculateEstimatedTimeWithWpm(script.split(/\s+/).filter(Boolean).length, currentWpm),
-    isLocked: lockedDurationSeconds !== null
-  };
+  const scriptStats = (() => {
+    const words = script.split(/\s+/).filter(Boolean).length;
+    let baseScenes = Math.ceil(words / (parseInt(wordsPerScene) || 80));
+    
+    // Se cenas dinâmicas ativadas, estimar o split
+    if (dynamicScenesEnabled && baseScenes > 0) {
+      const maxSec = parseInt(maxSecondsPerScene) || 6;
+      const avgWordsPerScene = words / baseScenes;
+      const avgDurationPerScene = (avgWordsPerScene / currentWpm) * 60;
+      if (avgDurationPerScene > maxSec) {
+        const splitFactor = Math.ceil(avgDurationPerScene / maxSec);
+        baseScenes = baseScenes * splitFactor;
+      }
+    }
+    
+    return {
+      words,
+      estimatedScenes: baseScenes,
+      estimatedDuration: lockedDurationSeconds !== null 
+        ? formatTimecode(lockedDurationSeconds)
+        : calculateEstimatedTimeWithWpm(words, currentWpm),
+      isLocked: lockedDurationSeconds !== null
+    };
+  })();
 
   const computeScenesWithWpm = (scenes: ScenePrompt[], wpm: number): ScenePrompt[] => {
     let cumulativeSeconds = 0;
@@ -4992,6 +5012,47 @@ RESPONDA EM JSON VÁLIDO:
                       </div>
                       <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-400 border-blue-500/30">
                         🎬 Veo3
+                      </Badge>
+                    </div>
+
+                    {/* Toggle para Cenas Dinâmicas - Split inteligente */}
+                    <div className="flex items-center gap-3 mt-3 p-3 bg-secondary/50 rounded-lg border border-border">
+                      <Switch
+                        id="dynamic-scenes"
+                        checked={dynamicScenesEnabled}
+                        onCheckedChange={setDynamicScenesEnabled}
+                      />
+                      <div className="flex-1">
+                        <Label 
+                          htmlFor="dynamic-scenes" 
+                          className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                        >
+                          <Sparkles className="w-4 h-4 text-primary" />
+                          Cenas Dinâmicas (Split Inteligente)
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Divide cenas longas em sub-cenas de até {maxSecondsPerScene}s para mais trocas visuais sem alterar a duração total
+                        </p>
+                      </div>
+                      {dynamicScenesEnabled && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">Máx:</span>
+                          <Select value={maxSecondsPerScene} onValueChange={setMaxSecondsPerScene}>
+                            <SelectTrigger className="w-20 h-8 text-xs bg-secondary border-border">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="4">4s</SelectItem>
+                              <SelectItem value="5">5s</SelectItem>
+                              <SelectItem value="6">6s</SelectItem>
+                              <SelectItem value="8">8s</SelectItem>
+                              <SelectItem value="10">10s</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30">
+                        ⚡ Retenção
                       </Badge>
                     </div>
 
