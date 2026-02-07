@@ -333,12 +333,27 @@ const VideoAnalyzer = () => {
             - Canal: ${realVideoData.channelTitle}
             - Views: ${realVideoData.views}
             - Likes: ${realVideoData.likes}
+            - Categoria YouTube: ${realVideoData.categoryId || "N/A"}
             - Tags: ${realVideoData.tags?.join(", ") || "N/A"}
             - Descrição: ${realVideoData.description?.substring(0, 500) || "N/A"}
             ` : ""}
             
+            IMPORTANTE: Determine o nicho, subnicho e micronicho baseando-se EXCLUSIVAMENTE no conteúdo real do vídeo (título, descrição, tags e categoria do YouTube). 
+            Não invente nichos que não tenham relação direta com o conteúdo do vídeo.
+            Exemplos de nichos corretos: "DIY", "ASMR", "Tecnologia", "Educação", "Entretenimento", "Games", "Culinária", "Fitness", etc.
+            O nicho deve refletir o assunto REAL do vídeo.
+            
+            Para estimatedRevenue: calcule baseado nas views reais usando a fórmula: (views / 1000) * RPM.
+            RPM médio por nicho: Tech=$4-8, Finance=$8-15, Entertainment=$1-3, Education=$3-6, DIY/ASMR=$2-5, Gaming=$2-4, Health=$5-10.
+            Escolha o RPM adequado ao nicho REAL do vídeo.
+            
             Retorne um JSON com:
-            1. videoInfo: informações do vídeo (nicho, subnicho, micronicho, estimatedRevenue em USD e BRL, rpm em USD e BRL)
+            1. videoInfo: informações do vídeo com:
+               - niche: nicho principal do vídeo (baseado no conteúdo real)
+               - subNiche: subnicho específico
+               - microNiche: micronicho detalhado
+               - estimatedRevenue: { usd: valor calculado, brl: valor * 5 }
+               - rpm: { usd: valor do RPM usado, brl: rpm * 5.5 }
             2. titles: array com 5 títulos gerados baseados na fórmula do título original. Cada título deve ter:
                - title: o título gerado
                - formula: análise da estrutura/fórmula (ex: "Promessa central + benefício + 5 termo(s) em CAIXA ALTA + loop mental")
@@ -437,17 +452,30 @@ const VideoAnalyzer = () => {
 
       // Set video info with thumbnail fallback
       const aiVideoInfo = videoInfoData || {};
+      const actualViews = realVideoData?.views || 0;
+      
+      // Calculate revenue from actual views if AI didn't provide proper values
+      const aiRpm = aiVideoInfo.rpm?.usd || 3.5;
+      const calculatedRevenueUsd = Math.round((actualViews / 1000) * aiRpm);
+      const calculatedRevenueBrl = Math.round(calculatedRevenueUsd * 5);
+      
+      // Use AI revenue only if it seems reasonable (>$1 for videos with views), otherwise calculate
+      const aiRevenueUsd = aiVideoInfo.estimatedRevenue?.usd || 0;
+      const useCalculated = actualViews > 1000 && (aiRevenueUsd < 1 || aiRevenueUsd < calculatedRevenueUsd * 0.1);
+      
       setVideoInfo({
         title: realVideoData?.title || aiVideoInfo.title || "Título do Vídeo",
         thumbnail: realVideoData?.thumbnail || fallbackThumbnail || "",
-        views: realVideoData?.views || 0,
+        views: actualViews,
         daysAgo: realVideoData?.daysAgo || 0,
         comments: realVideoData?.comments || 0,
-        estimatedRevenue: aiVideoInfo.estimatedRevenue || { usd: 5, brl: 25 },
+        estimatedRevenue: useCalculated 
+          ? { usd: calculatedRevenueUsd, brl: calculatedRevenueBrl }
+          : (aiVideoInfo.estimatedRevenue || { usd: calculatedRevenueUsd, brl: calculatedRevenueBrl }),
         rpm: aiVideoInfo.rpm || { usd: 3.5, brl: 19.25 },
         niche: aiVideoInfo.niche || "Conteúdo",
-        subNiche: aiVideoInfo.subNiche || "Educacional",
-        microNiche: aiVideoInfo.microNiche || "Análise de Tendências",
+        subNiche: aiVideoInfo.subNiche || "",
+        microNiche: aiVideoInfo.microNiche || "",
         originalTitleAnalysis: aiVideoInfo.originalTitleAnalysis,
       });
 
