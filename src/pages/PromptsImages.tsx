@@ -3846,15 +3846,15 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
     const words = script.split(/\s+/).filter(Boolean).length;
     let baseScenes = Math.ceil(words / (parseInt(wordsPerScene) || 80));
     
-    // Se cenas dinâmicas ativadas, estimar o split
+    // Se cenas dinâmicas ativadas, estimar o split baseado na duração total
+    // O backend só divide cenas que EXCEDEM o limite, não todas uniformemente
     if (dynamicScenesEnabled && baseScenes > 0) {
       const maxSec = parseInt(maxSecondsPerScene) || 6;
-      const avgWordsPerScene = words / baseScenes;
-      const avgDurationPerScene = (avgWordsPerScene / currentWpm) * 60;
-      if (avgDurationPerScene > maxSec) {
-        const splitFactor = Math.ceil(avgDurationPerScene / maxSec);
-        baseScenes = baseScenes * splitFactor;
-      }
+      const totalDurationSec = (words / currentWpm) * 60;
+      // Estimativa: duração total / tempo máximo por cena = máximo de cenas possível
+      const maxPossibleScenes = Math.ceil(totalDurationSec / maxSec);
+      // Usar o maior entre base e o split estimado (nunca menor que base)
+      baseScenes = Math.max(baseScenes, maxPossibleScenes);
     }
     
     return {
