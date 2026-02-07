@@ -751,7 +751,27 @@ const [generating, setGenerating] = useState(false);
     
     const wordCount = script.split(/\s+/).filter(Boolean).length;
     const wordsPerSceneNum = parseInt(wordsPerScene) || 80;
-    const estimatedTotalScenes = Math.ceil(wordCount / wordsPerSceneNum);
+    let estimatedTotalScenes = Math.ceil(wordCount / wordsPerSceneNum);
+    
+    // Aplicar mesma lógica de split dinâmico usada em scriptStats
+    if (dynamicScenesEnabled && estimatedTotalScenes > 0) {
+      const maxSec = parseInt(maxSecondsPerScene) || 6;
+      const maxWordsPerSub = Math.max(5, Math.round((maxSec * currentWpm) / 60));
+      let splitTotal = 0;
+      for (let i = 0; i < estimatedTotalScenes; i++) {
+        const sceneWords = i < estimatedTotalScenes - 1 
+          ? wordsPerSceneNum 
+          : wordCount - (wordsPerSceneNum * (estimatedTotalScenes - 1));
+        const sceneDuration = (sceneWords / currentWpm) * 60;
+        if (sceneDuration > maxSec + 1) {
+          splitTotal += Math.max(2, Math.ceil(sceneWords / maxWordsPerSub));
+        } else {
+          splitTotal += 1;
+        }
+      }
+      estimatedTotalScenes = splitTotal;
+    }
+    
     setSceneProgress({ done: 0, total: estimatedTotalScenes });
 
     // Para evitar timeouts quando há 100+ cenas, limitamos o tamanho por "cenas estimadas" e por palavras
