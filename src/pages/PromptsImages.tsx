@@ -3842,24 +3842,39 @@ ${s.characterName ? `👤 Personagem: ${s.characterName}` : ""}
   };
 
   // Estatísticas do roteiro atual (usando WPM configurado ou duração travada)
+  // Replica EXATAMENTE a lógica do backend: preSegmentScript → splitLongScenes
   const scriptStats = (() => {
     const words = script.split(/\s+/).filter(Boolean).length;
-    let baseScenes = Math.ceil(words / (parseInt(wordsPerScene) || 80));
+    const wps = parseInt(wordsPerScene) || 80;
+    let totalScenes = Math.max(1, Math.ceil(words / wps));
     
-    // Se cenas dinâmicas ativadas, estimar o split baseado na duração total
-    // O backend só divide cenas que EXCEDEM o limite, não todas uniformemente
-    if (dynamicScenesEnabled && baseScenes > 0) {
+    // Se cenas dinâmicas ativadas, simular o split idêntico ao backend
+    if (dynamicScenesEnabled && totalScenes > 0) {
       const maxSec = parseInt(maxSecondsPerScene) || 6;
-      const totalDurationSec = (words / currentWpm) * 60;
-      // Estimativa: duração total / tempo máximo por cena = máximo de cenas possível
-      const maxPossibleScenes = Math.ceil(totalDurationSec / maxSec);
-      // Usar o maior entre base e o split estimado (nunca menor que base)
-      baseScenes = Math.max(baseScenes, maxPossibleScenes);
+      const maxWordsPerSub = Math.max(5, Math.round((maxSec * currentWpm) / 60));
+      
+      // Simular cada cena base e contar sub-cenas (mesma lógica do backend splitLongScenes)
+      let splitTotal = 0;
+      for (let i = 0; i < totalScenes; i++) {
+        // Estimar palavras nesta cena (distribuição uniforme)
+        const sceneWords = i < totalScenes - 1 
+          ? wps 
+          : words - (wps * (totalScenes - 1));
+        const sceneDuration = (sceneWords / currentWpm) * 60;
+        
+        if (sceneDuration > maxSec + 1) {
+          // Backend divide em sub-cenas de ~maxWordsPerSub palavras
+          splitTotal += Math.max(2, Math.ceil(sceneWords / maxWordsPerSub));
+        } else {
+          splitTotal += 1;
+        }
+      }
+      totalScenes = splitTotal;
     }
     
     return {
       words,
-      estimatedScenes: baseScenes,
+      estimatedScenes: totalScenes,
       estimatedDuration: lockedDurationSeconds !== null 
         ? formatTimecode(lockedDurationSeconds)
         : calculateEstimatedTimeWithWpm(words, currentWpm),
