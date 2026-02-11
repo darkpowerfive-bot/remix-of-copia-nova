@@ -918,18 +918,17 @@ Crie uma fórmula que funcione assim:
         console.log(`[AI Assistant] Mental Triggers: ${agentTriggersArray.length} items`);
         
         
-        // Usar minDuration/maxDuration do request
+        // Usar minDuration/maxDuration do request - SEM INFLAR
         const scriptMinDuration = minDuration ? parseInt(minDuration.toString()) : (duration ? parseInt(duration.toString()) : 5);
-        const scriptMaxDuration = maxDuration ? parseInt(maxDuration.toString()) : scriptMinDuration + 3;
-        // Target deve ser exatamente entre min e max, mais próximo do min
-        const scriptTargetDuration = scriptMinDuration + 1;
+        const scriptMaxDuration = maxDuration ? parseInt(maxDuration.toString()) : scriptMinDuration;
+        const scriptTargetDuration = scriptMinDuration;
         
         const wordsPerMinute = 130;
         const minWords = scriptMinDuration * wordsPerMinute;
         const targetWords = scriptTargetDuration * wordsPerMinute;
-        const maxWords = scriptMaxDuration * wordsPerMinute;
+        const maxWords = Math.max(scriptMaxDuration * wordsPerMinute, minWords + Math.round(wordsPerMinute * 0.5)); // tolerância de 30s
         
-        console.log(`[AI Assistant] Script Duration - Min: ${scriptMinDuration}, Target: ${scriptTargetDuration}, Max: ${scriptMaxDuration}`);
+        console.log(`[AI Assistant] Script Duration - EXACT: ${scriptMinDuration} min, Max: ${scriptMaxDuration} min`);
         console.log(`[AI Assistant] Script Words - Min: ${minWords}, Target: ${targetWords}, Max: ${maxWords}`);
         console.log(`[AI Assistant] Script Language: ${language || 'pt-BR'}`);
         console.log(`[AI Assistant] Agent Name: ${agentData?.name || 'Unknown'}`);

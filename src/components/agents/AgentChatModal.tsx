@@ -372,7 +372,7 @@ REGRAS DE COMPORTAMENTO:
   };
 
   // Script generation logic
-  const wordsPerMinute = 150; // Velocidade média de narração
+  const wordsPerMinute = 130; // Velocidade média de narração (sincronizado com backend)
   const estimatedWords = parseInt(scriptDuration || "1") * wordsPerMinute;
   const estimatedParts = Math.max(1, Math.ceil(parseInt(scriptDuration || "1") / 3));
   
@@ -574,7 +574,7 @@ Retorne APENAS os 8 gatilhos, um por linha, sem numeração, hífens ou explica�
       if (ctaFinal) ctaPositions.push("final (últimos 30 segundos)");
 
       const userDuration = parseInt(scriptDuration || "1");
-      const duration = userDuration + 1;
+      const duration = userDuration; // EXATO - sem inflar
       
       // Dividir em partes de 3 minutos para roteiros longos
       const MINUTES_PER_PART = 3;
@@ -592,7 +592,7 @@ Retorne APENAS os 8 gatilhos, um por linha, sem numeração, hífens ou explica�
         setGenerationProgress(10 + Math.round((partIndex / numParts) * 70));
         
         const partMinutes = Math.ceil(duration / numParts);
-        const partWords = partMinutes * 150;
+        const partWords = partMinutes * 130; // 130 palavras/min (sincronizado com backend)
         const isFirstPart = partIndex === 0;
         const isLastPart = partIndex === numParts - 1;
 
@@ -628,9 +628,11 @@ ${!isFirstPart ? `- Continue de onde parou. Texto anterior (últimas 200 palavra
 ${isLastPart ? '- Esta é a ÚLTIMA parte: inclua uma conclusão impactante e CTA' : ''}
 ${!isLastPart ? '- NÃO conclua ainda - deixe um gancho para a continuação' : ''}
 
-📏 DURAÇÃO DESTA PARTE: ~${partMinutes} minutos (~${partWords} palavras)
+📏 DURAÇÃO DESTA PARTE: EXATAMENTE ${partMinutes} minutos = EXATAMENTE ${partWords} palavras (130 palavras/minuto)
+⛔ NÃO ULTRAPASSE ${partWords} palavras nesta parte!
 ` : `
-📏 DURAÇÃO: ${duration} minuto(s) = aproximadamente ${duration * 150} palavras (150 palavras/minuto)
+📏 DURAÇÃO: EXATAMENTE ${duration} minuto(s) = EXATAMENTE ${duration * 130} palavras (130 palavras/minuto)
+⛔ NÃO ULTRAPASSE ${duration * 130} palavras!
 `}
 
 ═══════════════════════════════════════════════════════════════════
@@ -695,7 +697,7 @@ GERE AGORA ${numParts > 1 ? `A PARTE ${partIndex + 1}` : 'O ROTEIRO COMPLETO'} D
             model: selectedModel,
             duration: partMinutes,
             minDuration: partMinutes,
-            maxDuration: partMinutes + 1,
+            maxDuration: partMinutes,
             language: scriptLanguage,
             userId: user.id,
             agentData: {
