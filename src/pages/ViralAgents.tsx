@@ -64,6 +64,8 @@ interface ScriptAgent {
   mental_triggers: string[] | null;
   times_used: number | null;
   preferred_model: string | null;
+  memory: string | null;
+  instructions: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -379,7 +381,7 @@ const ViralAgents = () => {
 
   const openMemoryModal = () => {
     if (!selectedAgent) return;
-    const currentMemory = selectedAgent.formula_structure?.memory || "";
+    const currentMemory = selectedAgent.memory || selectedAgent.formula_structure?.memory || "";
     setEditMemory(currentMemory);
     setShowMemoryModal(true);
   };
@@ -400,14 +402,18 @@ const ViralAgents = () => {
         memory: editMemory.trim()
       };
 
+      // Save to BOTH formula_structure.memory AND dedicated memory column
       const { error } = await supabase
         .from('script_agents')
-        .update({ formula_structure: updatedStructure })
+        .update({ 
+          formula_structure: updatedStructure,
+          memory: editMemory.trim() || null
+        })
         .eq('id', selectedAgent.id);
 
       if (error) throw error;
 
-      const updated = { ...selectedAgent, formula_structure: updatedStructure };
+      const updated = { ...selectedAgent, formula_structure: updatedStructure, memory: editMemory.trim() || null };
       setAgents(prev => prev.map(a => a.id === selectedAgent.id ? updated : a));
       setSelectedAgent(updated);
       setShowMemoryModal(false);
@@ -425,14 +431,18 @@ const ViralAgents = () => {
     
     setSavingInstructions(true);
     try {
+      // Save to BOTH formula column AND dedicated instructions column
       const { error } = await supabase
         .from('script_agents')
-        .update({ formula: editInstructions.trim() || null })
+        .update({ 
+          formula: editInstructions.trim() || null,
+          instructions: editInstructions.trim() || null
+        })
         .eq('id', selectedAgent.id);
 
       if (error) throw error;
 
-      const updated = { ...selectedAgent, formula: editInstructions.trim() || null };
+      const updated = { ...selectedAgent, formula: editInstructions.trim() || null, instructions: editInstructions.trim() || null };
       setAgents(prev => prev.map(a => a.id === selectedAgent.id ? updated : a));
       setSelectedAgent(updated);
       setShowInstructionsModal(false);
@@ -661,9 +671,9 @@ const ViralAgents = () => {
                           </Button>
                         </div>
                       </div>
-                      {selectedAgent.formula_structure?.memory ? (
+                      {(selectedAgent.memory || selectedAgent.formula_structure?.memory) ? (
                         <p className="text-sm text-muted-foreground line-clamp-4">
-                          {selectedAgent.formula_structure.memory}
+                          {selectedAgent.memory || selectedAgent.formula_structure.memory}
                         </p>
                       ) : (
                         <p className="text-sm text-muted-foreground">Nenhuma memória definida</p>

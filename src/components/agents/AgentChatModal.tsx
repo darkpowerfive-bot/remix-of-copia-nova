@@ -45,6 +45,9 @@ interface ScriptAgent {
   mental_triggers: string[] | null;
   times_used: number | null;
   preferred_model: string | null;
+  memory: string | null;
+  instructions: string | null;
+  based_on_title: string | null;
 }
 
 interface AgentChatModalProps {
@@ -213,13 +216,13 @@ ${agent.sub_niche ? ` | Subnicho: ${agent.sub_niche}` : ''}
 1️⃣ MEMÓRIA DO AGENTE (CONTEXTO OBRIGATÓRIO)
    Use estas informações como base de conhecimento permanente:
 ═══════════════════════════════════════════════════════════════════
-${agent.formula_structure?.memory ? agent.formula_structure.memory : '(Nenhuma memória configurada)'}
+${agent.memory || agent.formula_structure?.memory || '(Nenhuma memória configurada)'}
 
 ═══════════════════════════════════════════════════════════════════
 2️⃣ INSTRUÇÕES/FÓRMULA (SIGA EXATAMENTE)
    Esta é a fórmula que você DEVE seguir em TODAS as gerações:
 ═══════════════════════════════════════════════════════════════════
-${agent.formula ? agent.formula : '(Nenhuma instrução específica configurada)'}
+${agent.instructions || agent.formula || '(Nenhuma instrução específica configurada)'}
 
 ═══════════════════════════════════════════════════════════════════
 3️⃣ GATILHOS MENTAIS (USE TODOS OBRIGATORIAMENTE)
@@ -306,7 +309,8 @@ REGRAS DE COMPORTAMENTO:
             niche: agent.niche,
             subNiche: agent.sub_niche,
             formula: agent.formula,
-            memory: agent.formula_structure?.memory,
+            memory: agent.memory || agent.formula_structure?.memory || null,
+            instructions: agent.instructions || agent.formula_structure?.instructions || null,
             mentalTriggers: agent.mental_triggers,
             systemPrompt: buildSystemPrompt(),
             conversationHistory,
@@ -701,6 +705,10 @@ GERE AGORA ${numParts > 1 ? `A PARTE ${partIndex + 1}` : 'O ROTEIRO COMPLETO'} D
               formula: agent.formula,
               formula_structure: agent.formula_structure,
               mental_triggers: agent.mental_triggers,
+              // CRITICAL: Send dedicated memory and instructions fields
+              memory: agent.memory || agent.formula_structure?.memory || null,
+              instructions: agent.instructions || agent.formula_structure?.instructions || null,
+              based_on_title: agent.based_on_title || null,
               // Include files for backend context
               files: agentFiles.filter(f => f.content).map(f => ({
                 name: f.file_name,
