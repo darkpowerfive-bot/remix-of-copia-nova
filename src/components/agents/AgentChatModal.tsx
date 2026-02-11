@@ -640,18 +640,19 @@ ${!isLastPart ? '- ⛔ NÃO inclua CTA nesta parte! NÃO mencione "próximo víd
 `}
 
 ═══════════════════════════════════════════════════════════════════
-🎯 FÓRMULA/INSTRUÇÕES DO AGENTE (SIGA EXATAMENTE):
+⛔ PRIORIDADE #1 - IDENTIDADE DO AGENTE (OBRIGATÓRIO SEGUIR À RISCA):
 ═══════════════════════════════════════════════════════════════════
+
+🧠 MEMÓRIA DO AGENTE (quem ele é, como pensa, sua metodologia):
+${agent.memory || agent.formula_structure?.memory || '(Nenhuma memória configurada)'}
+
+📋 INSTRUÇÕES DO AGENTE (como deve escrever, estrutura, estilo):
+${agent.instructions || agent.formula || agent.formula_structure?.instructions || '(Nenhuma instrução configurada)'}
+
+🎯 FÓRMULA/TÉCNICA DO AGENTE:
 ${agent.formula || '(Nenhuma fórmula específica)'}
 
-═══════════════════════════════════════════════════════════════════
-📝 MEMÓRIA/CONTEXTO DO AGENTE (OBRIGATÓRIO):
-═══════════════════════════════════════════════════════════════════
-${agent.formula_structure?.memory || '(Nenhuma memória configurada)'}
-
-═══════════════════════════════════════════════════════════════════
-🧠 GATILHOS MENTAIS (USE TODOS OBRIGATORIAMENTE):
-═══════════════════════════════════════════════════════════════════
+🧠 GATILHOS MENTAIS (USE TODOS OBRIGATORIAMENTE em todo o roteiro):
 ${(() => {
   const allTriggers = [
     ...(agent.mental_triggers || []),
@@ -662,12 +663,14 @@ ${(() => {
     : '(Nenhum gatilho configurado)';
 })()}
 
-${agent.formula_structure?.instructions ? `
-═══════════════════════════════════════════════════════════════════
-📋 INSTRUÇÕES ESPECÍFICAS (SIGA À RISCA):
-═══════════════════════════════════════════════════════════════════
-${agent.formula_structure.instructions}
+${fileContentsForScript ? `
+📎 ARQUIVOS DE REFERÊNCIA DO AGENTE (USE COMO BASE DE CONHECIMENTO):
+${fileContentsForScript}
 ` : ''}
+
+⚠️ REGRA ABSOLUTA: O conteúdo do roteiro DEVE ser sobre o TÍTULO "${scriptTitle}".
+Use a memória, instruções e gatilhos do agente para GUIAR o estilo e a estrutura,
+mas o TEMA/ASSUNTO deve ser 100% relacionado ao título fornecido.
 
 ${fileContentsForScript ? `
 ═══════════════════════════════════════════════════════════════════

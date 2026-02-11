@@ -918,7 +918,7 @@ Crie uma fórmula que funcione assim:
         console.log(`[AI Assistant] Mental Triggers: ${agentTriggersArray.length} items`);
         
         
-        // Usar minDuration/maxDuration do request - SEM INFLAR
+        // Usar minDuration/maxDuration do request - tolerância de +2 min máximo
         const scriptMinDuration = minDuration ? parseInt(minDuration.toString()) : (duration ? parseInt(duration.toString()) : 5);
         const scriptMaxDuration = maxDuration ? parseInt(maxDuration.toString()) : scriptMinDuration;
         const scriptTargetDuration = scriptMinDuration;
@@ -926,7 +926,9 @@ Crie uma fórmula que funcione assim:
         const wordsPerMinute = 130;
         const minWords = scriptMinDuration * wordsPerMinute;
         const targetWords = scriptTargetDuration * wordsPerMinute;
-        const maxWords = Math.max(scriptMaxDuration * wordsPerMinute, minWords + Math.round(wordsPerMinute * 0.5)); // tolerância de 30s
+        // Tolerância máxima: +2 minutos além do pedido
+        const maxToleranceMinutes = Math.min(2, scriptMinDuration);
+        const maxWords = (scriptMinDuration + maxToleranceMinutes) * wordsPerMinute;
         
         console.log(`[AI Assistant] Script Duration - EXACT: ${scriptMinDuration} min, Max: ${scriptMaxDuration} min`);
         console.log(`[AI Assistant] Script Words - Min: ${minWords}, Target: ${targetWords}, Max: ${maxWords}`);
@@ -1112,40 +1114,43 @@ CERTO: "Testa por 3 dias. Se não funcionar, me cobra nos comentários."
 CERTO: "Aplica isso hoje. Me conta o resultado em uma semana."
 
 ═══════════════════════════════════════════════════════════════════════════════════════════
-ESTRUTURA DO AGENTE (USE A TÉCNICA, CRIE CONTEÚDO NOVO)
+⛔ PRIORIDADE #1 - IDENTIDADE INDIVIDUAL DO AGENTE (SEGUIR À RISCA)
 ═══════════════════════════════════════════════════════════════════════════════════════════
 
-LEMBRE-SE: O agente abaixo foi criado a partir de um vídeo de REFERÊNCIA.
-Você deve usar a TÉCNICA/ESTRUTURA, mas o CONTEÚDO deve ser 100% ORIGINAL sobre o título "${prompt}".
+CADA AGENTE TEM SUA PRÓPRIA IDENTIDADE. As informações abaixo definem QUEM você é e COMO deve escrever.
+Estas instruções TÊM PRIORIDADE sobre qualquer regra genérica acima.
 
-${agentMemory ? `PERSONA DO ESPECIALISTA:\n${agentMemory}\n` : ''}
-${basedOnTitle ? `Vídeo de referência (APENAS para entender a técnica): "${basedOnTitle}"` : ''}
+${agentMemory ? `🧠 MEMÓRIA DO AGENTE (sua identidade, metodologia, personalidade):\n${agentMemory}\n` : ''}
+${basedOnTitle ? `📌 Vídeo de referência (APENAS para entender a técnica): "${basedOnTitle}"` : ''}
 Nicho: ${agentData?.niche || 'Geral'} / ${agentData?.sub_niche || ''}
 
-${agentFormula ? `TÉCNICA A REPLICAR (estrutura, não texto):\n${agentFormula}` : ''}
-${agentInstructions ? `DIRETRIZES DE ESTILO:\n${agentInstructions}` : ''}
-${formulaReplicavel ? `MÉTODO:\n${formulaReplicavel}` : ''}
-${motivoSucesso ? `POR QUE FUNCIONA (aplique ao novo tema):\n${motivoSucesso}` : ''}
-${estruturaDetalhada ? `ARQUITETURA:\n${estruturaDetalhada}` : ''}
-${frasesChave ? `PADRÕES DE CONSTRUÇÃO (use como modelo, não copie):\n${frasesChave}` : ''}
+${agentInstructions ? `📋 INSTRUÇÕES DO AGENTE (SIGA EXATAMENTE - estrutura, estilo, tom):\n${agentInstructions}\n` : ''}
+${agentFormula ? `🎯 FÓRMULA/TÉCNICA DO AGENTE (replique a estrutura, não o texto):\n${agentFormula}\n` : ''}
+${formulaReplicavel ? `📐 MÉTODO:\n${formulaReplicavel}\n` : ''}
+${motivoSucesso ? `💡 POR QUE FUNCIONA (aplique ao novo tema):\n${motivoSucesso}\n` : ''}
+${estruturaDetalhada ? `🏗️ ARQUITETURA:\n${estruturaDetalhada}\n` : ''}
+${frasesChave ? `🔤 PADRÕES DE CONSTRUÇÃO (use como modelo, não copie):\n${frasesChave}\n` : ''}
 
-Gatilhos psicológicos a aplicar: ${agentTriggers}
+🧠 GATILHOS MENTAIS (aplique TODOS naturalmente ao longo do roteiro):
+${agentTriggers}
 
-${agentFileContents ? `Material de referência: ${agentFileContents}` : ''}
+${agentFileContents ? `📎 ARQUIVOS DE REFERÊNCIA DO AGENTE:\n${agentFileContents}\n` : ''}
+
+⚠️ REGRA: O conteúdo DEVE ser sobre o TÍTULO "${prompt}". Use a identidade do agente para guiar o ESTILO, mas o TEMA é definido pelo título.
 
 ═══════════════════════════════════════════════════════════════════════════════════════════
 ESPECIFICAÇÕES TÉCNICAS (INVIOLÁVEIS)
 ═══════════════════════════════════════════════════════════════════════════════════════════
 
-- Duração EXATA: ${scriptMinDuration} minutos
-- Contagem de palavras OBRIGATÓRIA: MÍNIMO ${minWords} palavras, MÁXIMO ${maxWords} palavras
-- META: ~${targetWords} palavras (130 palavras = 1 minuto de narração)
-- ⛔ Se o roteiro tiver MENOS de ${minWords} palavras, está CURTO DEMAIS → ADICIONE mais conteúdo
-- ⛔ Se o roteiro tiver MAIS de ${maxWords} palavras, está LONGO DEMAIS → CORTE conteúdo
+- Duração ALVO: ${scriptMinDuration} minutos (= ${targetWords} palavras)
+- Contagem de palavras: MÍNIMO ${minWords} palavras, MÁXIMO ${maxWords} palavras
+- TOLERÂNCIA: pode passar no MÁXIMO ${maxToleranceMinutes} minuto(s) além do pedido (${scriptMinDuration + maxToleranceMinutes} min = ${maxWords} palavras)
+- Taxa: 130 palavras = 1 minuto de narração
+- ⛔ Se o roteiro tiver MENOS de ${minWords} palavras → ADICIONE conteúdo
+- ⛔ Se o roteiro tiver MAIS de ${maxWords} palavras → CORTE conteúdo IMEDIATAMENTE
 - Formato: Texto CORRIDO para narração. Sem marcações.
 
-🚨 VOCÊ DEVE CONTAR AS PALAVRAS DO SEU ROTEIRO ANTES DE ENTREGAR.
-Se não atingir o MÍNIMO de ${minWords} palavras, CONTINUE escrevendo até atingir.
+🚨 CONTE AS PALAVRAS antes de entregar. O limite máximo absoluto é ${maxWords} palavras.
 
 ═══════════════════════════════════════════════════════════════════════════════════════════
 COMO VOCÊ ESCREVE (Tom de voz)
