@@ -597,6 +597,10 @@ Retorne APENAS os 8 gatilhos, um por linha, sem numeração, hífens ou explica�
         const partMinutes = Math.round(partWords / 130);
         const isFirstPart = partIndex === 0;
         const isLastPart = partIndex === numParts - 1;
+        // Tolerância total de +2 min distribuída entre as partes (não +2 por parte!)
+        const totalToleranceWords = Math.min(2, duration) * 130;
+        const partToleranceWords = Math.round(totalToleranceWords / numParts);
+        const partMaxWords = partWords + partToleranceWords;
 
         setGenerationStatus(numParts > 1 
           ? `Gerando parte ${partIndex + 1} de ${numParts}...` 
@@ -633,10 +637,10 @@ ${!isLastPart ? '- ⛔ NÃO inclua CTA nesta parte! NÃO mencione "próximo víd
 
 📏 CONTAGEM DE PALAVRAS DESTA PARTE: EXATAMENTE ${partWords} palavras (nem mais, nem menos)
 📏 O ROTEIRO TOTAL TEM ${totalWords} palavras divididas em ${numParts} partes iguais
-⛔ LIMITE ABSOLUTO: ${partWords} palavras nesta parte! Se ultrapassar, CORTE conteúdo.
+⛔ LIMITE ABSOLUTO: ${partMaxWords} palavras nesta parte! Se ultrapassar, CORTE conteúdo.
 ` : `
 📏 CONTAGEM DE PALAVRAS: EXATAMENTE ${totalWords} palavras (${duration} minutos × 130 palavras/minuto)
-⛔ LIMITE ABSOLUTO: ${totalWords} palavras! Se ultrapassar, CORTE conteúdo.
+⛔ LIMITE ABSOLUTO: ${totalWords + Math.min(2, duration) * 130} palavras! Se ultrapassar, CORTE conteúdo.
 `}
 
 ═══════════════════════════════════════════════════════════════════
@@ -706,6 +710,9 @@ GERE AGORA ${numParts > 1 ? `A PARTE ${partIndex + 1}` : 'O ROTEIRO COMPLETO'} D
             duration: partMinutes,
             minDuration: partMinutes,
             maxDuration: partMinutes,
+            // CRITICAL: Send exact word counts to prevent backend from adding its own tolerance
+            targetWords: partWords,
+            maxWords: partMaxWords,
             language: scriptLanguage,
             userId: user.id,
             agentData: {
