@@ -575,6 +575,7 @@ Retorne APENAS os 8 gatilhos, um por linha, sem numeração, hífens ou explica�
 
       const userDuration = parseInt(scriptDuration || "1");
       const duration = userDuration; // EXATO - sem inflar
+      const totalWords = duration * 130; // Total de palavras para o roteiro inteiro
       
       // Dividir em partes de 3 minutos para roteiros longos
       const MINUTES_PER_PART = 3;
@@ -591,8 +592,9 @@ Retorne APENAS os 8 gatilhos, um por linha, sem numeração, hífens ou explica�
         setCurrentPart(partIndex + 1);
         setGenerationProgress(10 + Math.round((partIndex / numParts) * 70));
         
-        const partMinutes = Math.ceil(duration / numParts);
-        const partWords = partMinutes * 130; // 130 palavras/min (sincronizado com backend)
+        // Calcular palavras por parte: dividir TOTAL igualmente, não arredondar minutos
+        const partWords = Math.round(totalWords / numParts);
+        const partMinutes = Math.round(partWords / 130);
         const isFirstPart = partIndex === 0;
         const isLastPart = partIndex === numParts - 1;
 
@@ -627,12 +629,14 @@ ${isFirstPart ? '- Esta é a PRIMEIRA parte: inclua um HOOK poderoso nos primeir
 ${!isFirstPart ? `- Continue de onde parou. Texto anterior (últimas 200 palavras para contexto):\n...${fullScript.slice(-800)}` : ''}
 ${isLastPart ? '- Esta é a ÚLTIMA parte: inclua uma conclusão impactante e CTA' : ''}
 ${!isLastPart ? '- NÃO conclua ainda - deixe um gancho para a continuação' : ''}
+${!isLastPart ? '- ⛔ NÃO inclua CTA nesta parte! NÃO mencione "próximo vídeo", NÃO peça like/subscribe. Apenas termine com um gancho narrativo.' : ''}
 
-📏 DURAÇÃO DESTA PARTE: EXATAMENTE ${partMinutes} minutos = EXATAMENTE ${partWords} palavras (130 palavras/minuto)
-⛔ NÃO ULTRAPASSE ${partWords} palavras nesta parte!
+📏 CONTAGEM DE PALAVRAS DESTA PARTE: EXATAMENTE ${partWords} palavras (nem mais, nem menos)
+📏 O ROTEIRO TOTAL TEM ${totalWords} palavras divididas em ${numParts} partes iguais
+⛔ LIMITE ABSOLUTO: ${partWords} palavras nesta parte! Se ultrapassar, CORTE conteúdo.
 ` : `
-📏 DURAÇÃO: EXATAMENTE ${duration} minuto(s) = EXATAMENTE ${duration * 130} palavras (130 palavras/minuto)
-⛔ NÃO ULTRAPASSE ${duration * 130} palavras!
+📏 CONTAGEM DE PALAVRAS: EXATAMENTE ${totalWords} palavras (${duration} minutos × 130 palavras/minuto)
+⛔ LIMITE ABSOLUTO: ${totalWords} palavras! Se ultrapassar, CORTE conteúdo.
 `}
 
 ═══════════════════════════════════════════════════════════════════
@@ -681,9 +685,10 @@ ${fileContentsForScript}
 4. Apenas o que o narrador deve FALAR
 5. IDIOMA: ${getLanguageName(scriptLanguage)} - ESCREVA INTEIRAMENTE NESTE IDIOMA!
 
-${isFirstPart && ctaInicio ? '✅ INCLUIR CTA NO INÍCIO' : ''}
-${isLastPart && ctaFinal ? '✅ INCLUIR CTA NO FINAL' : ''}
+${isFirstPart && ctaInicio ? '✅ INCLUIR CTA NO INÍCIO desta parte' : ''}
+${isLastPart && ctaFinal ? '✅ INCLUIR CTA NO FINAL desta parte' : ''}
 ${numParts === 1 && ctaMeio ? '✅ INCLUIR CTA NO MEIO' : ''}
+${!isLastPart && numParts > 1 ? '⛔ NÃO INCLUA CTA NESTA PARTE! Sem "próximo vídeo", sem "se inscreva", sem "deixe o like". Termine com gancho narrativo apenas.' : ''}
 
 🚨 LEMBRETE: SIGA A FÓRMULA/INSTRUÇÕES E GATILHOS DO AGENTE À RISCA!
 
