@@ -399,6 +399,8 @@ serve(async (req) => {
       duration,
       minDuration,
       maxDuration,
+      targetWords: requestTargetWords,
+      maxWords: requestMaxWords,
       agentData,
       userId: bodyUserId,
       stats // For dashboard_insight
@@ -924,14 +926,15 @@ Crie uma fórmula que funcione assim:
         const scriptTargetDuration = scriptMinDuration;
         
         const wordsPerMinute = 130;
-        const minWords = scriptMinDuration * wordsPerMinute;
-        const targetWords = scriptTargetDuration * wordsPerMinute;
-        // Tolerância máxima: +2 minutos além do pedido
-        const maxToleranceMinutes = Math.min(2, scriptMinDuration);
-        const maxWords = (scriptMinDuration + maxToleranceMinutes) * wordsPerMinute;
+        
+        // CRITICAL: Use exact word counts from frontend when available (prevents per-part tolerance inflation)
+        const minWords = requestTargetWords ? parseInt(requestTargetWords.toString()) : scriptMinDuration * wordsPerMinute;
+        const targetWords = minWords;
+        const maxWords = requestMaxWords ? parseInt(requestMaxWords.toString()) : (scriptMinDuration + Math.min(2, scriptMinDuration)) * wordsPerMinute;
+        const maxToleranceMinutes = Math.round((maxWords - minWords) / wordsPerMinute);
         
         console.log(`[AI Assistant] Script Duration - EXACT: ${scriptMinDuration} min, Max: ${scriptMaxDuration} min`);
-        console.log(`[AI Assistant] Script Words - Min: ${minWords}, Target: ${targetWords}, Max: ${maxWords}`);
+        console.log(`[AI Assistant] Script Words - Min: ${minWords}, Target: ${targetWords}, Max: ${maxWords} (from frontend: ${!!requestTargetWords})`);
         console.log(`[AI Assistant] Script Language: ${language || 'pt-BR'}`);
         console.log(`[AI Assistant] Agent Name: ${agentData?.name || 'Unknown'}`);
         console.log(`[AI Assistant] Agent Formula Length: ${agentFormula?.length || 0} chars`);
