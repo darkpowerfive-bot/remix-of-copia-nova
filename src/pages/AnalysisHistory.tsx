@@ -491,6 +491,7 @@ export default function AnalysisHistory() {
 
     // Store in localStorage for the VideoAnalyzer to pick up
     localStorage.setItem('analyzer_videoUrl', JSON.stringify(video.video_url));
+    localStorage.setItem('analyzer_lastAnalyzedUrl', JSON.stringify(video.video_url));
     localStorage.setItem('analyzer_videoInfo', JSON.stringify(videoInfo ? {
       title: video.original_title || videoInfo.title || '',
       thumbnail: video.original_thumbnail_url || videoInfo.thumbnail || '',
