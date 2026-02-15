@@ -255,9 +255,68 @@ const Folders = () => {
     );
   };
 
-  const handleUseVideo = (video: AnalyzedVideo) => {
-    // Navigate to analyzer with video URL
-    navigate(`/analyzer?url=${encodeURIComponent(video.video_url)}`);
+  const handleUseVideo = async (video: AnalyzedVideo) => {
+    // Pre-load analysis data into localStorage so VideoAnalyzer picks it up
+    const analysisData = video.analysis_data_json;
+    
+    if (analysisData) {
+      // Set persisted state keys used by VideoAnalyzer
+      localStorage.setItem("analyzer_videoUrl", JSON.stringify(video.video_url));
+      localStorage.setItem("analyzer_lastAnalyzedUrl", JSON.stringify(video.video_url));
+      localStorage.setItem("analyzer_currentAnalysisId", JSON.stringify(video.id));
+      
+      // Load videoInfo from analysis data
+      if (analysisData.videoInfo) {
+        const videoInfo = {
+          title: video.original_title || analysisData.videoInfo.title || "",
+          thumbnail: analysisData.videoInfo.thumbnail || "",
+          views: analysisData.videoInfo.views || 0,
+          daysAgo: analysisData.videoInfo.daysAgo || 0,
+          comments: analysisData.videoInfo.comments || 0,
+          estimatedRevenue: analysisData.videoInfo.estimatedRevenue || { usd: 0, brl: 0 },
+          rpm: analysisData.videoInfo.rpm || { usd: 3.5, brl: 19.25 },
+          niche: video.detected_niche || analysisData.videoInfo.niche || "",
+          subNiche: analysisData.videoInfo.subNiche || "",
+          microNiche: analysisData.videoInfo.microNiche || "",
+          originalTitleAnalysis: analysisData.videoInfo.originalTitleAnalysis,
+        };
+        localStorage.setItem("analyzer_videoInfo", JSON.stringify(videoInfo));
+      }
+      
+      // Load generated titles from analysis data
+      if (analysisData.titles && Array.isArray(analysisData.titles)) {
+        localStorage.setItem("analyzer_generatedTitles", JSON.stringify(analysisData.titles));
+      } else {
+        // Try fetching titles from database
+        const { data: titles } = await supabase
+          .from("generated_titles")
+          .select("*")
+          .eq("video_analysis_id", video.id)
+          .order("pontuacao", { ascending: false });
+        
+        if (titles && titles.length > 0) {
+          const mappedTitles = titles.map((t, i) => ({
+            id: t.id,
+            title: t.title_text,
+            formula: t.formula || "",
+            formulaSurpresa: "",
+            quality: Math.round((t.pontuacao || 50) / 10),
+            impact: Math.round((t.pontuacao || 50) / 10),
+            isBest: i === 0,
+            model: t.model_used || "N/A",
+            isUsed: t.is_used || false,
+          }));
+          localStorage.setItem("analyzer_generatedTitles", JSON.stringify(mappedTitles));
+        }
+      }
+    }
+    
+    toast({
+      title: "Análise carregada!",
+      description: "Redirecionando para o Analisador...",
+    });
+    
+    navigate('/analyzer');
   };
 
   const handleLoadStrategicPlan = (video: AnalyzedVideo) => {
