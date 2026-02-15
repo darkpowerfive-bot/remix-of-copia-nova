@@ -521,7 +521,7 @@ export default function AnalysisHistory() {
       description: "Redirecionando para o Analisador de Vídeos...",
     });
 
-    navigate('/video-analyzer');
+    navigate('/analyzer');
   };
 
   return (
