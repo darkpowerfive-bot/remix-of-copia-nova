@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 
 interface VersionInfo {
@@ -6,10 +6,8 @@ interface VersionInfo {
   buildTime: string;
 }
 
-// Store the initial version when the app loads
-let initialVersion: VersionInfo | null = null;
-
 export function useVersionCheck(checkInterval: number = 300000) { // 5 minutos (antes 60s)
+  const initialVersionRef = useRef<VersionInfo | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [newVersion, setNewVersion] = useState<VersionInfo | null>(null);
 
@@ -40,15 +38,15 @@ export function useVersionCheck(checkInterval: number = 300000) { // 5 minutos (
     if (!currentVersion) return;
 
     // Store initial version on first check
-    if (!initialVersion) {
-      initialVersion = currentVersion;
+    if (!initialVersionRef.current) {
+      initialVersionRef.current = currentVersion;
       return;
     }
 
     // Compare versions
     if (
-      currentVersion.buildTime !== initialVersion.buildTime ||
-      currentVersion.version !== initialVersion.version
+      currentVersion.buildTime !== initialVersionRef.current.buildTime ||
+      currentVersion.version !== initialVersionRef.current.version
     ) {
       setUpdateAvailable(true);
       setNewVersion(currentVersion);

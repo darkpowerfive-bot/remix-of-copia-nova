@@ -337,12 +337,11 @@ const ChannelAnalyzer = () => {
     setGeneratingAnalysis(true);
     setProgress(0);
 
-    try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 10, 90));
-      }, 500);
+    const progressInterval = setInterval(() => {
+      setProgress(prev => Math.min(prev + 10, 90));
+    }, 500);
 
+    try {
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: {
           type: 'analyze_multiple_channels',
@@ -360,7 +359,6 @@ const ChannelAnalyzer = () => {
         }
       });
 
-      clearInterval(progressInterval);
       setProgress(100);
 
       if (error) throw error;
@@ -378,14 +376,18 @@ const ChannelAnalyzer = () => {
       }
       toast.error('Erro ao gerar análise. Tente novamente.');
     } finally {
+      clearInterval(progressInterval);
       setGeneratingAnalysis(false);
       setTimeout(() => setProgress(0), 1000);
     }
   };
 
   const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success("Copiado!");
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success("Copiado!");
+    }).catch(() => {
+      toast.error("Erro ao copiar");
+    });
   };
 
   const handleSaveToDatabase = async () => {

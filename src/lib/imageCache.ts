@@ -262,8 +262,8 @@ export const getAllBatchCachedImages = async (): Promise<BatchCachedImage[]> => 
     // Sort by timestamp to maintain order
     return results.sort((a, b) => {
       // Extract index from id (img-timestamp-index)
-      const indexA = parseInt(a.id.split('-').pop() || '0');
-      const indexB = parseInt(b.id.split('-').pop() || '0');
+      const indexA = parseInt(a.id.split('-').pop() || '0', 10) || 0;
+      const indexB = parseInt(b.id.split('-').pop() || '0', 10) || 0;
       return indexA - indexB;
     });
   } catch (error) {

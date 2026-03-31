@@ -60,10 +60,10 @@ export function useProfileData() {
       if (creditsResult.data) {
         creditsBalance = Math.max(0, Math.ceil(creditsResult.data.balance));
       } else if (!creditsResult.error) {
-        // Create initial credits record
+        // Create initial credits record (upsert to avoid race condition duplicates)
         await supabase
           .from("user_credits")
-          .insert({ user_id: user.id, balance: 50 });
+          .upsert({ user_id: user.id, balance: 50 }, { onConflict: 'user_id' });
         creditsBalance = 50;
       }
 

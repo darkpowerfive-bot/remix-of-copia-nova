@@ -16,7 +16,14 @@ export function PermissionGate({ permission, children, featureName }: Permission
   const navigate = useNavigate();
 
   if (loading) {
-    return <>{children}</>;
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Verificando permissões...</p>
+        </div>
+      </div>
+    );
   }
 
   if (hasPermission(permission)) {

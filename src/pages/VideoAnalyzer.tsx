@@ -43,6 +43,7 @@ import { useCreditDeduction } from "@/hooks/useCreditDeduction";
 interface GeneratedTitle {
   id: string;
   title: string;
+  perspectiva?: string;
   formula: string;
   formulaSurpresa: string;
   quality: number;
@@ -327,42 +328,32 @@ const VideoAnalyzer = () => {
             },
             language,
             prompt: `Analise o vídeo do YouTube com URL: ${videoUrl}
-            ${realVideoData ? `
-            Dados reais do vídeo:
-            - Título: ${realVideoData.title}
-            - Canal: ${realVideoData.channelTitle}
-            - Views: ${realVideoData.views}
-            - Likes: ${realVideoData.likes}
-            - Categoria YouTube: ${realVideoData.categoryId || "N/A"}
-            - Tags: ${realVideoData.tags?.join(", ") || "N/A"}
-            - Descrição: ${realVideoData.description?.substring(0, 500) || "N/A"}
-            ` : ""}
-            
-            IMPORTANTE: Determine o nicho, subnicho e micronicho baseando-se EXCLUSIVAMENTE no conteúdo real do vídeo (título, descrição, tags e categoria do YouTube). 
-            Não invente nichos que não tenham relação direta com o conteúdo do vídeo.
-            Exemplos de nichos corretos: "DIY", "ASMR", "Tecnologia", "Educação", "Entretenimento", "Games", "Culinária", "Fitness", etc.
-            O nicho deve refletir o assunto REAL do vídeo.
-            
-            Para estimatedRevenue: calcule baseado nas views reais usando a fórmula: (views / 1000) * RPM.
-            RPM médio por nicho: Tech=$4-8, Finance=$8-15, Entertainment=$1-3, Education=$3-6, DIY/ASMR=$2-5, Gaming=$2-4, Health=$5-10.
-            Escolha o RPM adequado ao nicho REAL do vídeo.
-            
-            Retorne um JSON com:
-            1. videoInfo: informações do vídeo com:
-               - niche: nicho principal do vídeo (baseado no conteúdo real)
-               - subNiche: subnicho específico
-               - microNiche: micronicho detalhado
-               - estimatedRevenue: { usd: valor calculado, brl: valor * 5 }
-               - rpm: { usd: valor do RPM usado, brl: rpm * 5.5 }
-            2. titles: array com 5 títulos gerados baseados na fórmula do título original. Cada título deve ter:
-               - title: o título gerado
-               - formula: análise da estrutura/fórmula (ex: "Promessa central + benefício + 5 termo(s) em CAIXA ALTA + loop mental")
-               - formulaSurpresa: fórmula alternativa (ex: "Promessa central + benefício + gatilho de segredo + loop mental")
-               - quality: score de qualidade (1-10)
-               - impact: score de impacto (1-10)
-            
-            O título com maior score combinado deve ser marcado como isBest: true.
-            Idioma dos títulos: ${language === "pt-BR" ? "Português Brasileiro" : language}`,
+${realVideoData ? `
+DADOS REAIS DO VÍDEO (use EXATAMENTE estes dados):
+- Título Original: ${realVideoData.title}
+- Canal: ${realVideoData.channelTitle}
+- Views: ${realVideoData.views}
+- Likes: ${realVideoData.likes}
+- Categoria YouTube: ${realVideoData.categoryId || "N/A"}
+- Tags: ${realVideoData.tags?.join(", ") || "N/A"}
+- Descrição: ${realVideoData.description?.substring(0, 500) || "N/A"}
+` : ""}
+
+MISSÃO: Faça engenharia reversa do título original, identifique a fórmula viral que o fez ter sucesso, e gere 5 títulos SUPERIORES ao original — cada um com uma PERSPECTIVA/ÂNGULO DIFERENTE sobre o MESMO tema.
+
+PERSPECTIVAS OBRIGATÓRIAS (uma por título):
+1. "Revelação Proibida" - como se revelasse algo secreto/censurado
+2. "Consequência Chocante" - foco no impacto/resultado inesperado
+3. "Autoridade/Prova Social" - números específicos e validação
+4. "Narrativa Emocional" - tom de história/conexão pessoal
+5. "Contraintuitivo" - desafie o senso comum, ângulo provocativo
+
+Determine nicho/subnicho/micronicho baseando-se EXCLUSIVAMENTE no conteúdo real do vídeo.
+Para estimatedRevenue: (views / 1000) * RPM. RPM por nicho: Tech=$4-8, Finance=$8-15, Entertainment=$1-3, Education=$3-6, DIY/ASMR=$2-5, Gaming=$2-4, Health=$5-10.
+
+Cada título deve incluir campo "perspectiva" com o nome da perspectiva usada.
+O título com maior score combinado deve ter isBest: true.
+Idioma: ${language === "pt-BR" ? "Português Brasileiro" : language}`,
           },
         });
 
@@ -612,6 +603,7 @@ const VideoAnalyzer = () => {
       titles: [
         {
           title: "O SEGREDO MILITAR que NINGUÉM Revelou: EGÍPCIOS vs. HITITAS",
+          perspectiva: "Revelação Proibida",
           formula: "Promessa central + benefício + 5 termo(s) em CAIXA ALTA + loop mental (o detalhe/segredo/verdade).",
           formulaSurpresa: "Promessa central + benefício + gatilho de segredo + loop mental",
           quality: 9,
@@ -619,32 +611,36 @@ const VideoAnalyzer = () => {
           isBest: true,
         },
         {
-          title: "A TÁTICA OCULTA que NINGUÉM Esperava: ROMANOS vs. VISIGODOS",
+          title: "Depois DISSO, Nenhuma Civilização Foi a MESMA: ROMANOS vs. VISIGODOS",
+          perspectiva: "Consequência Chocante",
           formula: "Promessa central + benefício + 5 termo(s) em CAIXA ALTA + loop mental (o detalhe/segredo/verdade).",
           formulaSurpresa: "Mistério central + benefício + gatilho de revelação",
           quality: 9,
           impact: 8,
         },
         {
-          title: "A ESTRATÉGIA PERDIDA que NINGUÉM Conhecia: VIKINGS vs. SAXÕES",
-          formula: "Promessa central + benefício + 5 termo(s) em CAIXA ALTA + loop mental (o detalhe/segredo/verdade).",
+          title: "47 BATALHAS Ocultas que MUDARAM o Mundo: VIKINGS vs. SAXÕES",
+          perspectiva: "Autoridade/Prova Social",
+          formula: "Número específico + CAIXA ALTA + loop mental + credibilidade.",
           formulaSurpresa: "Promessa central + benefício + segredo revelado + loop mental",
           quality: 9,
           impact: 8,
         },
         {
-          title: "A ESTRATÉGIA IMPOSSÍVEL que MUDOU TUDO: SPARTANOS vs. PERSAS",
-          formula: "Promessa central + benefício + 5 termo(s) em CAIXA ALTA + loop mental (o detalhe/segredo/verdade).",
+          title: "A HISTÓRIA que Meu Professor NUNCA Contou: SPARTANOS vs. PERSAS",
+          perspectiva: "Narrativa Emocional",
+          formula: "Narrativa pessoal + CAIXA ALTA + identificação + loop mental.",
           formulaSurpresa: "Contraste extremo + benefício + gatilho de mistério",
           quality: 9,
-          impact: 4,
+          impact: 7,
         },
         {
-          title: "O CONFRONTO SECRETO que TRANSFORMOU a HISTÓRIA: CHINESES vs. MONGÓIS",
-          formula: "Promessa central + benefício + 5 termo(s) em CAIXA ALTA + loop mental (o detalhe/segredo/verdade).",
+          title: "Por Que TUDO que Você Sabe Sobre CHINESES vs. MONGÓIS Está ERRADO",
+          perspectiva: "Contraintuitivo",
+          formula: "Quebra de expectativa + CAIXA ALTA + desafio ao senso comum.",
           formulaSurpresa: "Promessa central + segredo impactante + loop mental",
           quality: 9,
-          impact: 4,
+          impact: 8,
         },
       ],
     };
@@ -1206,6 +1202,24 @@ const VideoAnalyzer = () => {
                           >
                             {title.model}
                           </Badge>
+                          {title.perspectiva && (
+                            <Badge
+                              variant="outline"
+                              className={`text-xs shrink-0 ${
+                                title.perspectiva.toLowerCase().includes("revelação") || title.perspectiva.toLowerCase().includes("proibid")
+                                  ? "bg-red-500/10 text-red-400 border-red-500/30"
+                                  : title.perspectiva.toLowerCase().includes("consequência") || title.perspectiva.toLowerCase().includes("chocante")
+                                    ? "bg-yellow-500/10 text-yellow-400 border-yellow-500/30"
+                                    : title.perspectiva.toLowerCase().includes("autoridade") || title.perspectiva.toLowerCase().includes("prova")
+                                      ? "bg-green-500/10 text-green-400 border-green-500/30"
+                                      : title.perspectiva.toLowerCase().includes("narrativa") || title.perspectiva.toLowerCase().includes("emocional")
+                                        ? "bg-cyan-500/10 text-cyan-400 border-cyan-500/30"
+                                        : "bg-purple-500/10 text-purple-400 border-purple-500/30"
+                              }`}
+                            >
+                              {title.perspectiva}
+                            </Badge>
+                          )}
                           {title.isUsed && (
                             <Badge variant="outline" className="text-xs shrink-0 text-muted-foreground border-muted-foreground/50">
                               Utilizado

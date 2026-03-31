@@ -13,8 +13,8 @@ export interface SEORoute {
 // Base URL for the site
 export const BASE_URL = 'https://canaisdarks.com.br';
 
-// Current date for lastmod - Fixed to ensure consistency
-const today = '2026-01-11';
+// Current date for lastmod - generated dynamically
+const today = new Date().toISOString().split('T')[0];
 
 /**
  * Public routes that should be indexed by search engines

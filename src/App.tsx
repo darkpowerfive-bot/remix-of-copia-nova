@@ -106,8 +106,7 @@ const PageLoader = () => (
 // Smart redirect: logged in -> dashboard, not logged in -> landing
 const RootRedirect = () => {
   const { user, loading } = useAuth();
-  useAppDomainRedirect();
-  
+
   if (loading) {
     return <PageLoader />;
   }

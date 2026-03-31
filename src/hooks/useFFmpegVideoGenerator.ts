@@ -212,7 +212,12 @@ export function useFFmpegVideoGenerator() {
           message: "Inicializando FFmpeg...",
         });
 
-        if (cancelledRef.current) throw new Error("Cancelled");
+        if (cancelledRef.current) {
+          URL.revokeObjectURL(coreURL);
+          URL.revokeObjectURL(wasmURL);
+          if (workerURL) URL.revokeObjectURL(workerURL);
+          throw new Error("Cancelled");
+        }
 
         await ffmpeg.load({
           coreURL,

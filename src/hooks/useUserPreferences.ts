@@ -108,9 +108,7 @@ export function useUserPreferences() {
       }
     }
 
-    setTimeout(() => {
-      isSaving.current = false;
-    }, 100);
+    isSaving.current = false;
   }, [user?.id]);
 
   // Save theme

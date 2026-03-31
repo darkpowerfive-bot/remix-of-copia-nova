@@ -387,7 +387,8 @@ export function getDailyQuote(): { text: string; ref: string; dayOfYear: number 
   const dayOfYear = Math.floor(diff / oneDay);
   
   // Use dayOfYear as index (0-364), wrap around if needed
-  const quoteIndex = (dayOfYear - 1) % dailyQuotes.length;
+  const safeDay = Math.max(0, dayOfYear - 1);
+  const quoteIndex = safeDay % dailyQuotes.length;
   const quote = dailyQuotes[quoteIndex];
   
   return {

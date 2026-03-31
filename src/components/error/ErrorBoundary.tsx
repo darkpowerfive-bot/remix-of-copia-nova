@@ -49,12 +49,11 @@ export class ErrorBoundary extends Component<Props, State> {
     // If it's a chunk loading error, force reload to get new assets
     if (this.isChunkLoadError(error)) {
       console.log("Chunk load error detected, reloading page...");
-      // Clear any cached state and reload
-      sessionStorage.setItem('chunk_reload_attempted', 'true');
-      
+
       // Only auto-reload if we haven't already tried
       const alreadyReloaded = sessionStorage.getItem('chunk_reload_attempted');
       if (!alreadyReloaded) {
+        sessionStorage.setItem('chunk_reload_attempted', 'true');
         window.location.reload();
         return;
       }

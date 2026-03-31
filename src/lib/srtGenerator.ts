@@ -117,8 +117,20 @@ const splitTextIntoBlocks = (text: string, maxChars: number = 499): string[] => 
       // Fallback: dividir por palavras se ainda exceder
       const words = block.split(/\s+/).filter(w => w.length > 0);
       let current = '';
-      
+
       for (const word of words) {
+        // Handle single words longer than maxChars by splitting them
+        if (word.length > maxChars) {
+          if (current.length > 0) {
+            validatedBlocks.push(current);
+            current = '';
+          }
+          for (let i = 0; i < word.length; i += maxChars) {
+            validatedBlocks.push(word.slice(i, i + maxChars));
+          }
+          continue;
+        }
+
         if (current.length === 0) {
           current = word;
         } else {
@@ -131,7 +143,7 @@ const splitTextIntoBlocks = (text: string, maxChars: number = 499): string[] => 
           }
         }
       }
-      
+
       if (current.length > 0) {
         validatedBlocks.push(current);
       }

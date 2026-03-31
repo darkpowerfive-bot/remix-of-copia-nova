@@ -303,7 +303,7 @@ serve(async (req) => {
     // Passo 8: Construir prompt de análise conforme documentação
     const langLabel = language === "Português" ? "Português Brasileiro" : language === "English" ? "Inglês" : "Espanhol";
     
-    const analysisPrompt = `Você é um especialista em análise de títulos virais para YouTube.
+    const analysisPrompt = `Você é o maior especialista mundial em engenharia reversa de títulos virais do YouTube e psicologia de cliques.
 
 VÍDEO PARA ANALISAR:
 - URL: ${videoUrl}
@@ -318,36 +318,31 @@ ${videoData ? `
 - Descrição (início): "${videoData.description?.substring(0, 300) || "N/A"}"
 ` : ""}
 
-Analise este título e identifique:
+═══ FASE 1: ENGENHARIA REVERSA PROFUNDA ═══
 
-1. FORMATO E ESTRUTURA DO TÍTULO ORIGINAL:
-   - Detecte o formato exato: usa CAIXA ALTA? Usa separadores (| - : •)?
-   - Tem sufixo padrão (ex: "- Documentário", "| REACT", "(LEGENDADO)")?
-   - Qual a estrutura visual? (ex: "TEMA | SUBTEMA - Categoria")
-   - CRÍTICO: Os títulos gerados DEVEM seguir este mesmo formato visual!
+Disseque o título original completamente:
+1. FORMATO VISUAL: CAIXA ALTA? Separadores (| - : •)? Sufixo padrão? Estrutura visual?
+2. FÓRMULA VIRAL: Qual padrão/técnica usa? Por que funciona neste nicho?
+3. NICHO/SUBNICHO/MICRONICHO: Detecte com base no conteúdo real
+4. GATILHOS PSICOLÓGICOS: Quais emoções ativa? Qual é o gap de curiosidade?
+5. POR QUE VIRALIZOU: Análise profunda do motivo de sucesso
 
-2. FÓRMULA DO TÍTULO:
-   - Qual padrão/técnica ele usa? (pergunta, número, mistério, nome próprio, CAIXA ALTA, etc)
-   - Por que essa fórmula funciona para este nicho?
+═══ FASE 2: GERE 5 TÍTULOS COM PERSPECTIVAS DIFERENTES ═══
 
-3. NICHO E SUBNICHO:
-   - Nicho principal detectado
-   - Subnicho específico
-   - Micronicho (se aplicável)
+Cada título deve usar o MESMO FORMATO VISUAL do original (separadores, caixa alta, sufixos) mas com um ÂNGULO/PERSPECTIVA DIFERENTE:
 
-4. ELEMENTOS DE SUCESSO:
-   - Por que este título viralizou?
-   - Que gatilhos emocionais ativa?
-   - Que curiosidade desperta?
+🔴 TÍTULO 1 - "Revelação Proibida": Como se revelasse algo censurado/secreto
+🟡 TÍTULO 2 - "Consequência Chocante": Foco no impacto/resultado inesperado
+🟢 TÍTULO 3 - "Autoridade/Prova Social": Números específicos e validação
+🔵 TÍTULO 4 - "Narrativa Emocional": Tom de história/conexão pessoal
+🟣 TÍTULO 5 - "Contraintuitivo": Desafie o senso comum, ângulo provocativo
 
-5. GERE 5 TÍTULOS OTIMIZADOS:
-   - OBRIGATÓRIO: Use o MESMO FORMATO VISUAL do original (separadores, caixa alta, sufixos)
-   - Se o original usa "TEMA | SUBTEMA", os novos também devem
-   - Se o original tem "- Documentário" no final, mantenha
-   - Use a mesma fórmula identificada
-   - Adapte para o idioma: ${langLabel}
-   - Mantenha o impacto e curiosidade
-   - Máximo 70 caracteres cada
+REGRAS:
+- MESMO formato visual do original (separadores, CAIXA ALTA, sufixos)
+- NUNCA copiar o título original (todos devem ter melhorias reais)
+- Mantenha o TEMA/ENTIDADES do original mas MUDE o ângulo
+- Máximo 100 caracteres cada
+- Idioma: ${langLabel}
 
 Retorne APENAS em formato JSON válido:
 {
@@ -367,14 +362,14 @@ Retorne APENAS em formato JSON válido:
   "detectedNiche": "nicho principal",
   "detectedSubniche": "subnicho específico",
   "detectedMicroniche": "micronicho",
-  "formula": "descrição da fórmula identificada",
-  "whyItWorks": "explicação de por que este título funciona e viraliza",
+  "formula": "fórmula viral identificada (ex: [Gancho emocional] + [Entidade] + [Loop aberto])",
+  "whyItWorks": "análise profunda de por que este título gera cliques e viraliza (gatilhos psicológicos, gap de curiosidade, conexão com algoritmo)",
   "titles": [
-    {"title": "TÍTULO 1 NO MESMO FORMATO", "score": 95, "explanation": "Mantém estrutura X | Y com gatilho Z"},
-    {"title": "TÍTULO 2 NO MESMO FORMATO", "score": 92, "explanation": "Variação usando mesmos separadores"},
-    {"title": "TÍTULO 3 NO MESMO FORMATO", "score": 90, "explanation": "Combina elementos A e B no formato original"},
-    {"title": "TÍTULO 4 NO MESMO FORMATO", "score": 88, "explanation": "Foco em gatilho W mantendo estrutura"},
-    {"title": "TÍTULO 5 NO MESMO FORMATO", "score": 85, "explanation": "Alternativa respeitando o formato visual"}
+    {"title": "TÍTULO 1", "perspectiva": "Revelação Proibida", "score": 95, "explanation": "Como aplica a fórmula com este ângulo"},
+    {"title": "TÍTULO 2", "perspectiva": "Consequência Chocante", "score": 92, "explanation": "Como aplica a fórmula com este ângulo"},
+    {"title": "TÍTULO 3", "perspectiva": "Autoridade/Prova Social", "score": 90, "explanation": "Como aplica a fórmula com este ângulo"},
+    {"title": "TÍTULO 4", "perspectiva": "Narrativa Emocional", "score": 88, "explanation": "Como aplica a fórmula com este ângulo"},
+    {"title": "TÍTULO 5", "perspectiva": "Contraintuitivo", "score": 85, "explanation": "Como aplica a fórmula com este ângulo"}
   ]
 }`;
 

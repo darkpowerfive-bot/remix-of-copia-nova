@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Crown, Zap, Rocket } from "lucide-react";
 
 const notifications = [
@@ -51,6 +51,8 @@ const FakeNotifications = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!isPageVisible) return;
 
@@ -59,7 +61,8 @@ const FakeNotifications = () => {
       setCurrentNotification(randomIndex);
       setIsVisible(true);
 
-      setTimeout(() => {
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = setTimeout(() => {
         setIsVisible(false);
       }, 4000);
     };
@@ -77,6 +80,7 @@ const FakeNotifications = () => {
     return () => {
       clearTimeout(initialTimeout);
       clearInterval(interval);
+      if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     };
   }, [isPageVisible]);
 

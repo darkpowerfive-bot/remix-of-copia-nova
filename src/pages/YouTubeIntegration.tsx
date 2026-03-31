@@ -292,41 +292,43 @@ const YouTubeIntegration = () => {
         setUploadProgress(prev => Math.min(prev + 5, 90));
       }, 500);
 
-      const { data, error } = await supabase.functions.invoke('youtube-upload', {
-        body: {
-          title: uploadForm.title,
-          description: uploadForm.description,
-          tags: uploadForm.tags.split(',').map(t => t.trim()).filter(Boolean),
-          privacyStatus: uploadForm.privacyStatus,
-          categoryId: uploadForm.categoryId,
-          madeForKids: uploadForm.madeForKids,
-          fileBase64,
-          fileName: selectedFile.name,
-          mimeType: selectedFile.type
-        }
-      });
-
-      clearInterval(progressInterval);
-
-      if (error) throw error;
-
-      setUploadProgress(100);
-      toast.success('Vídeo enviado com sucesso!');
-      
-      setTimeout(() => {
-        setUploadModalOpen(false);
-        setSelectedFile(null);
-        setUploadProgress(0);
-        setUploadForm({
-          title: '',
-          description: '',
-          tags: '',
-          privacyStatus: 'private',
-          categoryId: '22',
-          madeForKids: false
+      try {
+        const { data, error } = await supabase.functions.invoke('youtube-upload', {
+          body: {
+            title: uploadForm.title,
+            description: uploadForm.description,
+            tags: uploadForm.tags.split(',').map(t => t.trim()).filter(Boolean),
+            privacyStatus: uploadForm.privacyStatus,
+            categoryId: uploadForm.categoryId,
+            madeForKids: uploadForm.madeForKids,
+            fileBase64,
+            fileName: selectedFile.name,
+            mimeType: selectedFile.type
+          }
         });
-        fetchAnalytics();
-      }, 1500);
+
+        if (error) throw error;
+
+        setUploadProgress(100);
+        toast.success('Vídeo enviado com sucesso!');
+
+        setTimeout(() => {
+          setUploadModalOpen(false);
+          setSelectedFile(null);
+          setUploadProgress(0);
+          setUploadForm({
+            title: '',
+            description: '',
+            tags: '',
+            privacyStatus: 'private',
+            categoryId: '22',
+            madeForKids: false
+          });
+          fetchAnalytics();
+        }, 1500);
+      } finally {
+        clearInterval(progressInterval);
+      }
 
     } catch (error: any) {
       console.error('Upload error:', error);

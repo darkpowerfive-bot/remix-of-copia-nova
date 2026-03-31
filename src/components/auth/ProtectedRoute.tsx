@@ -73,7 +73,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
       const isGoogleUser = provider === "google";
 
       // Para Google users novos, garante profile existe
-      if (isGoogleUser && !cached) {
+      const hasValidCache = cached && Date.now() - cached.timestamp < CACHE_TTL;
+      if (isGoogleUser && !hasValidCache) {
         try {
           await supabase.functions.invoke("ensure-user-profile");
         } catch (e) {

@@ -680,7 +680,6 @@ const ExploreNiche = () => {
         toast.warning("Plano gerado sem dados reais. Configure sua YouTube API Key nas configurações para análises mais precisas.");
       }
     } catch (error: any) {
-      clearInterval(stepInterval);
       console.error('Error generating plan:', error);
       if (error.message?.includes('Créditos insuficientes')) {
         toast.error(error.message);
@@ -688,6 +687,7 @@ const ExploreNiche = () => {
         toast.error('Erro ao gerar plano. Tente novamente.');
       }
     } finally {
+      clearInterval(stepInterval);
       setLoadingPlan(false);
       setPlanProcessingStep("");
     }

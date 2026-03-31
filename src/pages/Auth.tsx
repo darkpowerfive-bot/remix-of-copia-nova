@@ -72,9 +72,13 @@ const Auth = () => {
     const savedEmail = localStorage.getItem("remembered-email");
     const savedPassword = localStorage.getItem("remembered-password");
     if (savedEmail && savedPassword) {
-      setEmail(savedEmail);
-      setPassword(atob(savedPassword));
-      setRememberPassword(true);
+      try {
+        setEmail(savedEmail);
+        setPassword(atob(savedPassword));
+        setRememberPassword(true);
+      } catch {
+        localStorage.removeItem("remembered-password");
+      }
     }
     
     return () => clearTimeout(timer);

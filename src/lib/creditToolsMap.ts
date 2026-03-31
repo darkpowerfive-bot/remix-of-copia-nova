@@ -528,6 +528,7 @@ export function calculateCostWithModel(operationType: string, model?: string): n
 // Custos para TTS - 2 créditos por minuto de áudio
 // Estimativa: ~150 palavras/minuto = ~900 caracteres/minuto
 export function calculateTTSCost(textLength: number): number {
+  if (!textLength || textLength <= 0) return 0;
   // ~900 caracteres por minuto, 2 créditos por minuto
   const estimatedMinutes = textLength / 900;
   return Math.max(1, Math.ceil(estimatedMinutes * 2));
@@ -580,6 +581,7 @@ export function calculateAnalyticsCost(): number {
 
 // Custos para geração de cenas - 0.5 crédito por prompt/cena
 export function calculateSceneBatchCost(sceneCount: number, model?: string): number {
+  if (!sceneCount || sceneCount <= 0 || !isFinite(sceneCount)) return 0;
   // 0.5 crédito por cena/prompt
   const baseCost = sceneCount * 0.5;
   return Math.max(1, Math.ceil(baseCost));
