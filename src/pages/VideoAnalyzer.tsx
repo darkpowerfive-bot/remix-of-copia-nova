@@ -415,12 +415,20 @@ Idioma: ${language === "pt-BR" ? "Português Brasileiro" : language}`,
           videoInfoData = parsedResult.videoInfo;
         }
 
-        // Add titles with model label
+        // Add titles with model label and fallback perspectives
+        const defaultPerspectives = [
+          "Revelação Proibida",
+          "Consequência Chocante",
+          "Autoridade/Prova Social",
+          "Narrativa Emocional",
+          "Contraintuitivo",
+        ];
         if (parsedResult?.titles && Array.isArray(parsedResult.titles)) {
           const titlesWithModel = parsedResult.titles.map((t: any, i: number) => ({
             ...t,
             id: `title-${modelIndex}-${i}`,
             model: modelLabel,
+            perspectiva: t.perspectiva || defaultPerspectives[i % defaultPerspectives.length],
           }));
           allTitles = [...allTitles, ...titlesWithModel];
         }
@@ -1190,14 +1198,18 @@ Idioma: ${language === "pt-BR" ? "Português Brasileiro" : language}`,
                       />
                       <div className="flex-1">
                         <div className="flex items-start gap-2 mb-2 flex-wrap">
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className={`text-xs shrink-0 ${
-                              title.model.includes("GPT") 
-                                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" 
-                                : title.model.includes("Claude") 
+                              title.model.includes("GPT")
+                                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
+                                : title.model.includes("Claude")
                                   ? "bg-orange-500/10 text-orange-500 border-orange-500/30"
-                                  : "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                                  : title.model.includes("Gemini")
+                                    ? "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                                    : title.model.includes("DeepSeek")
+                                      ? "bg-violet-500/10 text-violet-500 border-violet-500/30"
+                                      : "bg-zinc-500/10 text-zinc-400 border-zinc-500/30"
                             }`}
                           >
                             {title.model}
